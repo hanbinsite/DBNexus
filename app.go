@@ -214,52 +214,80 @@ func (a *App) DeleteConnection(id string) error {
 
 // TestConnection tests a database connection
 func (a *App) TestConnection(config Connection) (bool, string) {
+	// Use default database if not specified
+	database := config.Database
+	if database == "" {
+		database = a.getDefaultDatabase(config.Type)
+	}
+
 	dbConfig := db.ConnectionConfig{
 		Type:     db.DBType(config.Type),
 		Host:     config.Host,
 		Port:     config.Port,
 		Username: config.Username,
 		Password: config.Password,
-		Database: config.Database,
+		Database: database,
 		SSLMode:  config.SSLMode,
 	}
 
 	driver, err := a.driverManager.Connect(dbConfig)
 	if err != nil {
-		return false, fmt.Sprintf("Connection failed: %v", err)
+		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
 		driver.Close()
-		return false, fmt.Sprintf("Ping failed: %v", err)
+		return false, fmt.Sprintf("Ping 失败: %v", err)
 	}
 
 	driver.Close()
-	return true, "Connection successful!"
+	return true, "连接成功！"
+}
+
+// getDefaultDatabase returns the default database for connection
+func (a *App) getDefaultDatabase(dbType string) string {
+	switch dbType {
+	case "postgresql", "polardb", "gaussdb":
+		return "postgres"
+	case "mysql":
+		return "mysql"
+	case "redis":
+		return "0"
+	case "sqlite":
+		return "" // SQLite requires a path
+	default:
+		return ""
+	}
 }
 
 // ConnectToDatabase connects to a database and returns connection status
 func (a *App) ConnectToDatabase(config Connection) (bool, string) {
+	// Use default database if not specified
+	database := config.Database
+	if database == "" {
+		database = a.getDefaultDatabase(config.Type)
+	}
+
 	dbConfig := db.ConnectionConfig{
 		Type:     db.DBType(config.Type),
 		Host:     config.Host,
 		Port:     config.Port,
 		Username: config.Username,
 		Password: config.Password,
-		Database: config.Database,
+		Database: database,
 		SSLMode:  config.SSLMode,
 	}
 
 	driver, err := a.driverManager.Connect(dbConfig)
 	if err != nil {
-		return false, fmt.Sprintf("Connection failed: %v", err)
+		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
 		driver.Close()
-		return false, fmt.Sprintf("Connection failed: %v", err)
+		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
 	return true, "Connected successfully"

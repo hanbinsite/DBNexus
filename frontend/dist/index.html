@@ -393,8 +393,21 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="connDatabase" data-i18n="database">数据库</label>
-                            <input type="text" id="connDatabase" placeholder="mydb">
+                            <label for="connDatabase" data-i18n="database">数据库 (可选)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <select id="connDatabase" style="flex: 1;">
+                                    <option value="">连接后选择数据库</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary" onclick="fetchDatabases()" style="white-space: nowrap;" title="获取数据库列表">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <small style="color: var(--fg-muted); font-size: 11px; margin-top: 4px; display: block;">
+                                留空将连接到默认数据库，然后获取数据库列表
+                            </small>
                         </div>
                     </div>
                     <div class="form-row checkbox-row">

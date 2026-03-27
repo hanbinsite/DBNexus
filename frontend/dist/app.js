@@ -1494,6 +1494,7 @@ window.toggleSearchPanel = toggleSearchPanel;
 window.contextAction = contextAction;
 window.selectConnection = selectConnection;
 window.connectToConnection = connectToConnection;
+window.fetchDatabases = fetchDatabases;
 
 // ==========================================================================
 // Language Settings
@@ -1637,5 +1638,60 @@ async function runTest() {
         await runConnectionTest();
     } else {
         await runAllTests();
+    }
+}
+
+// ==========================================================================
+// Fetch Databases from Connection
+// ==========================================================================
+async function fetchDatabases() {
+    const connection = getConnectionFromForm();
+    const dbSelect = document.getElementById('connDatabase');
+    
+    // Clear current options
+    dbSelect.innerHTML = '<option value="">加载中...</option>';
+    
+    try {
+        if (isWailsAvailable()) {
+            const databases = await WailsAPI.getDatabases(connection);
+            
+            dbSelect.innerHTML = '<option value="">选择数据库</option>';
+            
+            if (databases && databases.length > 0) {
+                databases.forEach(db => {
+                    const option = document.createElement('option');
+                    option.value = db.name;
+                    option.textContent = db.name;
+                    dbSelect.appendChild(option);
+                });
+                showNotification('success', `找到 ${databases.length} 个数据库`);
+            } else {
+                dbSelect.innerHTML = '<option value="">未找到数据库</option>';
+                showNotification('warning', '未找到数据库');
+            }
+        } else {
+            // Mock databases
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const mockDatabases = [
+                { name: 'postgres' },
+                { name: 'mydb' },
+                { name: 'testdb' },
+                { name: 'production' }
+            ];
+            
+            dbSelect.innerHTML = '<option value="">选择数据库</option>';
+            mockDatabases.forEach(db => {
+                const option = document.createElement('option');
+                option.value = db.name;
+                option.textContent = db.name;
+                dbSelect.appendChild(option);
+            });
+            showNotification('success', `找到 ${mockDatabases.length} 个数据库 (模拟)`);
+        }
+    } catch (error) {
+        console.error('Fetch databases error:', error);
+        dbSelect.innerHTML = '<option value="">获取失败</option>';
+        showNotification('error', `获取数据库失败: ${error.message || error}`);
     }
 }
