@@ -367,6 +367,8 @@
                             <span id="dvRecordCount">0 条记录</span>
                             <span class="dv-separator">|</span>
                             <span id="dvSelectedCount">已选: 0</span>
+                            <span class="dv-separator">|</span>
+                            <span id="dvTableEngine">InnoDB</span>
                         </div>
                         <div class="dv-status-right">
                             <div class="dv-pagination">
@@ -380,7 +382,7 @@
                                         <path d="M15 18l-6-6 6-6"/>
                                     </svg>
                                 </button>
-                                <span class="dv-page-info" id="dvPageInfo">第 1 页</span>
+                                <span class="dv-page-info" id="dvPageInfo">第 1 页，共 1 页</span>
                                 <button class="dv-page-btn" onclick="dataViewNextPage()" title="下一页">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M9 18l6-6-6-6"/>
@@ -393,11 +395,17 @@
                                 </button>
                             </div>
                             <select class="dv-page-size" id="dvPageSize" onchange="changePageSize()">
-                                <option value="100">100 条/页</option>
+                                <option value="50">50 条/页</option>
+                                <option value="100" selected>100 条/页</option>
+                                <option value="200">200 条/页</option>
                                 <option value="500">500 条/页</option>
                                 <option value="1000">1000 条/页</option>
-                                <option value="5000">5000 条/页</option>
                             </select>
+                            <span class="dv-go-to">
+                                跳转到
+                                <input type="number" id="dvGoToPage" class="dv-go-input" min="1" value="1">
+                                页
+                            </span>
                         </div>
                     </div>
                     
@@ -424,6 +432,96 @@
                                 <!-- 动态生成 -->
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- 索引视图 (默认隐藏) -->
+                    <div class="indexes-view" id="indexesView" style="display: none;">
+                        <div class="indexes-toolbar">
+                            <button class="dv-btn" onclick="showCreateIndexDialog()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                                <span>新建索引</span>
+                            </button>
+                            <button class="dv-btn" onclick="deleteSelectedIndexes()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                                <span>删除索引</span>
+                            </button>
+                        </div>
+                        <table class="dv-table indexes-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;"><input type="checkbox" id="selectAllIndexes"></th>
+                                    <th style="width: 180px;">索引名</th>
+                                    <th style="width: 100px;">类型</th>
+                                    <th style="width: 80px;">唯一</th>
+                                    <th>列</th>
+                                    <th style="width: 120px;">基数</th>
+                                    <th style="width: 150px;">注释</th>
+                                    <th style="width: 100px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="indexesViewBody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                        <div class="indexes-info">
+                            <div class="info-item">
+                                <span class="info-label">索引数量:</span>
+                                <span id="indexCount">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">索引大小:</span>
+                                <span id="indexSize">0 B</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 外键视图 (默认隐藏) -->
+                    <div class="foreign-keys-view" id="foreignKeysView" style="display: none;">
+                        <div class="fk-toolbar">
+                            <button class="dv-btn" onclick="showAddForeignKeyDialog()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                                <span>新建外键</span>
+                            </button>
+                            <button class="dv-btn" onclick="deleteSelectedForeignKeys()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                                <span>删除外键</span>
+                            </button>
+                        </div>
+                        <table class="dv-table fk-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;"><input type="checkbox" id="selectAllFK"></th>
+                                    <th style="width: 180px;">外键名</th>
+                                    <th style="width: 150px;">列名</th>
+                                    <th style="width: 50px;">→</th>
+                                    <th style="width: 150px;">引用表</th>
+                                    <th style="width: 150px;">引用列</th>
+                                    <th style="width: 100px;">更新规则</th>
+                                    <th style="width: 100px;">删除规则</th>
+                                    <th style="width: 100px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="foreignKeysViewBody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                        <div class="fk-info">
+                            <div class="info-item">
+                                <span class="info-label">外键数量:</span>
+                                <span id="fkCount">0</span>
+                            </div>
+                        </div>
+                        <div class="fk-visual" id="fkVisual">
+                            <!-- 外键关系图 -->
+                        </div>
                     </div>
                 </div>
             </section>

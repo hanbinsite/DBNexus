@@ -2346,3 +2346,255 @@ body {
         flex-wrap: wrap;
     }
 }
+
+/* ==========================================================================
+   Indexes and Foreign Keys Views
+   ========================================================================== */
+.indexes-toolbar,
+.fk-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.indexes-toolbar .dv-btn,
+.fk-toolbar .dv-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    height: 30px;
+    padding: 0 var(--space-3);
+    width: auto;
+}
+
+.indexes-toolbar .dv-btn svg,
+.fk-toolbar .dv-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.indexes-view,
+.foreign-keys-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.indexes-table,
+.fk-table {
+    flex: 1;
+    overflow: auto;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.badge-primary {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.badge-unique {
+    background-color: #f0ad4e;
+    color: #212529;
+}
+
+.badge-index {
+    background-color: var(--bg-tertiary);
+    color: var(--fg-secondary);
+}
+
+/* Foreign Key Styles */
+.arrow-cell {
+    text-align: center;
+    color: var(--accent-primary);
+    font-weight: bold;
+}
+
+.fk-rule {
+    display: inline-block;
+    padding: 2px 6px;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.fk-info,
+.indexes-info {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 12px;
+}
+
+.info-item {
+    display: flex;
+    gap: var(--space-1);
+}
+
+.info-label {
+    color: var(--fg-muted);
+}
+
+/* Foreign Key Visualization */
+.fk-visual {
+    padding: var(--space-4);
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    max-height: 200px;
+    overflow: auto;
+}
+
+.fk-diagram {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.fk-current-table,
+.fk-ref-table {
+    background-color: var(--bg-primary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    min-width: 120px;
+}
+
+.fk-current-table {
+    border-color: var(--accent-primary);
+}
+
+.fk-table-name {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: var(--space-2);
+    color: var(--fg-primary);
+}
+
+.fk-columns {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fk-column {
+    font-size: 11px;
+    color: var(--fg-secondary);
+    padding: 2px 6px;
+    background-color: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.fk-column.pk-column {
+    background-color: rgba(88, 166, 255, 0.15);
+    color: var(--accent-primary);
+    font-weight: 500;
+}
+
+.fk-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.fk-arrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.fk-rule-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    background-color: var(--bg-tertiary);
+    border-radius: 3px;
+    color: var(--fg-secondary);
+}
+
+/* Action buttons */
+.action-btn-sm {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.action-btn-sm:hover {
+    background-color: var(--bg-hover);
+    color: var(--fg-primary);
+}
+
+.action-btn-sm.danger:hover {
+    background-color: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+    border-color: #f85149;
+}
+
+.action-btn-sm svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Table cell states */
+.loading-cell,
+.error-cell,
+.empty-cell {
+    text-align: center;
+    padding: var(--space-4) !important;
+    color: var(--fg-muted);
+    font-style: italic;
+}
+
+.error-cell {
+    color: #f85149;
+}
+
+/* Row actions column */
+.row-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+/* Go to page input */
+.dv-go-to {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 11px;
+    color: var(--fg-secondary);
+}
+
+.dv-go-input {
+    width: 50px;
+    height: 22px;
+    padding: 0 var(--space-1);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 11px;
+    text-align: center;
+}

@@ -62,6 +62,11 @@ const WailsAPI = {
     getSupportedFeatures: () => window.go.main.App.GetSupportedFeatures(),
     getServerInfo: (conn) => window.go.main.App.GetServerInfo(conn),
     
+    // Table Info
+    getTableIndexes: (conn, db, table) => window.go.main.App.GetTableIndexes(conn, db, table),
+    getTableForeignKeys: (conn, db, table) => window.go.main.App.GetTableForeignKeys(conn, db, table),
+    getTableStats: (conn, db, table) => window.go.main.App.GetTableStats(conn, db, table),
+    
     // Utility
     greet: (name) => window.go.main.App.Greet(name)
 };
@@ -1373,16 +1378,39 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.data-view-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             
-            // Show/hide views
-            document.getElementById('dataViewGrid').style.display = view === 'content' ? 'block' : 'none';
-            document.getElementById('structureView').style.display = view === 'structure' ? 'block' : 'none';
-            document.querySelector('.data-view-filter').style.display = view === 'content' ? 'flex' : 'none';
+            // Hide all views first
+            document.getElementById('dataViewGrid').style.display = 'none';
+            document.getElementById('structureView').style.display = 'none';
+            document.getElementById('indexesView').style.display = 'none';
+            document.getElementById('foreignKeysView').style.display = 'none';
+            document.querySelector('.data-view-filter').style.display = 'none';
             
-            // Show loading for other views
-            if (view !== 'content' && view !== 'structure') {
-                showNotification('info', `${tab.textContent} 视图开发中...`);
+            // Show selected view
+            switch (view) {
+                case 'content':
+                    document.getElementById('dataViewGrid').style.display = 'block';
+                    document.querySelector('.data-view-filter').style.display = 'flex';
+                    break;
+                case 'structure':
+                    document.getElementById('structureView').style.display = 'block';
+                    break;
+                case 'indexes':
+                    document.getElementById('indexesView').style.display = 'block';
+                    loadTableIndexes();
+                    break;
+                case 'foreign-keys':
+                    document.getElementById('foreignKeysView').style.display = 'block';
+                    loadTableForeignKeys();
+                    break;
             }
         });
+    });
+    
+    // Go to page input
+    document.getElementById('dvGoToPage')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            goToPage();
+        }
     });
 });
 
@@ -1446,11 +1474,495 @@ function toggleSortOrder() {
     showNotification('info', '排序功能开发中...');
 }
 
-function dataViewFirstPage() { showNotification('info', '分页功能开发中...'); }
-function dataViewPrevPage() { showNotification('info', '分页功能开发中...'); }
-function dataViewNextPage() { showNotification('info', '分页功能开发中...'); }
-function dataViewLastPage() { showNotification('info', '分页功能开发中...'); }
-function changePageSize() { showNotification('info', '分页功能开发中...'); }
+// ==========================================================================
+// Pagination
+// ==========================================================================
+let pagination = {
+    currentPage: 1,
+    pageSize: 100,
+    totalRows: 0,
+    totalPages: 1,
+    allData: [],
+    currentData: []
+};
+
+function initPagination(totalRows) {
+    pagination.totalRows = totalRows;
+    pagination.totalPages = Math.ceil(totalRows / pagination.pageSize) || 1;
+    pagination.currentPage = 1;
+    updatePaginationUI();
+}
+
+function updatePaginationUI() {
+    document.getElementById('dvPageInfo').textContent = 
+        `第 ${pagination.currentPage} 页，共 ${pagination.totalPages} 页`;
+    document.getElementById('dvGoToPage').max = pagination.totalPages;
+    document.getElementById('dvGoToPage').value = pagination.currentPage;
+}
+
+function dataViewFirstPage() {
+    if (pagination.currentPage !== 1) {
+        pagination.currentPage = 1;
+        updatePaginationUI();
+        renderCurrentPage();
+    }
+}
+
+function dataViewPrevPage() {
+    if (pagination.currentPage > 1) {
+        pagination.currentPage--;
+        updatePaginationUI();
+        renderCurrentPage();
+    }
+}
+
+function dataViewNextPage() {
+    if (pagination.currentPage < pagination.totalPages) {
+        pagination.currentPage++;
+        updatePaginationUI();
+        renderCurrentPage();
+    }
+}
+
+function dataViewLastPage() {
+    if (pagination.currentPage !== pagination.totalPages) {
+        pagination.currentPage = pagination.totalPages;
+        updatePaginationUI();
+        renderCurrentPage();
+    }
+}
+
+function changePageSize() {
+    pagination.pageSize = parseInt(document.getElementById('dvPageSize').value);
+    pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
+    pagination.currentPage = 1;
+    updatePaginationUI();
+    renderCurrentPage();
+}
+
+function goToPage() {
+    let page = parseInt(document.getElementById('dvGoToPage').value);
+    page = Math.max(1, Math.min(page, pagination.totalPages));
+    pagination.currentPage = page;
+    updatePaginationUI();
+    renderCurrentPage();
+}
+
+function renderCurrentPage() {
+    if (!pagination.allData || pagination.allData.length === 0) {
+        renderDataView({ columns: [], rows: [], row_count: 0 });
+        return;
+    }
+    
+    const start = (pagination.currentPage - 1) * pagination.pageSize;
+    const end = Math.min(start + pagination.pageSize, pagination.allData.length);
+    const pageData = pagination.allData.slice(start, end);
+    
+    renderDataView({
+        columns: pagination.columns,
+        rows: pageData,
+        row_count: pagination.allData.length
+    });
+}
+
+function renderDataView(result) {
+    const header = document.getElementById('dataViewHeader');
+    const body = document.getElementById('dataViewBody');
+    
+    // Store column widths in state
+    state.columnWidths = state.columnWidths || {};
+    
+    // Render header with resize handles
+    let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+    result.columns.forEach((col, index) => {
+        const width = state.columnWidths[col] || 150;
+        headerHtml += `
+            <th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
+                <span class="th-content">${col}</span>
+                <div class="resize-handle" data-col="${index}"></div>
+            </th>`;
+    });
+    headerHtml += '</tr>';
+    header.innerHTML = headerHtml;
+    
+    // Render body
+    let bodyHtml = '';
+    result.rows.forEach((row, rowIndex) => {
+        bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
+        row.forEach((cell, colIndex) => {
+            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
+            bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    body.innerHTML = bodyHtml;
+    
+    // Update record count
+    document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
+    document.getElementById('dvSelectedCount').textContent = '已选: 0';
+    
+    // Add event listeners
+    document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Initialize column resize
+    initColumnResize();
+}
+
+// ==========================================================================
+// Load Table Indexes
+// ==========================================================================
+async function loadTableIndexes() {
+    if (!state.currentTable || !state.activeConnection) return;
+    
+    const tbody = document.getElementById('indexesViewBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">加载中...</td></tr>';
+    
+    try {
+        if (isWailsAvailable()) {
+            const indexes = await WailsAPI.getTableIndexes(
+                state.activeConnection, 
+                state.currentTable.database, 
+                state.currentTable.name
+            );
+            renderIndexes(indexes);
+        } else {
+            // Mock indexes
+            await new Promise(r => setTimeout(r, 300));
+            renderIndexes([
+                { name: 'PRIMARY', type: 'PRIMARY', columns: ['id'], unique: true, cardinality: 100 },
+                { name: 'idx_email', type: 'UNIQUE', columns: ['email'], unique: true, cardinality: 98 },
+                { name: 'idx_name', type: 'INDEX', columns: ['name'], unique: false, cardinality: 50 },
+                { name: 'idx_status_created', type: 'INDEX', columns: ['status', 'created_at'], unique: false, cardinality: 3 }
+            ]);
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="8" class="error-cell">加载失败: ${error.message}</td></tr>`;
+    }
+}
+
+function renderIndexes(indexes) {
+    const tbody = document.getElementById('indexesViewBody');
+    
+    if (!indexes || indexes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">暂无索引</td></tr>';
+        document.getElementById('indexCount').textContent = '0';
+        return;
+    }
+    
+    let html = '';
+    indexes.forEach((idx, index) => {
+        const typeBadge = idx.type === 'PRIMARY' ? 'badge-primary' : 
+                         idx.type === 'UNIQUE' ? 'badge-unique' : 'badge-index';
+        
+        html += `
+            <tr data-index="${idx.name}">
+                <td><input type="checkbox" class="index-checkbox" data-index="${idx.name}"></td>
+                <td><strong>${idx.name}</strong></td>
+                <td><span class="badge ${typeBadge}">${idx.type}</span></td>
+                <td>${idx.unique ? '是' : '否'}</td>
+                <td>${idx.columns.join(', ')}</td>
+                <td>${idx.cardinality || '-'}</td>
+                <td>${idx.comment || ''}</td>
+                <td class="row-actions">
+                    <button class="action-btn-sm" onclick="editIndex('${idx.name}')" title="编辑">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="action-btn-sm danger" onclick="dropIndex('${idx.name}')" title="删除">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    document.getElementById('indexCount').textContent = indexes.length;
+    
+    // Add select all listener
+    document.getElementById('selectAllIndexes')?.addEventListener('change', (e) => {
+        document.querySelectorAll('.index-checkbox').forEach(cb => cb.checked = e.target.checked);
+    });
+}
+
+function showCreateIndexDialog() {
+    showNotification('info', '新建索引功能开发中...');
+}
+
+function editIndex(indexName) {
+    showNotification('info', `编辑索引 ${indexName} 功能开发中...`);
+}
+
+function dropIndex(indexName) {
+    if (confirm(`确定要删除索引 "${indexName}" 吗？`)) {
+        showNotification('info', `删除索引 ${indexName} 功能开发中...`);
+    }
+}
+
+function deleteSelectedIndexes() {
+    const selected = document.querySelectorAll('.index-checkbox:checked');
+    if (selected.length === 0) {
+        showNotification('warning', '请先选择要删除的索引');
+        return;
+    }
+    if (confirm(`确定要删除选中的 ${selected.length} 个索引吗？`)) {
+        showNotification('info', '批量删除索引功能开发中...');
+    }
+}
+
+// ==========================================================================
+// Load Table Foreign Keys
+// ==========================================================================
+async function loadTableForeignKeys() {
+    if (!state.currentTable || !state.activeConnection) return;
+    
+    const tbody = document.getElementById('foreignKeysViewBody');
+    tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">加载中...</td></tr>';
+    
+    try {
+        if (isWailsAvailable()) {
+            const fks = await WailsAPI.getTableForeignKeys(
+                state.activeConnection, 
+                state.currentTable.database, 
+                state.currentTable.name
+            );
+            renderForeignKeys(fks);
+        } else {
+            // Mock foreign keys
+            await new Promise(r => setTimeout(r, 300));
+            renderForeignKeys([
+                { name: 'fk_user_id', column_name: 'user_id', ref_table: 'users', ref_column: 'id', on_delete: 'CASCADE', on_update: 'NO ACTION' },
+                { name: 'fk_product_id', column_name: 'product_id', ref_table: 'products', ref_column: 'id', on_delete: 'RESTRICT', on_update: 'CASCADE' }
+            ]);
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="9" class="error-cell">加载失败: ${error.message}</td></tr>`;
+    }
+}
+
+function renderForeignKeys(fks) {
+    const tbody = document.getElementById('foreignKeysViewBody');
+    
+    if (!fks || fks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-cell">暂无外键</td></tr>';
+        document.getElementById('fkCount').textContent = '0';
+        document.getElementById('fkVisual').innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    fks.forEach((fk, index) => {
+        html += `
+            <tr data-fk="${fk.name}">
+                <td><input type="checkbox" class="fk-checkbox" data-fk="${fk.name}"></td>
+                <td><strong>${fk.name}</strong></td>
+                <td>${fk.column_name}</td>
+                <td class="arrow-cell">→</td>
+                <td>${fk.ref_table}</td>
+                <td>${fk.ref_column}</td>
+                <td><span class="fk-rule">${fk.on_update}</span></td>
+                <td><span class="fk-rule">${fk.on_delete}</span></td>
+                <td class="row-actions">
+                    <button class="action-btn-sm" onclick="editForeignKey('${fk.name}')" title="编辑">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="action-btn-sm danger" onclick="dropForeignKey('${fk.name}')" title="删除">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    document.getElementById('fkCount').textContent = fks.length;
+    
+    // Render foreign key visualization
+    renderFKVisualization(fks);
+    
+    // Add select all listener
+    document.getElementById('selectAllFK')?.addEventListener('change', (e) => {
+        document.querySelectorAll('.fk-checkbox').forEach(cb => cb.checked = e.target.checked);
+    });
+}
+
+function renderFKVisualization(fks) {
+    const container = document.getElementById('fkVisual');
+    if (!fks || fks.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="fk-diagram">';
+    html += '<div class="fk-current-table">';
+    html += `<span class="fk-table-name">${state.currentTable?.name || '当前表'}</span>`;
+    html += '<div class="fk-columns">';
+    fks.forEach(fk => {
+        html += `<span class="fk-column">${fk.column_name}</span>`;
+    });
+    html += '</div></div>';
+    
+    html += '<div class="fk-arrows">';
+    fks.forEach(fk => {
+        html += `
+            <div class="fk-arrow">
+                <svg viewBox="0 0 100 24" width="100" height="24">
+                    <line x1="0" y1="12" x2="70" y2="12" stroke="var(--accent-primary)" stroke-width="2"/>
+                    <polygon points="70,6 84,12 70,18" fill="var(--accent-primary)"/>
+                </svg>
+                <span class="fk-rule-badge">${fk.on_delete}</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    html += '<div class="fk-ref-tables">';
+    fks.forEach(fk => {
+        html += `
+            <div class="fk-ref-table">
+                <span class="fk-table-name">${fk.ref_table}</span>
+                <div class="fk-columns">
+                    <span class="fk-column pk-column">${fk.ref_column} (PK)</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function showAddForeignKeyDialog() {
+    showNotification('info', '新建外键功能开发中...');
+}
+
+function editForeignKey(fkName) {
+    showNotification('info', `编辑外键 ${fkName} 功能开发中...`);
+}
+
+function dropForeignKey(fkName) {
+    if (confirm(`确定要删除外键 "${fkName}" 吗？`)) {
+        showNotification('info', `删除外键 ${fkName} 功能开发中...`);
+    }
+}
+
+function deleteSelectedForeignKeys() {
+    const selected = document.querySelectorAll('.fk-checkbox:checked');
+    if (selected.length === 0) {
+        showNotification('warning', '请先选择要删除的外键');
+        return;
+    }
+    if (confirm(`确定要删除选中的 ${selected.length} 个外键吗？`)) {
+        showNotification('info', '批量删除外键功能开发中...');
+    }
+}
+
+// Update loadTableData to store all data for pagination
+async function loadTableData(tableName, database) {
+    if (!state.activeConnection) {
+        showNotification('warning', '请先选择一个数据库连接');
+        return;
+    }
+    
+    showLoading(`加载表数据: ${tableName}...`);
+    
+    try {
+        // Load columns for filter dropdowns
+        if (isWailsAvailable()) {
+            const columns = await WailsAPI.getTableColumns(state.activeConnection, database, tableName);
+            populateFilterDropdowns(columns);
+            populateStructureView(columns);
+        }
+        
+        // Load table stats
+        if (isWailsAvailable()) {
+            try {
+                const stats = await WailsAPI.getTableStats(state.activeConnection, database, tableName);
+                document.getElementById('dvTableEngine').textContent = stats.engine || 'InnoDB';
+            } catch (e) {
+                console.log('Stats not available:', e);
+            }
+        }
+        
+        // Execute query to get data
+        const query = `SELECT * FROM \`${tableName}\` LIMIT 10000`;
+        
+        if (isWailsAvailable()) {
+            const result = await WailsAPI.executeQuery(state.activeConnection, database, query);
+            
+            if (result.error) {
+                showNotification('error', result.error);
+            } else {
+                // Store all data for pagination
+                pagination.allData = result.rows;
+                pagination.columns = result.columns;
+                pagination.totalRows = result.row_count;
+                pagination.totalPages = Math.ceil(result.row_count / pagination.pageSize);
+                pagination.currentPage = 1;
+                
+                updatePaginationUI();
+                renderCurrentPage();
+            }
+        } else {
+            // Mock data
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const mockColumns = ['id', 'name', 'email', 'created_at', 'status', 'phone', 'address'];
+            const mockRows = [];
+            for (let i = 1; i <= 156; i++) {
+                mockRows.push([
+                    i,
+                    `用户${i}`,
+                    `user${i}@example.com`,
+                    `2024-01-${String(i % 28 + 1).padStart(2, '0')} ${String(i % 24).padStart(2, '0')}:00:00`,
+                    i % 3 === 0 ? 'inactive' : 'active',
+                    `1380000${String(i).padStart(4, '0')}`,
+                    `北京市朝阳区某街道${i}号`
+                ]);
+            }
+            
+            // Store all data
+            pagination.allData = mockRows;
+            pagination.columns = mockColumns;
+            pagination.totalRows = mockRows.length;
+            pagination.totalPages = Math.ceil(mockRows.length / pagination.pageSize);
+            pagination.currentPage = 1;
+            
+            updatePaginationUI();
+            renderCurrentPage();
+            
+            // Populate mock structure
+            const mockColumnsInfo = [
+                { name: 'id', type: 'INT', nullable: false, primary_key: true, default_value: 'auto_increment' },
+                { name: 'name', type: 'VARCHAR(100)', nullable: false, primary_key: false, default_value: '' },
+                { name: 'email', type: 'VARCHAR(255)', nullable: true, primary_key: false, default_value: '' },
+                { name: 'created_at', type: 'DATETIME', nullable: true, primary_key: false, default_value: 'CURRENT_TIMESTAMP' },
+                { name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" },
+                { name: 'phone', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: '' },
+                { name: 'address', type: 'VARCHAR(500)', nullable: true, primary_key: false, default_value: '' }
+            ];
+            populateFilterDropdowns(mockColumnsInfo);
+            populateStructureView(mockColumnsInfo);
+        }
+    } catch (error) {
+        showNotification('error', `加载数据失败: ${error.message}`);
+    }
+    
+    hideLoading();
+}
 
 function openView(viewName, database) {
     openTable(viewName, database);
