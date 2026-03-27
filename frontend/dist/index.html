@@ -405,9 +405,19 @@
                                     </svg>
                                 </button>
                             </div>
-                            <small style="color: var(--fg-muted); font-size: 11px; margin-top: 4px; display: block;">
+                            <small style="color: var(--fg-muted); font-size: 11px; margin-top: 4px; display: block;" id="databaseHint">
                                 留空将连接到默认数据库，然后获取数据库列表
                             </small>
+                        </div>
+                    </div>
+                    <!-- SQLite 特有字段 -->
+                    <div class="form-row" id="sqlitePathRow" style="display: none;">
+                        <div class="form-group">
+                            <label>数据库文件路径</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="sqlitePath" placeholder="选择 .db 文件" style="flex: 1;">
+                                <button type="button" class="btn btn-secondary" onclick="browseSQLiteFile()">浏览</button>
+                            </div>
                         </div>
                     </div>
                     <div class="form-row checkbox-row">

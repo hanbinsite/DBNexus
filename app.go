@@ -214,6 +214,17 @@ func (a *App) DeleteConnection(id string) error {
 
 // TestConnection tests a database connection
 func (a *App) TestConnection(config Connection) (bool, string) {
+	// Validate config
+	if config.Host == "" && config.Type != "sqlite" {
+		return false, "请输入主机地址"
+	}
+	if config.Username == "" && config.Type != "redis" && config.Type != "sqlite" {
+		return false, "请输入用户名"
+	}
+	if config.Type == "sqlite" && config.Database == "" {
+		return false, "请选择 SQLite 数据库文件"
+	}
+
 	// Use default database if not specified
 	database := config.Database
 	if database == "" {
@@ -232,17 +243,59 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 
 	driver, err := a.driverManager.Connect(dbConfig)
 	if err != nil {
-		return false, fmt.Sprintf("连接失败: %v", err)
+		return false, a.formatError("连接失败", err, config.Type)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
 		driver.Close()
-		return false, fmt.Sprintf("Ping 失败: %v", err)
+		return false, a.formatError("连接超时或认证失败", err, config.Type)
 	}
 
 	driver.Close()
-	return true, "连接成功！"
+	return true, fmt.Sprintf("连接成功！数据库: %s", database)
+}
+
+// formatError formats error message with helpful hints
+func (a *App) formatError(prefix string, err error, dbType string) string {
+	errMsg := err.Error()
+
+	// Add specific hints based on error type
+	hint := ""
+	switch {
+	case contains(errMsg, "connection refused"):
+		hint = "\n\n💡 提示: 请检查主机地址和端口是否正确，以及数据库服务是否正在运行"
+	case contains(errMsg, "authentication failed"):
+		hint = "\n\n💡 提示: 用户名或密码错误，请检查凭据"
+	case contains(errMsg, "no such host"):
+		hint = "\n\n💡 提示: 无法解析主机地址，请检查网络连接和主机名"
+	case contains(errMsg, "timeout"):
+		hint = "\n\n💡 提示: 连接超时，请检查防火墙设置和网络连接"
+	case contains(errMsg, "Unknown database"):
+		hint = "\n\n💡 提示: 数据库不存在，请检查数据库名称或留空以自动获取"
+	case dbType == "mysql" && contains(errMsg, "Access denied"):
+		hint = "\n\n💡 提示: MySQL 访问被拒绝，请检查用户名和密码，以及用户是否有远程连接权限"
+	case dbType == "postgresql" && contains(errMsg, "no password supplied"):
+		hint = "\n\n💡 提示: PostgreSQL 需要密码认证，请提供密码"
+	}
+
+	return fmt.Sprintf("%s: %s%s", prefix, errMsg, hint)
+}
+
+// contains checks if string contains substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			len(s) > len(substr)+1 && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // getDefaultDatabase returns the default database for connection

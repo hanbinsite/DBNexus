@@ -409,41 +409,82 @@ function closeConnectionDialog() {
 
 function updateConnectionForm(type) {
     const sqlitePathRow = document.getElementById('sqlitePathRow');
-    const redisDbRow = document.getElementById('redisDbRow');
     const portInput = document.getElementById('connPort');
     const hostRow = document.querySelector('.form-row.two-cols');
-    const dbRow = document.querySelector('.form-row:not(.two-cols)');
+    const dbRow = document.getElementById('connDatabase').closest('.form-row');
+    const connUser = document.getElementById('connUser');
+    const connHost = document.getElementById('connHost');
+    const databaseHint = document.getElementById('databaseHint');
+    const dbNameLabel = document.querySelector('label[for="connDatabase"]');
+    const connName = document.getElementById('connName');
     
     // Reset visibility
     sqlitePathRow.style.display = 'none';
-    redisDbRow.style.display = 'none';
     hostRow.style.display = 'grid';
-    document.querySelector('.form-group label[for="connDatabase"]').textContent = 'Database';
+    dbRow.style.display = 'flex';
+    
+    // Reset connection name placeholder
+    const typeNames = {
+        postgresql: 'PostgreSQL',
+        mysql: 'MySQL', 
+        polardb: 'PolarDB',
+        gaussdb: 'GaussDB',
+        sqlite: 'SQLite',
+        redis: 'Redis'
+    };
     
     switch (type) {
         case 'postgresql':
             portInput.value = '5432';
-            document.getElementById('connUser').placeholder = 'postgres';
+            connUser.placeholder = 'postgres';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'PostgreSQL 连接';
+            databaseHint.textContent = '留空将连接到 postgres 系统数据库';
+            dbNameLabel.textContent = '数据库 (可选)';
             break;
+            
         case 'mysql':
             portInput.value = '3306';
-            document.getElementById('connUser').placeholder = 'root';
+            connUser.placeholder = 'root';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'MySQL 连接';
+            databaseHint.textContent = '留空将连接到 mysql 系统数据库';
+            dbNameLabel.textContent = '数据库 (可选)';
             break;
+            
         case 'polardb':
             portInput.value = '5432';
+            connUser.placeholder = 'postgres';
+            connHost.placeholder = 'your-polardb.rds.aliyuncs.com';
+            if (!connName.value) connName.placeholder = 'PolarDB 连接';
+            databaseHint.textContent = '留空将连接到默认数据库';
+            dbNameLabel.textContent = '数据库 (可选)';
             break;
+            
         case 'gaussdb':
             portInput.value = '5432';
+            connUser.placeholder = 'gaussdb';
+            connHost.placeholder = 'your-gaussdb.cn-north-4.huaweicloud.com';
+            if (!connName.value) connName.placeholder = 'GaussDB 连接';
+            databaseHint.textContent = '留空将连接到默认数据库';
+            dbNameLabel.textContent = '数据库 (可选)';
             break;
+            
         case 'sqlite':
             sqlitePathRow.style.display = 'flex';
             hostRow.style.display = 'none';
+            dbRow.style.display = 'none';
             portInput.value = '';
+            if (!connName.value) connName.placeholder = 'SQLite 连接';
             break;
+            
         case 'redis':
-            redisDbRow.style.display = 'flex';
             portInput.value = '6379';
-            document.getElementById('connUser').placeholder = 'default (optional)';
+            connUser.placeholder = '可选';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'Redis 连接';
+            databaseHint.textContent = 'Redis 数据库编号 (0-15)';
+            dbNameLabel.textContent = '数据库编号';
             break;
     }
 }
@@ -452,10 +493,18 @@ async function testConnection() {
     const btn = event.target.closest('button');
     const originalContent = btn.innerHTML;
     
-    btn.innerHTML = '<span class="spinner"></span> Testing...';
+    btn.innerHTML = '<span class="spinner"></span> 测试中...';
     btn.disabled = true;
     
     const connection = getConnectionFromForm();
+    
+    // Validate before sending
+    if (connection.type !== 'sqlite' && !connection.host) {
+        showNotification('error', '请输入主机地址');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        return;
+    }
     
     try {
         if (isWailsAvailable()) {
@@ -465,23 +514,58 @@ async function testConnection() {
             if (Array.isArray(result)) {
                 [success, message] = result;
             } else {
-                // If result is a single value, handle accordingly
                 success = !!result;
-                message = result ? 'Connection successful!' : 'Connection failed';
+                message = result ? '连接成功' : '连接失败';
             }
-            showNotification(success ? 'success' : 'error', message || 'Unknown error');
+            
+            // Show detailed notification
+            if (success) {
+                showNotification('success', message || '连接成功！');
+            } else {
+                // Show error with details
+                showDetailedError(message || '连接失败');
+            }
         } else {
-            // Mock test
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            showNotification('success', '连接成功！(模拟)');
+            // Mock test with realistic delay
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Simulate validation
+            if (!connection.host) {
+                showNotification('error', '请输入主机地址');
+            } else if (!connection.username && connection.type !== 'redis' && connection.type !== 'sqlite') {
+                showNotification('error', '请输入用户名');
+            } else {
+                showNotification('success', `连接到 ${connection.type} 成功！(模拟)`);
+            }
         }
     } catch (error) {
         console.error('Test connection error:', error);
-        showNotification('error', `连接失败: ${error.message || error}`);
+        showDetailedError(error.message || String(error));
     }
     
     btn.innerHTML = originalContent;
     btn.disabled = false;
+}
+
+function showDetailedError(message) {
+    // Create a more detailed error dialog
+    const errorHtml = `
+        <div class="error-detail">
+            <div class="error-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8v4M12 16h.01"/>
+                </svg>
+            </div>
+            <div class="error-message">${message.replace(/\n/g, '<br>')}</div>
+        </div>
+    `;
+    
+    // Show as notification with longer duration
+    showNotification('error', message.split('\n')[0]);
+    
+    // Log full error for debugging
+    console.error('Connection Error Details:', message);
 }
 
 function getConnectionFromForm() {
@@ -813,50 +897,77 @@ function renderDatabaseTree(databases) {
     
     databases.forEach(db => {
         const dbHtml = `
-            <div class="tree-item" onclick="selectDatabase('${db.name}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-                </svg>
-                <span>${db.name}</span>
-            </div>
-            <div class="tree-branch">
-                <div class="tree-item tables" onclick="toggleTreeSection('tables-${db.name}')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 9h18M9 21V9"/>
-                    </svg>
-                    <span>Tables</span>
+            <div class="tree-node">
+                <div class="tree-item db-item" onclick="toggleDatabase('${db.name}')">
                     <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="m9 18 6-6-6-6"/>
                     </svg>
-                </div>
-                <div class="tree-children" id="tables-${db.name}Tree">
-                    <div class="tree-loading">Loading...</div>
-                </div>
-            </div>
-            <div class="tree-branch">
-                <div class="tree-item views" onclick="toggleTreeSection('views-${db.name}')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
+                    <svg class="db-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
                     </svg>
-                    <span>Views</span>
-                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="m9 18 6-6-6-6"/>
-                    </svg>
+                    <span>${db.name}</span>
                 </div>
-                <div class="tree-children" id="views-${db.name}Tree">
-                    <div class="tree-loading">Loading...</div>
+                <div class="tree-children collapsed" id="db-${db.name}-children">
+                    <div class="tree-branch">
+                        <div class="tree-item branch-item" onclick="toggleTreeSection('tables-${db.name}')">
+                            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <path d="M3 9h18M9 21V9"/>
+                            </svg>
+                            <span>表</span>
+                        </div>
+                        <div class="tree-children collapsed" id="tables-${db.name}Tree">
+                            <div class="tree-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="tree-branch">
+                        <div class="tree-item branch-item" onclick="toggleTreeSection('views-${db.name}')">
+                            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <span>视图</span>
+                        </div>
+                        <div class="tree-children collapsed" id="views-${db.name}Tree">
+                            <div class="tree-loading">加载中...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
         dbTree.insertAdjacentHTML('beforeend', dbHtml);
     });
     
-    // Load tables for first database
+    // Auto-load tables for first database
     if (databases.length > 0) {
-        loadTablesForDatabase(databases[0].name);
+        toggleDatabase(databases[0].name);
+    }
+}
+
+function toggleDatabase(dbName) {
+    const children = document.getElementById(`db-${dbName}-children`);
+    const dbItem = children?.previousElementSibling;
+    
+    if (children && dbItem) {
+        const isCollapsed = children.classList.contains('collapsed');
+        if (isCollapsed) {
+            children.classList.remove('collapsed');
+            children.classList.add('expanded');
+            dbItem.classList.add('expanded');
+            // Load tables when expanding
+            loadTablesForDatabase(dbName);
+        } else {
+            children.classList.remove('expanded');
+            children.classList.add('collapsed');
+            dbItem.classList.remove('expanded');
+        }
     }
 }
 
