@@ -1025,6 +1025,9 @@ function toggleTreeSection(sectionId) {
 async function selectDatabase(databaseName) {
     console.log('Selected database:', databaseName);
     
+    // Save to state
+    state.selectedDatabase = databaseName;
+    
     const selector = document.getElementById('queryDatabase');
     const option = Array.from(selector.options).find(opt => opt.value === databaseName);
     if (!option) {
@@ -1032,11 +1035,28 @@ async function selectDatabase(databaseName) {
     }
     selector.value = databaseName;
     
+    // Update status bar
+    const currentDb = document.getElementById('currentConnection');
+    if (currentDb && state.activeConnection) {
+        currentDb.innerHTML = `<span>${state.activeConnection.name} / ${databaseName}</span>`;
+    }
+    
     await loadTablesForDatabase(databaseName);
 }
 
 async function openTable(tableName, database) {
     console.log('Opening table:', tableName, 'in database:', database);
+    
+    // Set the database in state and selector
+    if (database) {
+        state.selectedDatabase = database;
+        const selector = document.getElementById('queryDatabase');
+        const option = Array.from(selector.options).find(opt => opt.value === database);
+        if (!option) {
+            selector.insertAdjacentHTML('beforeend', `<option value="${database}">${database}</option>`);
+        }
+        selector.value = database;
+    }
     
     const tabId = `table-${tableName}`;
     let tab = document.querySelector(`[data-tab="${tabId}"]`);
@@ -1155,19 +1175,30 @@ function updateLineNumbers() {
 async function executeQuery() {
     const editor = document.getElementById('queryEditor');
     const query = editor.value.trim();
-    const database = document.getElementById('queryDatabase').value;
+    let database = document.getElementById('queryDatabase').value;
     
     if (!query) {
-        showNotification('warning', 'Please enter a query');
+        showNotification('warning', '请输入查询语句');
         return;
     }
     
     if (!state.activeConnection) {
-        showNotification('warning', 'Please select a connection');
+        showNotification('warning', '请先选择一个数据库连接');
         return;
     }
     
-    showLoading('Executing query...');
+    // Check if database is selected, try to use from state
+    if (!database && state.selectedDatabase) {
+        database = state.selectedDatabase;
+        document.getElementById('queryDatabase').value = database;
+    }
+    
+    if (!database) {
+        showNotification('warning', '请先在左侧选择一个数据库');
+        return;
+    }
+    
+    showLoading('执行查询中...');
     
     const resultCount = document.getElementById('resultCount');
     const resultTime = document.getElementById('resultTime');
@@ -1179,11 +1210,11 @@ async function executeQuery() {
             
             if (result.error) {
                 showNotification('error', result.error);
-                resultCount.textContent = 'Error';
+                resultCount.textContent = '错误';
                 resultTime.textContent = '';
             } else {
                 renderQueryResult(result);
-                resultCount.textContent = `${result.row_count} rows returned`;
+                resultCount.textContent = `${result.row_count} 行数据`;
                 resultTime.textContent = result.duration;
             }
         } else {
@@ -1193,23 +1224,23 @@ async function executeQuery() {
             const mockResult = {
                 columns: ['id', 'name', 'email', 'created_at', 'status'],
                 rows: [
-                    [1, 'John Doe', 'john@example.com', '2024-01-15', 'active'],
-                    [2, 'Jane Smith', 'jane@example.com', '2024-01-16', 'active'],
-                    [3, 'Bob Wilson', 'bob@example.com', '2024-01-17', 'inactive'],
-                    [4, 'Alice Brown', 'alice@example.com', '2024-01-18', 'active'],
-                    [5, 'Charlie Davis', 'charlie@example.com', '2024-01-19', 'pending']
+                    [1, '张三', 'zhangsan@example.com', '2024-01-15', 'active'],
+                    [2, '李四', 'lisi@example.com', '2024-01-16', 'active'],
+                    [3, '王五', 'wangwu@example.com', '2024-01-17', 'inactive'],
+                    [4, '赵六', 'zhaoliu@example.com', '2024-01-18', 'active'],
+                    [5, '钱七', 'qianqi@example.com', '2024-01-19', 'pending']
                 ],
                 row_count: 5,
                 duration: '0.023s'
             };
             
             renderQueryResult(mockResult);
-            resultCount.textContent = `${mockResult.row_count} rows returned`;
+            resultCount.textContent = `${mockResult.row_count} 行数据`;
             resultTime.textContent = mockResult.duration;
         }
     } catch (error) {
-        showNotification('error', `Query failed: ${error.message}`);
-        resultCount.textContent = 'Error';
+        showNotification('error', `查询失败: ${error.message}`);
+        resultCount.textContent = '错误';
         resultTime.textContent = '';
     }
     

@@ -580,7 +580,6 @@ body {
 }
 
 .tree-item .chevron {
-    margin-left: auto;
     transition: transform var(--transition-fast);
 }
 
