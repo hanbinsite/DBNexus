@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB Client - 数据库管理工具</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部工具栏 -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <div class="app-logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+                        <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+                    </svg>
+                    <span class="logo-text" data-i18n="appName">DB Client</span>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-actions">
+                    <button class="toolbar-btn" data-i18n-title="newConnection" onclick="openConnectionDialog()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 8v8M8 12h8"/>
+                        </svg>
+                        <span data-i18n="newConnection">新建</span>
+                    </button>
+                    <button class="toolbar-btn" data-i18n-title="newQuery" onclick="createNewTab()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+                        </svg>
+                        <span data-i18n="newQuery">查询</span>
+                    </button>
+                    <button class="toolbar-btn" data-i18n-title="executeQuery" onclick="executeQuery()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span data-i18n="executeQuery">运行</span>
+                    </button>
+                    <button class="toolbar-btn" data-i18n-title="refresh" onclick="refreshConnection()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        <span data-i18n="refresh">刷新</span>
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="toolbar-btn icon-only" data-i18n-title="language" onclick="openLanguageSettings()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                </button>
+                <button class="toolbar-btn icon-only" data-i18n-title="settings" onclick="openSettings()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                </button>
+                <div class="theme-toggle">
+                    <button class="toolbar-btn icon-only" id="themeToggle" onclick="toggleTheme()">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="window-controls">
+                    <button class="window-btn minimize" onclick="minimizeWindow()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14"/>
+                        </svg>
+                    </button>
+                    <button class="window-btn maximize" onclick="maximizeWindow()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        </svg>
+                    </button>
+                    <button class="window-btn close" onclick="closeWindow()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 左侧边栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3 class="sidebar-title" data-i18n="connections">连接</h3>
+                    <button class="sidebar-action-btn" onclick="openConnectionDialog()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 8v8M8 12h8"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="connection-list" id="connectionList">
+                    <!-- 连接列表将动态填充 -->
+                </div>
+
+                <!-- 数据库对象树 -->
+                <div class="db-tree" id="dbTree">
+                    <div class="tree-header">
+                        <button class="expand-btn expanded" onclick="toggleTreeSection('databases')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                        </button>
+                        <span class="tree-title" data-i18n="databases">数据库</span>
+                    </div>
+                    <div class="tree-content expanded" id="databasesTree">
+                        <!-- 数据库树将动态填充 -->
+                        <div class="tree-empty-hint">选择一个连接以查看数据库</div>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="resize-handle" id="sidebarResize"></div>
+
+            <!-- 工作区 -->
+            <section class="workspace">
+                <!-- 标签栏 -->
+                <div class="tab-bar" id="tabBar">
+                    <div class="tabs-container" id="tabsContainer">
+                        <div class="tab active" data-tab="query-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+                            </svg>
+                            <span>查询 1</span>
+                            <button class="tab-close" onclick="closeTab('query-1', event)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 6 6 18M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="tab-actions">
+                        <button class="tab-action-btn" onclick="createNewTab()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 查询编辑器面板 -->
+                <div class="editor-panel" id="editorPanel">
+                    <div class="editor-toolbar">
+                        <div class="editor-actions">
+                            <button class="editor-btn" onclick="formatSQL()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
+                                </svg>
+                            </button>
+                            <button class="editor-btn" onclick="executeQuery()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                            </button>
+                            <button class="editor-btn" onclick="explainQuery()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 16v-4M12 8h.01"/>
+                                </svg>
+                            </button>
+                            <div class="editor-divider"></div>
+                            <button class="editor-btn" onclick="saveQuery()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <path d="M17 21v-8H7v8M7 3v5h8"/>
+                                </svg>
+                            </button>
+                            <button class="editor-btn" onclick="loadQuery()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="editor-db-selector">
+                            <label data-i18n="database">数据库:</label>
+                            <select id="queryDatabase">
+                                <option value="">选择数据库</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="editor-container">
+                        <div class="line-numbers" id="lineNumbers">
+                            <span>1</span>
+                        </div>
+                        <textarea class="query-editor" id="queryEditor" placeholder="-- 输入 SQL 查询语句...">SELECT * FROM users LIMIT 100;</textarea>
+                    </div>
+                </div>
+
+                <!-- 结果面板 -->
+                <div class="results-panel" id="resultsPanel">
+                    <div class="results-header">
+                        <div class="results-tabs">
+                            <button class="results-tab active" data-results="grid" data-i18n="gridView">网格视图</button>
+                            <button class="results-tab" data-results="text" data-i18n="textView">文本视图</button>
+                            <button class="results-tab" data-results="history" data-i18n="history">历史记录</button>
+                        </div>
+                        <div class="results-info">
+                            <span class="result-count" id="resultCount">等待查询...</span>
+                            <span class="result-time" id="resultTime"></span>
+                        </div>
+                    </div>
+                    <div class="results-container">
+                        <div class="data-grid" id="dataGrid">
+                            <table class="results-table">
+                                <thead>
+                                    <tr id="resultsHeader">
+                                        <th><input type="checkbox"></th>
+                                        <th>ID</th>
+                                        <th>姓名</th>
+                                        <th>邮箱</th>
+                                        <th>创建时间</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsBody">
+                                    <tr>
+                                        <td><input type="checkbox"></td>
+                                        <td>1</td>
+                                        <td>张三</td>
+                                        <td>zhangsan@example.com</td>
+                                        <td>2024-01-15 10:30:00</td>
+                                        <td><span class="status-badge active">活跃</span></td>
+                                        <td class="row-actions">
+                                            <button class="action-btn" title="编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                                            <button class="action-btn" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="results-pagination">
+                            <button class="pagination-btn" title="首页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg></button>
+                            <button class="pagination-btn" title="上一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                            <span class="pagination-info">1 - 1</span>
+                            <button class="pagination-btn" title="下一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                            <button class="pagination-btn" title="末页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg></button>
+                            <select class="page-size-select">
+                                <option value="10">10 条/页</option>
+                                <option value="25">25 条/页</option>
+                                <option value="50">50 条/页</option>
+                                <option value="100">100 条/页</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="split-handle" id="editorResultsSplit"></div>
+            </section>
+        </main>
+
+        <!-- 状态栏 -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <div class="status-item connection-status" id="connectionStatus">
+                    <svg class="status-icon disconnected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M15 9l-6 6M9 9l6 6"/>
+                    </svg>
+                    <span data-i18n="notConnected">未连接</span>
+                </div>
+                <div class="status-divider"></div>
+                <div class="status-item" id="currentConnection">
+                    <span>无活动连接</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <div class="status-item" id="languageStatus">
+                    <span>中文</span>
+                </div>
+                <div class="status-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                    <span id="windowSize">1280 x 800</span>
+                </div>
+                <div class="status-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    <span id="currentTime">00:00:00</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 新建连接对话框 -->
+    <div class="modal-overlay" id="connectionModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 data-i18n="newConnectionTitle">新建连接</h2>
+                <button class="modal-close" onclick="closeConnectionDialog()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="connection-type-selector">
+                    <button class="db-type-btn active" data-type="postgresql">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                            <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+                        </svg>
+                        <span data-i18n="postgresql">PostgreSQL</span>
+                    </button>
+                    <button class="db-type-btn" data-type="mysql">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                            <path d="M8.5 8.5c1.5-1.5 4-1.5 5.5 0 1.5 1.5 1.5 4 0 5.5-1.5 1.5-4 1.5-5.5 0-1.5-1.5-1.5-4 0-5.5z"/>
+                        </svg>
+                        <span data-i18n="mysql">MySQL</span>
+                    </button>
+                    <button class="db-type-btn" data-type="polardb">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span data-i18n="polardb">PolarDB</span>
+                    </button>
+                    <button class="db-type-btn" data-type="gaussdb">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M2 12h20"/>
+                        </svg>
+                        <span data-i18n="gaussdb">GaussDB</span>
+                    </button>
+                    <button class="db-type-btn" data-type="sqlite">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        <span data-i18n="sqlite">SQLite</span>
+                    </button>
+                    <button class="db-type-btn" data-type="redis">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                            <path d="M12 6c-1.5 0-3 1.5-3 4s1.5 4 3 4 3-1.5 3-4-1.5-4-3-4z"/>
+                        </svg>
+                        <span data-i18n="redis">Redis</span>
+                    </button>
+                </div>
+                <div class="connection-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="connName" data-i18n="connectionName">连接名称</label>
+                            <input type="text" id="connName" placeholder="我的数据库">
+                        </div>
+                    </div>
+                    <div class="form-row two-cols">
+                        <div class="form-group">
+                            <label for="connHost" data-i18n="host">主机</label>
+                            <input type="text" id="connHost" placeholder="localhost" value="localhost">
+                        </div>
+                        <div class="form-group">
+                            <label for="connPort" data-i18n="port">端口</label>
+                            <input type="number" id="connPort" placeholder="5432" value="5432">
+                        </div>
+                    </div>
+                    <div class="form-row two-cols">
+                        <div class="form-group">
+                            <label for="connUser" data-i18n="username">用户名</label>
+                            <input type="text" id="connUser" placeholder="postgres">
+                        </div>
+                        <div class="form-group">
+                            <label for="connPassword" data-i18n="password">密码</label>
+                            <input type="password" id="connPassword" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="connDatabase" data-i18n="database">数据库</label>
+                            <input type="text" id="connDatabase" placeholder="mydb">
+                        </div>
+                    </div>
+                    <div class="form-row checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="connSavePassword">
+                            <span data-i18n="savePassword">保存密码</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="connAutoConnect" checked>
+                            <span data-i18n="autoConnect">启动时自动连接</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="testConnection()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
+                    </svg>
+                    <span data-i18n="testConnection">测试连接</span>
+                </button>
+                <div class="modal-footer-right">
+                    <button class="btn btn-ghost" onclick="closeConnectionDialog()" data-i18n="cancel">取消</button>
+                    <button class="btn btn-primary" onclick="saveConnection()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <path d="M17 21v-8H7v8M7 3v5h8"/>
+                        </svg>
+                        <span data-i18n="save">保存</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 语言设置对话框 -->
+    <div class="modal-overlay" id="languageModal">
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>语言设置 / Language</h2>
+                <button class="modal-close" onclick="closeLanguageDialog()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="language-options">
+                    <button class="language-btn active" data-lang="zh" onclick="setLanguage('zh')">
+                        <span class="lang-flag">🇨🇳</span>
+                        <span class="lang-name">简体中文</span>
+                    </button>
+                    <button class="language-btn" data-lang="en" onclick="setLanguage('en')">
+                        <span class="lang-flag">🇺🇸</span>
+                        <span class="lang-name">English</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置对话框 -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container settings-modal">
+            <div class="modal-header">
+                <h2 data-i18n="settingsTitle">设置</h2>
+                <button class="modal-close" onclick="closeSettings()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body settings-body">
+                <div class="settings-sidebar">
+                    <button class="settings-nav-btn active" data-section="general">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                        </svg>
+                        <span data-i18n="general">常规</span>
+                    </button>
+                    <button class="settings-nav-btn" data-section="editor">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+                        </svg>
+                        <span data-i18n="editor">编辑器</span>
+                    </button>
+                    <button class="settings-nav-btn" data-section="appearance">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </svg>
+                        <span data-i18n="appearance">外观</span>
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-section active" data-section="general">
+                        <h3 data-i18n="general">常规设置</h3>
+                        <div class="settings-group">
+                            <label class="settings-label">
+                                <span data-i18n="language">语言</span>
+                                <select id="settingsLanguage" onchange="setLanguage(this.value)">
+                                    <option value="zh">简体中文</option>
+                                    <option value="en">English</option>
+                                </select>
+                            </label>
+                            <label class="settings-label">
+                                <span>连接超时（秒）</span>
+                                <input type="number" value="10">
+                            </label>
+                            <label class="settings-label">
+                                <span>查询超时（秒）</span>
+                                <input type="number" value="30">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="settings-section" data-section="editor">
+                        <h3 data-i18n="editor">编辑器设置</h3>
+                        <div class="settings-group">
+                            <label class="settings-label">
+                                <span data-i18n="fontSize">字体大小</span>
+                                <select>
+                                    <option value="12">12px</option>
+                                    <option value="14" selected>14px</option>
+                                    <option value="16">16px</option>
+                                    <option value="18">18px</option>
+                                </select>
+                            </label>
+                            <label class="settings-label">
+                                <span data-i18n="tabSize">Tab 大小</span>
+                                <select>
+                                    <option value="2" selected>2 空格</option>
+                                    <option value="4">4 空格</option>
+                                </select>
+                            </label>
+                            <label class="settings-label">
+                                <span data-i18n="lineNumbers">行号</span>
+                                <input type="checkbox" checked>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="settings-section" data-section="appearance">
+                        <h3 data-i18n="appearance">外观设置</h3>
+                        <div class="settings-group">
+                            <label class="settings-label">
+                                <span data-i18n="theme">主题</span>
+                                <select id="appearanceTheme" onchange="setThemeFromSettings(this.value)">
+                                    <option value="dark">深色</option>
+                                    <option value="light">浅色</option>
+                                    <option value="system">跟随系统</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="contextAction('open')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <path d="M15 3h6v6M10 14L21 3"/>
+            </svg>
+            <span>打开</span>
+        </div>
+        <div class="context-menu-item" onclick="contextAction('new_query')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            </svg>
+            <span>新查询</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="contextAction('refresh')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>刷新</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item danger" onclick="contextAction('delete')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>删除</span>
+        </div>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

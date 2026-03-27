@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.json",
+  "name": "DB Client",
+  "outputfilename": "db-client",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "",
+    "email": ""
+  },
+  "wailsjs dir": "frontend/dist",
+  "version": "2"
+}
