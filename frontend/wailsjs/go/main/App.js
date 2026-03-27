@@ -34,8 +34,20 @@ export function GetFunctions(arg1, arg2) {
   return window['go']['main']['App']['GetFunctions'](arg1, arg2);
 }
 
+export function GetLanguage() {
+  return window['go']['main']['App']['GetLanguage']();
+}
+
+export function GetServerInfo(arg1) {
+  return window['go']['main']['App']['GetServerInfo'](arg1);
+}
+
 export function GetSupportedDatabases() {
   return window['go']['main']['App']['GetSupportedDatabases']();
+}
+
+export function GetSupportedFeatures() {
+  return window['go']['main']['App']['GetSupportedFeatures']();
 }
 
 export function GetTableColumns(arg1, arg2, arg3) {
@@ -58,12 +70,24 @@ export function OpenFileDialog(arg1, arg2) {
   return window['go']['main']['App']['OpenFileDialog'](arg1, arg2);
 }
 
+export function RunAllTests() {
+  return window['go']['main']['App']['RunAllTests']();
+}
+
+export function RunConnectionTest(arg1) {
+  return window['go']['main']['App']['RunConnectionTest'](arg1);
+}
+
 export function SaveConnection(arg1) {
   return window['go']['main']['App']['SaveConnection'](arg1);
 }
 
 export function SaveFileDialog(arg1, arg2) {
   return window['go']['main']['App']['SaveFileDialog'](arg1, arg2);
+}
+
+export function SetLanguage(arg1) {
+  return window['go']['main']['App']['SetLanguage'](arg1);
 }
 
 export function TestConnection(arg1) {

@@ -19,7 +19,13 @@ export function GetDatabases(arg1:main.Connection):Promise<Array<main.DatabaseIn
 
 export function GetFunctions(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
 
+export function GetLanguage():Promise<string>;
+
+export function GetServerInfo(arg1:main.Connection):Promise<Record<string, string>>;
+
 export function GetSupportedDatabases():Promise<Array<Record<string, string>>>;
+
+export function GetSupportedFeatures():Promise<Record<string, Array<string>>>;
 
 export function GetTableColumns(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<db.ColumnInfo>>;
 
@@ -31,9 +37,15 @@ export function Greet(arg1:string):Promise<string>;
 
 export function OpenFileDialog(arg1:string,arg2:string):Promise<string>;
 
+export function RunAllTests():Promise<Array<main.TestResult>>;
+
+export function RunConnectionTest(arg1:main.Connection):Promise<main.TestResult>;
+
 export function SaveConnection(arg1:main.Connection):Promise<void>;
 
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
+
+export function SetLanguage(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:main.Connection):Promise<boolean|string>;
 

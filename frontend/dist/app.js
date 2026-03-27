@@ -52,6 +52,16 @@ const WailsAPI = {
     openFileDialog: (title, filters) => window.go.main.App.OpenFileDialog(title, filters),
     saveFileDialog: (title, defaultName) => window.go.main.App.SaveFileDialog(title, defaultName),
     
+    // Language
+    getLanguage: () => window.go.main.App.GetLanguage(),
+    setLanguage: (lang) => window.go.main.App.SetLanguage(lang),
+    
+    // Test Services
+    runConnectionTest: (conn) => window.go.main.App.RunConnectionTest(conn),
+    runAllTests: () => window.go.main.App.RunAllTests(),
+    getSupportedFeatures: () => window.go.main.App.GetSupportedFeatures(),
+    getServerInfo: (conn) => window.go.main.App.GetServerInfo(conn),
+    
     // Utility
     greet: (name) => window.go.main.App.Greet(name)
 };
@@ -1526,3 +1536,86 @@ document.addEventListener('keydown', (e) => {
         closeLanguageDialog();
     }
 });
+
+// ==========================================================================
+// Test Services
+// ==========================================================================
+async function runConnectionTest() {
+    if (!state.activeConnection) {
+        showNotification('warning', '请先选择一个连接');
+        return;
+    }
+    
+    showLoading('测试连接中...');
+    
+    try {
+        if (isWailsAvailable()) {
+            const result = await WailsAPI.runConnectionTest(state.activeConnection);
+            showNotification(result.success ? 'success' : 'error', result.message);
+        } else {
+            // Mock test
+            await new Promise(resolve => setTimeout(resolve, 500));
+            showNotification('success', '连接测试成功！(模拟)');
+        }
+    } catch (error) {
+        showNotification('error', `测试失败: ${error.message}`);
+    }
+    
+    hideLoading();
+}
+
+async function runAllTests() {
+    showLoading('运行所有连接测试...');
+    
+    try {
+        if (isWailsAvailable()) {
+            const results = await WailsAPI.runAllTests();
+            
+            let html = '<h3>连接测试结果</h3><ul>';
+            results.forEach(r => {
+                const icon = r.success ? '✓' : '✗';
+                const color = r.success ? 'green' : 'red';
+                html += `<li style="color: ${color}">${icon} ${r.name}: ${r.message} (${r.time})</li>`;
+            });
+            html += '</ul>';
+            
+            showNotification('info', `测试完成: ${results.filter(r => r.success).length}/${results.length} 成功`);
+        } else {
+            // Mock test results
+            await new Promise(resolve => setTimeout(resolve, 800));
+            showNotification('success', '所有连接测试通过！(模拟)');
+        }
+    } catch (error) {
+        showNotification('error', `测试失败: ${error.message}`);
+    }
+    
+    hideLoading();
+}
+
+async function getServerInfo() {
+    if (!state.activeConnection) {
+        showNotification('warning', '请先选择一个连接');
+        return;
+    }
+    
+    try {
+        if (isWailsAvailable()) {
+            const info = await WailsAPI.getServerInfo(state.activeConnection);
+            console.log('Server Info:', info);
+            showNotification('info', `数据库: ${info.type}, 表数量: ${info.table_count || 'N/A'}`);
+        } else {
+            showNotification('info', '服务器信息: PostgreSQL 14.0 (模拟)');
+        }
+    } catch (error) {
+        showNotification('error', `获取信息失败: ${error.message}`);
+    }
+}
+
+// Test button handler for toolbar
+async function runTest() {
+    if (state.activeConnection) {
+        await runConnectionTest();
+    } else {
+        await runAllTests();
+    }
+}

@@ -115,6 +115,24 @@ export namespace main {
 	        this.comment = source["comment"];
 	    }
 	}
+	export class TestResult {
+	    name: string;
+	    success: boolean;
+	    message: string;
+	    time: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.time = source["time"];
+	    }
+	}
 
 }
 
