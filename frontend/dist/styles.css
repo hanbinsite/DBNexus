@@ -1944,3 +1944,370 @@ body {
 .logo-text {
     -webkit-app-region: no-drag;
 }
+
+/* ==========================================================================
+   Navicat 风格数据表查看面板
+   ========================================================================== */
+.data-view-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    background-color: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+/* 数据表工具栏 */
+.data-view-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    height: 40px;
+}
+
+.data-view-tabs {
+    display: flex;
+    gap: 2px;
+    background-color: var(--bg-primary);
+    padding: 2px;
+    border-radius: var(--radius-md);
+}
+
+.data-view-tab {
+    padding: var(--space-1) var(--space-3);
+    background: transparent;
+    border: none;
+    color: var(--fg-secondary);
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.data-view-tab:hover {
+    background-color: var(--bg-hover);
+    color: var(--fg-primary);
+}
+
+.data-view-tab.active {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.data-view-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.dv-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.dv-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--fg-primary);
+    border-color: var(--fg-muted);
+}
+
+.dv-btn:active {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.dv-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.dv-divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--border-color);
+    margin: 0 var(--space-1);
+}
+
+/* 筛选栏 */
+.data-view-filter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    height: 36px;
+    gap: var(--space-4);
+}
+
+.filter-left,
+.filter-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.data-view-filter label {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    white-space: nowrap;
+}
+
+.filter-column,
+.filter-operator,
+.sort-column {
+    height: 26px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 12px;
+    min-width: 100px;
+}
+
+.filter-value {
+    height: 26px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 12px;
+    width: 150px;
+}
+
+.dv-btn-sm {
+    height: 26px;
+    padding: 0 var(--space-3);
+    background-color: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.dv-btn-sm:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+.dv-btn-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--fg-secondary);
+    cursor: pointer;
+}
+
+.dv-btn-icon:hover {
+    background-color: var(--bg-hover);
+}
+
+.dv-btn-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 数据网格 */
+.data-view-grid {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--bg-primary);
+}
+
+.dv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+}
+
+.dv-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.dv-table th {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    font-weight: 500;
+    color: var(--fg-primary);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.dv-table th:hover {
+    background-color: var(--bg-hover);
+}
+
+.dv-table td {
+    border: 1px solid var(--border-color);
+    padding: var(--space-1) var(--space-2);
+    color: var(--fg-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dv-table tr:hover td {
+    background-color: var(--bg-hover);
+}
+
+.dv-table tr.selected td {
+    background-color: rgba(88, 166, 255, 0.15);
+}
+
+.dv-table td.null-value {
+    color: var(--fg-muted);
+    font-style: italic;
+}
+
+.dv-table td.editing {
+    padding: 0;
+}
+
+.dv-table td.editing input {
+    width: 100%;
+    height: 100%;
+    padding: var(--space-1) var(--space-2);
+    border: 2px solid var(--accent-primary);
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 12px;
+}
+
+.dv-table th input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* 底部状态栏 */
+.data-view-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-1) var(--space-3);
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 11px;
+    color: var(--fg-secondary);
+    height: 28px;
+}
+
+.dv-status-left,
+.dv-status-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.dv-separator {
+    color: var(--border-color);
+}
+
+.dv-pagination {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.dv-page-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.dv-page-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--fg-primary);
+}
+
+.dv-page-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.dv-page-info {
+    padding: 0 var(--space-2);
+    font-size: 11px;
+}
+
+.dv-page-size {
+    height: 22px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 11px;
+}
+
+/* 表结构视图 */
+.structure-view {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--bg-primary);
+}
+
+.structure-table th,
+.structure-table td {
+    text-align: left;
+}
+
+.structure-table td input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* 行选中高亮 */
+.dv-table tbody tr {
+    cursor: pointer;
+}
+
+.dv-table tbody tr.selected {
+    background-color: rgba(88, 166, 255, 0.1);
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+    .data-view-filter {
+        flex-direction: column;
+        height: auto;
+        padding: var(--space-2);
+        gap: var(--space-2);
+    }
+    
+    .filter-left,
+    .filter-right {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}

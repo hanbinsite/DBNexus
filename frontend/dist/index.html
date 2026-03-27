@@ -139,7 +139,7 @@
                 <!-- 标签栏 -->
                 <div class="tab-bar" id="tabBar">
                     <div class="tabs-container" id="tabsContainer">
-                        <div class="tab active" data-tab="query-1">
+                        <div class="tab active" data-tab="query-1" data-type="query">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                 <path d="M14 2v6h6M12 18v-6M9 15h6"/>
@@ -269,6 +269,163 @@
                 </div>
 
                 <div class="split-handle" id="editorResultsSplit"></div>
+                
+                <!-- Navicat 风格数据表查看面板 (默认隐藏) -->
+                <div class="data-view-panel" id="dataViewPanel" style="display: none;">
+                    <!-- 数据表工具栏 -->
+                    <div class="data-view-toolbar">
+                        <div class="data-view-tabs">
+                            <button class="data-view-tab active" data-view="content">内容</button>
+                            <button class="data-view-tab" data-view="structure">表结构</button>
+                            <button class="data-view-tab" data-view="indexes">索引</button>
+                            <button class="data-view-tab" data-view="foreign-keys">外键</button>
+                        </div>
+                        <div class="data-view-actions">
+                            <button class="dv-btn" title="添加记录" onclick="addNewRow()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                            </button>
+                            <button class="dv-btn" title="删除选中" onclick="deleteSelectedRows()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                            <div class="dv-divider"></div>
+                            <button class="dv-btn" title="保存更改" onclick="saveDataChanges()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <path d="M17 21v-8H7v8M7 3v5h8"/>
+                                </svg>
+                            </button>
+                            <button class="dv-btn" title="撤销更改" onclick="discardChanges()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 7"/>
+                                </svg>
+                            </button>
+                            <div class="dv-divider"></div>
+                            <button class="dv-btn" title="刷新" onclick="refreshDataView()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 筛选栏 -->
+                    <div class="data-view-filter">
+                        <div class="filter-left">
+                            <label>筛选:</label>
+                            <select class="filter-column" id="filterColumn">
+                                <option value="">所有列</option>
+                            </select>
+                            <select class="filter-operator" id="filterOperator">
+                                <option value="=">=</option>
+                                <option value="!=">!=</option>
+                                <option value=">">></option>
+                                <option value="<"><</option>
+                                <option value=">=">>=</option>
+                                <option value="<="><=</option>
+                                <option value="LIKE">LIKE</option>
+                                <option value="IN">IN</option>
+                                <option value="IS NULL">IS NULL</option>
+                                <option value="IS NOT NULL">IS NOT NULL</option>
+                            </select>
+                            <input type="text" class="filter-value" id="filterValue" placeholder="值">
+                            <button class="dv-btn-sm" onclick="applyFilter()">应用</button>
+                            <button class="dv-btn-sm" onclick="clearFilter()">清除</button>
+                        </div>
+                        <div class="filter-right">
+                            <label>排序:</label>
+                            <select class="sort-column" id="sortColumn">
+                                <option value="">无</option>
+                            </select>
+                            <button class="dv-btn-icon" id="sortOrder" onclick="toggleSortOrder()" title="升序/降序">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M7 15l5 5 5-5M7 9l5-5 5 5"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 数据网格 -->
+                    <div class="data-view-grid" id="dataViewGrid">
+                        <table class="dv-table">
+                            <thead id="dataViewHeader">
+                                <!-- 动态生成 -->
+                            </thead>
+                            <tbody id="dataViewBody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 底部状态栏 -->
+                    <div class="data-view-status">
+                        <div class="dv-status-left">
+                            <span id="dvRecordCount">0 条记录</span>
+                            <span class="dv-separator">|</span>
+                            <span id="dvSelectedCount">已选: 0</span>
+                        </div>
+                        <div class="dv-status-right">
+                            <div class="dv-pagination">
+                                <button class="dv-page-btn" onclick="dataViewFirstPage()" title="首页">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
+                                    </svg>
+                                </button>
+                                <button class="dv-page-btn" onclick="dataViewPrevPage()" title="上一页">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M15 18l-6-6 6-6"/>
+                                    </svg>
+                                </button>
+                                <span class="dv-page-info" id="dvPageInfo">第 1 页</span>
+                                <button class="dv-page-btn" onclick="dataViewNextPage()" title="下一页">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 18l6-6-6-6"/>
+                                    </svg>
+                                </button>
+                                <button class="dv-page-btn" onclick="dataViewLastPage()" title="末页">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <select class="dv-page-size" id="dvPageSize" onchange="changePageSize()">
+                                <option value="100">100 条/页</option>
+                                <option value="500">500 条/页</option>
+                                <option value="1000">1000 条/页</option>
+                                <option value="5000">5000 条/页</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 表结构视图 (默认隐藏) -->
+                    <div class="structure-view" id="structureView" style="display: none;">
+                        <table class="dv-table structure-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th style="width: 180px;">列名</th>
+                                    <th style="width: 150px;">数据类型</th>
+                                    <th style="width: 80px;">长度</th>
+                                    <th style="width: 80px;">小数点</th>
+                                    <th style="width: 80px;">不是 null</th>
+                                    <th style="width: 80px;">主键</th>
+                                    <th style="width: 80px;">自增</th>
+                                    <th>默认值</th>
+                                    <th style="width: 150px;">注释</th>
+                                    <th style="width: 80px;">字符集</th>
+                                    <th style="width: 120px;">排序规则</th>
+                                </tr>
+                            </thead>
+                            <tbody id="structureViewBody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
         </main>
 

@@ -245,16 +245,16 @@ function initTabs() {
 }
 
 function createNewTab() {
-    const tabNumber = document.querySelectorAll('.tab').length + 1;
+    const tabNumber = document.querySelectorAll('.tab[data-type="query"]').length + 1;
     const tabId = `query-${tabNumber}`;
     
     const tabHtml = `
-        <div class="tab" data-tab="${tabId}">
+        <div class="tab" data-tab="${tabId}" data-type="query">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <path d="M14 2v6h6M12 18v-6M9 15h6"/>
             </svg>
-            <span>Query ${tabNumber}</span>
+            <span>查询 ${tabNumber}</span>
             <button class="tab-close" onclick="closeTab('${tabId}', event)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 6 6 18M6 6l12 12"/>
@@ -265,6 +265,12 @@ function createNewTab() {
     
     document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
     activateTab(tabId);
+    
+    // Show query editor, hide data view
+    document.querySelector('.editor-panel').style.display = 'block';
+    document.querySelector('.results-panel').style.display = 'block';
+    document.querySelector('.split-handle').style.display = 'block';
+    document.getElementById('dataViewPanel').style.display = 'none';
     
     // Clear editor for new tab
     document.getElementById('queryEditor').value = '';
@@ -280,6 +286,23 @@ function activateTab(tabId) {
     if (selectedTab) {
         selectedTab.classList.add('active');
         state.activeTab = tabId;
+        
+        // Switch view based on tab type
+        const tabType = selectedTab.dataset.type;
+        
+        if (tabType === 'table') {
+            // Show data view panel
+            document.querySelector('.editor-panel').style.display = 'none';
+            document.querySelector('.results-panel').style.display = 'none';
+            document.querySelector('.split-handle').style.display = 'none';
+            document.getElementById('dataViewPanel').style.display = 'flex';
+        } else {
+            // Show query editor
+            document.querySelector('.editor-panel').style.display = 'block';
+            document.querySelector('.results-panel').style.display = 'block';
+            document.querySelector('.split-handle').style.display = 'block';
+            document.getElementById('dataViewPanel').style.display = 'none';
+        }
     }
 }
 
@@ -1058,12 +1081,18 @@ async function openTable(tableName, database) {
         selector.value = database;
     }
     
+    // Save current table info
+    state.currentTable = {
+        name: tableName,
+        database: database || state.selectedDatabase
+    };
+    
     const tabId = `table-${tableName}`;
     let tab = document.querySelector(`[data-tab="${tabId}"]`);
     
     if (!tab) {
         const tabHtml = `
-            <div class="tab" data-tab="${tabId}">
+            <div class="tab" data-tab="${tabId}" data-type="table">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <path d="M3 9h18M9 21V9"/>
@@ -1081,14 +1110,273 @@ async function openTable(tableName, database) {
     
     activateTab(tabId);
     
-    // Set query and execute
-    const editor = document.getElementById('queryEditor');
-    editor.value = `SELECT * FROM ${tableName} LIMIT 100;`;
-    updateLineNumbers();
+    // Show data view panel, hide editor and results
+    document.querySelector('.editor-panel').style.display = 'none';
+    document.querySelector('.results-panel').style.display = 'none';
+    document.querySelector('.split-handle').style.display = 'none';
+    document.getElementById('dataViewPanel').style.display = 'flex';
     
-    // Execute query
-    await executeQuery();
+    // Reset data view tabs
+    document.querySelectorAll('.data-view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('.data-view-tab[data-view="content"]').classList.add('active');
+    document.getElementById('structureView').style.display = 'none';
+    document.getElementById('dataViewGrid').style.display = 'block';
+    document.querySelector('.data-view-filter').style.display = 'flex';
+    document.querySelector('.data-view-status').style.display = 'flex';
+    
+    // Load table data
+    await loadTableData(tableName, database);
 }
+
+async function loadTableData(tableName, database) {
+    if (!state.activeConnection) {
+        showNotification('warning', '请先选择一个数据库连接');
+        return;
+    }
+    
+    showLoading(`加载表数据: ${tableName}...`);
+    
+    try {
+        // Load columns for filter dropdowns
+        if (isWailsAvailable()) {
+            const columns = await WailsAPI.getTableColumns(state.activeConnection, database, tableName);
+            populateFilterDropdowns(columns);
+            populateStructureView(columns);
+        }
+        
+        // Execute query to get data
+        const query = `SELECT * FROM \`${tableName}\` LIMIT 1000`;
+        
+        if (isWailsAvailable()) {
+            const result = await WailsAPI.executeQuery(state.activeConnection, database, query);
+            
+            if (result.error) {
+                showNotification('error', result.error);
+            } else {
+                renderDataView(result);
+            }
+        } else {
+            // Mock data
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const mockResult = {
+                columns: ['id', 'name', 'email', 'created_at', 'status'],
+                rows: [
+                    [1, '张三', 'zhangsan@example.com', '2024-01-15 10:30:00', 'active'],
+                    [2, '李四', 'lisi@example.com', '2024-01-16 11:45:00', 'active'],
+                    [3, '王五', 'wangwu@example.com', '2024-01-17 14:20:00', 'inactive'],
+                    [4, '赵六', 'zhaoliu@example.com', '2024-01-18 09:15:00', 'active'],
+                    [5, '钱七', 'qianqi@example.com', '2024-01-19 16:30:00', 'pending'],
+                    [6, '孙八', 'sunba@example.com', '2024-01-20 13:25:00', 'active'],
+                    [7, '周九', 'zhoujiu@example.com', '2024-01-21 10:10:00', 'inactive'],
+                    [8, '吴十', 'wushi@example.com', '2024-01-22 15:45:00', 'active'],
+                ],
+                row_count: 8,
+                duration: '0.015s'
+            };
+            
+            renderDataView(mockResult);
+            
+            // Populate mock structure
+            const mockColumns = [
+                { name: 'id', type: 'INT', nullable: false, primary_key: true, default_value: 'auto_increment' },
+                { name: 'name', type: 'VARCHAR(100)', nullable: false, primary_key: false, default_value: '' },
+                { name: 'email', type: 'VARCHAR(255)', nullable: true, primary_key: false, default_value: '' },
+                { name: 'created_at', type: 'DATETIME', nullable: true, primary_key: false, default_value: 'CURRENT_TIMESTAMP' },
+                { name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" }
+            ];
+            populateFilterDropdowns(mockColumns);
+            populateStructureView(mockColumns);
+        }
+    } catch (error) {
+        showNotification('error', `加载数据失败: ${error.message}`);
+    }
+    
+    hideLoading();
+}
+
+function populateFilterDropdowns(columns) {
+    const filterColumn = document.getElementById('filterColumn');
+    const sortColumn = document.getElementById('sortColumn');
+    
+    filterColumn.innerHTML = '<option value="">所有列</option>';
+    sortColumn.innerHTML = '<option value="">无</option>';
+    
+    columns.forEach(col => {
+        filterColumn.insertAdjacentHTML('beforeend', `<option value="${col.name}">${col.name}</option>`);
+        sortColumn.insertAdjacentHTML('beforeend', `<option value="${col.name}">${col.name}</option>`);
+    });
+}
+
+function populateStructureView(columns) {
+    const tbody = document.getElementById('structureViewBody');
+    tbody.innerHTML = '';
+    
+    columns.forEach((col, index) => {
+        const typeMatch = col.type.match(/^(\w+)(?:\((\d+(?:,\d+)?)\))?/);
+        const dataType = typeMatch ? typeMatch[1] : col.type;
+        const length = typeMatch && typeMatch[2] ? typeMatch[2] : '';
+        
+        const row = `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${col.name}</td>
+                <td>${dataType}</td>
+                <td>${length}</td>
+                <td></td>
+                <td><input type="checkbox" ${col.nullable ? '' : 'checked'}></td>
+                <td><input type="checkbox" ${col.primary_key ? 'checked' : ''}></td>
+                <td><input type="checkbox"></td>
+                <td>${col.default_value || ''}</td>
+                <td></td>
+                <td>utf8mb4</td>
+                <td>utf8mb4_general_ci</td>
+            </tr>
+        `;
+        tbody.insertAdjacentHTML('beforeend', row);
+    });
+}
+
+function renderDataView(result) {
+    const header = document.getElementById('dataViewHeader');
+    const body = document.getElementById('dataViewBody');
+    
+    // Render header
+    let headerHtml = '<tr><th style="width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+    result.columns.forEach(col => {
+        headerHtml += `<th>${col}</th>`;
+    });
+    headerHtml += '</tr>';
+    header.innerHTML = headerHtml;
+    
+    // Render body
+    let bodyHtml = '';
+    result.rows.forEach((row, rowIndex) => {
+        bodyHtml += `<tr data-row="${rowIndex}"><td><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
+        row.forEach(cell => {
+            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
+            bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    body.innerHTML = bodyHtml;
+    
+    // Update record count
+    document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
+    document.getElementById('dvSelectedCount').textContent = '已选: 0';
+    
+    // Add event listeners
+    document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+}
+
+function toggleSelectAllRows(e) {
+    const checked = e.target.checked;
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = checked;
+        cb.closest('tr').classList.toggle('selected', checked);
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('.row-checkbox:checked').length;
+    document.getElementById('dvSelectedCount').textContent = `已选: ${selected}`;
+    
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.closest('tr').classList.toggle('selected', cb.checked);
+    });
+}
+
+// Data view tab switching
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.data-view-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const view = tab.dataset.view;
+            
+            document.querySelectorAll('.data-view-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Show/hide views
+            document.getElementById('dataViewGrid').style.display = view === 'content' ? 'block' : 'none';
+            document.getElementById('structureView').style.display = view === 'structure' ? 'block' : 'none';
+            document.querySelector('.data-view-filter').style.display = view === 'content' ? 'flex' : 'none';
+            
+            // Show loading for other views
+            if (view !== 'content' && view !== 'structure') {
+                showNotification('info', `${tab.textContent} 视图开发中...`);
+            }
+        });
+    });
+});
+
+// Data view actions
+function addNewRow() {
+    const body = document.getElementById('dataViewBody');
+    const columnCount = document.querySelectorAll('#dataViewHeader th').length - 1;
+    
+    let rowHtml = '<tr class="new-row editing"><td><input type="checkbox" class="row-checkbox"></td>';
+    for (let i = 0; i < columnCount; i++) {
+        rowHtml += '<td><input type="text" placeholder="NULL"></td>';
+    }
+    rowHtml += '</tr>';
+    
+    body.insertAdjacentHTML('afterbegin', rowHtml);
+}
+
+function deleteSelectedRows() {
+    const selected = document.querySelectorAll('.row-checkbox:checked');
+    if (selected.length === 0) {
+        showNotification('warning', '请先选择要删除的行');
+        return;
+    }
+    
+    if (confirm(`确定要删除选中的 ${selected.length} 行吗？`)) {
+        selected.forEach(cb => cb.closest('tr').remove());
+        updateSelectedCount();
+        showNotification('success', `已删除 ${selected.length} 行`);
+    }
+}
+
+function saveDataChanges() {
+    showNotification('info', '保存更改功能开发中...');
+}
+
+function discardChanges() {
+    if (state.currentTable) {
+        loadTableData(state.currentTable.name, state.currentTable.database);
+    }
+}
+
+function refreshDataView() {
+    if (state.currentTable) {
+        loadTableData(state.currentTable.name, state.currentTable.database);
+    }
+}
+
+function applyFilter() {
+    showNotification('info', '筛选功能开发中...');
+}
+
+function clearFilter() {
+    document.getElementById('filterColumn').value = '';
+    document.getElementById('filterValue').value = '';
+    refreshDataView();
+}
+
+function toggleSortOrder() {
+    const btn = document.getElementById('sortOrder');
+    btn.classList.toggle('desc');
+    showNotification('info', '排序功能开发中...');
+}
+
+function dataViewFirstPage() { showNotification('info', '分页功能开发中...'); }
+function dataViewPrevPage() { showNotification('info', '分页功能开发中...'); }
+function dataViewNextPage() { showNotification('info', '分页功能开发中...'); }
+function dataViewLastPage() { showNotification('info', '分页功能开发中...'); }
+function changePageSize() { showNotification('info', '分页功能开发中...'); }
 
 function openView(viewName, database) {
     openTable(viewName, database);
