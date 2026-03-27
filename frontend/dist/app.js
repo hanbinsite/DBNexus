@@ -459,15 +459,25 @@ async function testConnection() {
     
     try {
         if (isWailsAvailable()) {
-            const [success, message] = await WailsAPI.testConnection(connection);
-            showNotification(success ? 'success' : 'error', message);
+            const result = await WailsAPI.testConnection(connection);
+            // Wails returns multi-value as array: [bool, string]
+            let success, message;
+            if (Array.isArray(result)) {
+                [success, message] = result;
+            } else {
+                // If result is a single value, handle accordingly
+                success = !!result;
+                message = result ? 'Connection successful!' : 'Connection failed';
+            }
+            showNotification(success ? 'success' : 'error', message || 'Unknown error');
         } else {
             // Mock test
             await new Promise(resolve => setTimeout(resolve, 1000));
-            showNotification('success', 'Connection successful! (Mock)');
+            showNotification('success', '连接成功！(模拟)');
         }
     } catch (error) {
-        showNotification('error', `Connection failed: ${error.message}`);
+        console.error('Test connection error:', error);
+        showNotification('error', `连接失败: ${error.message || error}`);
     }
     
     btn.innerHTML = originalContent;
@@ -643,27 +653,37 @@ async function connectToConnection(id) {
 async function connectToSelectedConnection() {
     if (!state.activeConnection) return;
     
-    showLoading('Connecting...');
+    showLoading('连接中...');
     
     try {
         if (isWailsAvailable()) {
-            const [success, message] = await WailsAPI.connectToDatabase(state.activeConnection);
+            const result = await WailsAPI.connectToDatabase(state.activeConnection);
+            // Wails returns multi-value as array: [bool, string]
+            let success, message;
+            if (Array.isArray(result)) {
+                [success, message] = result;
+            } else {
+                success = !!result;
+                message = result ? '连接成功' : '连接失败';
+            }
+            
             if (success) {
                 await loadDatabaseTree();
-                showNotification('success', 'Connected successfully!');
+                showNotification('success', '连接成功！');
             } else {
-                showNotification('error', message);
+                showNotification('error', message || '连接失败');
             }
         } else {
             // Mock connect
             await new Promise(resolve => setTimeout(resolve, 500));
             await loadMockDatabaseTree();
-            showNotification('success', 'Connected successfully! (Mock)');
+            showNotification('success', '连接成功！(模拟)');
         }
         
         updateConnectionStatusIcon(state.activeConnection.id, true);
     } catch (error) {
-        showNotification('error', `Connection failed: ${error.message}`);
+        console.error('Connect error:', error);
+        showNotification('error', `连接失败: ${error.message || error}`);
     }
     
     hideLoading();
