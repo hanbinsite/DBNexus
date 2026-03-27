@@ -2138,7 +2138,8 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    table-layout: fixed;
+    table-layout: auto;
+    min-width: 100%;
 }
 
 .dv-table thead {
@@ -2148,6 +2149,7 @@ body {
 }
 
 .dv-table th {
+    position: relative;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: var(--space-2) var(--space-3);
@@ -2156,10 +2158,43 @@ body {
     color: var(--fg-primary);
     white-space: nowrap;
     user-select: none;
+    min-width: 80px;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dv-table th:hover {
     background-color: var(--bg-hover);
+}
+
+/* 列宽拖拽手柄 */
+.dv-table th .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background-color var(--transition-fast);
+}
+
+.dv-table th .resize-handle:hover,
+.dv-table th .resize-handle.resizing {
+    background-color: var(--accent-primary);
+}
+
+.dv-table th .resize-handle:hover::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 20px;
+    background-color: var(--accent-primary);
+    border-radius: 2px;
 }
 
 .dv-table td {

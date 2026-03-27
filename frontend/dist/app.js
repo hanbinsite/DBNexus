@@ -1241,10 +1241,18 @@ function renderDataView(result) {
     const header = document.getElementById('dataViewHeader');
     const body = document.getElementById('dataViewBody');
     
-    // Render header
-    let headerHtml = '<tr><th style="width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
-    result.columns.forEach(col => {
-        headerHtml += `<th>${col}</th>`;
+    // Store column widths in state
+    state.columnWidths = state.columnWidths || {};
+    
+    // Render header with resize handles
+    let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+    result.columns.forEach((col, index) => {
+        const width = state.columnWidths[col] || 150;
+        headerHtml += `
+            <th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
+                <span class="th-content">${col}</span>
+                <div class="resize-handle" data-col="${index}"></div>
+            </th>`;
     });
     headerHtml += '</tr>';
     header.innerHTML = headerHtml;
@@ -1252,8 +1260,8 @@ function renderDataView(result) {
     // Render body
     let bodyHtml = '';
     result.rows.forEach((row, rowIndex) => {
-        bodyHtml += `<tr data-row="${rowIndex}"><td><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
-        row.forEach(cell => {
+        bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
+        row.forEach((cell, colIndex) => {
             const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
             bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
         });
@@ -1269,6 +1277,72 @@ function renderDataView(result) {
     document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
     document.querySelectorAll('.row-checkbox').forEach(cb => {
         cb.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Initialize column resize
+    initColumnResize();
+}
+
+// Column resize functionality
+function initColumnResize() {
+    const table = document.getElementById('dvTable');
+    const headers = table.querySelectorAll('th');
+    
+    headers.forEach((th, index) => {
+        if (index === 0) return; // Skip checkbox column
+        
+        const resizeHandle = th.querySelector('.resize-handle');
+        if (!resizeHandle) return;
+        
+        let startX, startWidth;
+        
+        const onMouseDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            startX = e.pageX;
+            startWidth = th.offsetWidth;
+            
+            resizeHandle.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
+        
+        const onMouseMove = (e) => {
+            const diff = e.pageX - startX;
+            const newWidth = Math.max(80, Math.min(400, startWidth + diff));
+            
+            th.style.width = newWidth + 'px';
+            th.style.minWidth = newWidth + 'px';
+            
+            // Update all cells in this column
+            const colIndex = th.dataset.col;
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cell = row.cells[parseInt(colIndex) + 1];
+                if (cell) {
+                    cell.style.width = newWidth + 'px';
+                    cell.style.minWidth = newWidth + 'px';
+                }
+            });
+            
+            // Store the width
+            state.columnWidths[th.dataset.colname] = newWidth;
+        };
+        
+        const onMouseUp = () => {
+            resizeHandle.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+        
+        resizeHandle.addEventListener('mousedown', onMouseDown);
     });
 }
 
