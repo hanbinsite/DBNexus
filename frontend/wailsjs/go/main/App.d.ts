@@ -29,6 +29,12 @@ export function GetSupportedFeatures():Promise<Record<string, Array<string>>>;
 
 export function GetTableColumns(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<db.ColumnInfo>>;
 
+export function GetTableForeignKeys(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<main.ForeignKeyInfo>>;
+
+export function GetTableIndexes(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<main.IndexInfo>>;
+
+export function GetTableStats(arg1:main.Connection,arg2:string,arg3:string):Promise<main.TableStats>;
+
 export function GetTables(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
 
 export function GetViews(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;

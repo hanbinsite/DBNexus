@@ -9,15 +9,43 @@ const translations = {
         appName: 'DB Client',
         appSubtitle: '数据库管理工具',
         
-        // Toolbar
-        newConnection: '新建连接',
-        newQuery: '新建查询',
-        executeQuery: '执行查询',
-        refresh: '刷新',
-        settings: '设置',
-        
-        // Sidebar
-        connections: '连接',
+// Toolbar
+	newConnection: '新建连接',
+	newQuery: '新建查询',
+	executeQuery: '执行查询',
+	refresh: '刷新',
+	settings: '设置',
+	language: '语言',
+	disconnect: '断开连接',
+	
+	// Editor buttons
+	formatSQL: '格式化 SQL',
+	runQuery: '运行查询 (F5)',
+	explainQuery: '查看执行计划',
+	saveQuery: '保存查询',
+	loadQuery: '加载查询',
+	
+	// Data view buttons
+	addRecord: '添加记录',
+	deleteSelected: '删除选中',
+	saveChanges: '保存更改',
+	discardChanges: '撤销更改',
+	refreshData: '刷新数据',
+	firstPage: '首页',
+	prevPage: '上一页',
+	nextPage: '下一页',
+	lastPage: '末页',
+	applyFilter: '应用筛选',
+	clearFilter: '清除筛选',
+	toggleSort: '切换排序',
+	
+	// Window buttons
+	minimize: '最小化',
+	maximize: '最大化',
+	close: '关闭',
+	
+	// Sidebar
+	connections: '连接',
         databases: '数据库',
         tables: '表',
         views: '视图',
@@ -104,15 +132,43 @@ const translations = {
         appName: 'DB Client',
         appSubtitle: 'Database Management Tool',
         
-        // Toolbar
-        newConnection: 'New',
-        newQuery: 'Query',
-        executeQuery: 'Run',
-        refresh: 'Refresh',
-        settings: 'Settings',
-        
-        // Sidebar
-        connections: 'Connections',
+// Toolbar
+	newConnection: 'New',
+	newQuery: 'Query',
+	executeQuery: 'Run',
+	refresh: 'Refresh',
+	settings: 'Settings',
+	language: 'Language',
+	disconnect: 'Disconnect',
+	
+	// Editor buttons
+	formatSQL: 'Format SQL',
+	runQuery: 'Run Query (F5)',
+	explainQuery: 'Explain Query',
+	saveQuery: 'Save Query',
+	loadQuery: 'Load Query',
+	
+	// Data view buttons
+	addRecord: 'Add Record',
+	deleteSelected: 'Delete Selected',
+	saveChanges: 'Save Changes',
+	discardChanges: 'Discard Changes',
+	refreshData: 'Refresh Data',
+	firstPage: 'First Page',
+	prevPage: 'Previous Page',
+	nextPage: 'Next Page',
+	lastPage: 'Last Page',
+	applyFilter: 'Apply Filter',
+	clearFilter: 'Clear Filter',
+	toggleSort: 'Toggle Sort Order',
+	
+	// Window buttons
+	minimize: 'Minimize',
+	maximize: 'Maximize',
+	close: 'Close',
+
+	// Sidebar
+	connections: 'Connections',
         databases: 'DATABASES',
         tables: 'Tables',
         views: 'Views',

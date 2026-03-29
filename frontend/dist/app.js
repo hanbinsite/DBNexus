@@ -10,7 +10,7 @@ const state = {
     currentTheme: 'dark',
     connections: [],
     tabs: [],
-    activeTab: 'query-1',
+    activeTab: null,
     activeConnection: null,
     sidebarWidth: 260,
     editorHeight: 300,
@@ -150,6 +150,12 @@ function setThemeFromSettings(value) {
 // ==========================================================================
 function initWindowControls() {
     // Event listeners are already bound in HTML
+    // Check initial maximized state
+    if (isWailsAvailable()) {
+        WailsAPI.windowIsMaximized().then(isMaximized => {
+            updateMaximizeIcon(isMaximized);
+        });
+    }
 }
 
 async function minimizeWindow() {
@@ -163,6 +169,25 @@ async function maximizeWindow() {
     console.log('Maximize window');
     if (isWailsAvailable()) {
         await WailsAPI.windowMaximize();
+        // Toggle icon based on maximized state
+        const isMaximized = await WailsAPI.windowIsMaximized();
+        updateMaximizeIcon(isMaximized);
+    }
+}
+
+function updateMaximizeIcon(isMaximized) {
+    const btn = document.getElementById('maximizeBtn');
+    if (!btn) return;
+    const maximizeIcon = btn.querySelector('.maximize-icon');
+    const restoreIcon = btn.querySelector('.restore-icon');
+    if (isMaximized) {
+        maximizeIcon.style.display = 'none';
+        restoreIcon.style.display = 'block';
+        btn.title = '还原';
+    } else {
+        maximizeIcon.style.display = 'block';
+        restoreIcon.style.display = 'none';
+        btn.title = '最大化';
     }
 }
 
@@ -271,15 +296,22 @@ function createNewTab() {
     document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
     activateTab(tabId);
     
-    // Show query editor, hide data view
+    // Hide welcome panel, show query editor
+    const welcomePanel = document.getElementById('welcomePanel');
+    if (welcomePanel) welcomePanel.style.display = 'none';
     document.querySelector('.editor-panel').style.display = 'block';
     document.querySelector('.results-panel').style.display = 'block';
     document.querySelector('.split-handle').style.display = 'block';
     document.getElementById('dataViewPanel').style.display = 'none';
     
     // Clear editor for new tab
-    document.getElementById('queryEditor').value = '';
+    const editor = document.getElementById('queryEditor');
+    editor.value = '';
+    updateSyntaxHighlight();
     updateLineNumbers();
+    
+    // Focus the editor
+    editor.focus();
 }
 
 function activateTab(tabId) {
@@ -291,6 +323,10 @@ function activateTab(tabId) {
     if (selectedTab) {
         selectedTab.classList.add('active');
         state.activeTab = tabId;
+        
+        // Hide welcome panel
+        const welcomePanel = document.getElementById('welcomePanel');
+        if (welcomePanel) welcomePanel.style.display = 'none';
         
         // Switch view based on tab type
         const tabType = selectedTab.dataset.type;
@@ -307,6 +343,12 @@ function activateTab(tabId) {
             document.querySelector('.results-panel').style.display = 'block';
             document.querySelector('.split-handle').style.display = 'block';
             document.getElementById('dataViewPanel').style.display = 'none';
+            
+            // Focus the editor for query tabs
+            const editor = document.getElementById('queryEditor');
+            if (editor) {
+                editor.focus();
+            }
         }
     }
 }
@@ -317,8 +359,9 @@ function closeTab(tabId, event) {
     }
     
     const tab = document.querySelector(`[data-tab="${tabId}"]`);
+    const allTabs = document.querySelectorAll('.tab');
+    
     if (tab && tab.classList.contains('active')) {
-        const allTabs = document.querySelectorAll('.tab');
         if (allTabs.length > 1) {
             const tabArray = Array.from(allTabs);
             const currentIndex = tabArray.indexOf(tab);
@@ -326,6 +369,15 @@ function closeTab(tabId, event) {
             if (prevTab) {
                 activateTab(prevTab.dataset.tab);
             }
+        } else {
+            // Last tab closed, show welcome panel
+            state.activeTab = null;
+            const welcomePanel = document.getElementById('welcomePanel');
+            if (welcomePanel) welcomePanel.style.display = 'flex';
+            document.querySelector('.editor-panel').style.display = 'none';
+            document.querySelector('.results-panel').style.display = 'none';
+            document.querySelector('.split-handle').style.display = 'none';
+            document.getElementById('dataViewPanel').style.display = 'none';
         }
     }
     
@@ -901,6 +953,7 @@ async function loadDatabaseTree() {
         if (isWailsAvailable()) {
             const databases = await WailsAPI.getDatabases(state.activeConnection);
             renderDatabaseTree(databases);
+            populateDatabaseSelector(databases);
         } else {
             await loadMockDatabaseTree();
         }
@@ -911,12 +964,34 @@ async function loadDatabaseTree() {
     hideLoading();
 }
 
+function populateDatabaseSelector(databases) {
+    const selector = document.getElementById('queryDatabase');
+    if (!selector) return;
+    
+    // Clear existing options except the first one
+    selector.innerHTML = '<option value="">选择数据库</option>';
+    
+    // Add all databases
+    databases.forEach(db => {
+        const option = document.createElement('option');
+        option.value = db.name;
+        option.textContent = db.name;
+        selector.appendChild(option);
+    });
+    
+    // Select the previously selected database if exists
+    if (state.selectedDatabase) {
+        selector.value = state.selectedDatabase;
+    }
+}
+
 async function loadMockDatabaseTree() {
     const databases = [
         { name: 'mydb' },
         { name: 'testdb' }
     ];
     renderDatabaseTree(databases);
+    populateDatabaseSelector(databases);
 }
 
 function renderDatabaseTree(databases) {
@@ -1006,6 +1081,8 @@ async function loadTablesForDatabase(dbName) {
         if (isWailsAvailable()) {
             const tables = await WailsAPI.getTables(state.activeConnection, dbName);
             renderTablesTree(tables, dbName);
+            // Update autocomplete with table names
+            updateDatabaseTables(tables.map(t => t.name));
         } else {
             // Mock tables
             const tables = [
@@ -1014,6 +1091,7 @@ async function loadTablesForDatabase(dbName) {
                 { name: 'products' }
             ];
             renderTablesTree(tables, dbName);
+            updateDatabaseTables(tables.map(t => t.name));
         }
     } catch (error) {
         console.error('Failed to load tables:', error);
@@ -2017,26 +2095,178 @@ function showSettingsSection(section) {
 }
 
 // ==========================================================================
-// Query Editor
+// Query Editor with Syntax Highlighting and Autocomplete
 // ==========================================================================
+
+// SQL Keywords for highlighting and autocomplete
+const SQL_KEYWORDS = [
+    'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
+    'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP',
+    'INDEX', 'VIEW', 'TRIGGER', 'PROCEDURE', 'FUNCTION', 'DATABASE', 'SCHEMA',
+    'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'CROSS', 'FULL', 'ON', 'USING',
+    'GROUP', 'BY', 'ORDER', 'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL',
+    'AS', 'DISTINCT', 'TOP', 'WITH', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+    'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CONSTRAINT', 'UNIQUE', 'CHECK', 'DEFAULT',
+    'NOT', 'NULL', 'AUTO_INCREMENT', 'IDENTITY', 'SERIAL',
+    'INT', 'INTEGER', 'VARCHAR', 'CHAR', 'TEXT', 'BLOB', 'DECIMAL', 'FLOAT', 'DOUBLE',
+    'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'BOOLEAN', 'BOOL', 'BIT',
+    'IF', 'EXISTS', 'CASCADE', 'RESTRICT', 'ADD', 'COLUMN', 'RENAME', 'TO',
+    'BEGIN', 'COMMIT', 'ROLLBACK', 'TRANSACTION', 'GRANT', 'REVOKE',
+    'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
+    'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT',
+    'NOW', 'CURDATE', 'CURTIME', 'DATE_FORMAT', 'STR_TO_DATE', 'DATEDIFF', 'DATE_ADD', 'DATE_SUB',
+    'IFNULL', 'IF', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END'
+];
+
+const SQL_FUNCTIONS = [
+    'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
+    'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT',
+    'NOW', 'CURDATE', 'CURTIME', 'DATE_FORMAT', 'STR_TO_DATE', 'DATEDIFF',
+    'IFNULL', 'IF', 'ABS', 'CEIL', 'FLOOR', 'ROUND', 'MOD', 'POWER', 'SQRT'
+];
+
+// Global state for autocomplete
+let autocompleteIndex = 0;
+let autocompleteItems = [];
+let autocompleteVisible = false;
+let currentDatabaseTables = [];
+
 function initEditor() {
     const editor = document.getElementById('queryEditor');
+    const highlight = document.getElementById('sqlHighlight');
     const lineNumbers = document.getElementById('lineNumbers');
+    const popup = document.getElementById('autocompletePopup');
+    const editorContainer = document.getElementById('editorContainer');
     
+    if (!editor || !highlight) return;
+    
+    // Fix: Ensure the highlight element doesn't block pointer events
+    highlight.style.pointerEvents = 'none';
+    
+    // Fix: Ensure the textarea has proper z-index and is on top
+    editor.style.position = 'relative';
+    editor.style.zIndex = '1';
+    
+    // Fix: Focus the editor when clicking anywhere in the editor container
+    if (editorContainer) {
+        editorContainer.addEventListener('click', (e) => {
+            // Only focus if clicking directly on the container or the wrapper, not on buttons
+            if (e.target === editorContainer || e.target.classList.contains('sql-editor-wrapper')) {
+                editor.focus();
+            }
+        });
+    }
+    
+    // Fix: Ensure the editor gets focus when clicked
+    editor.addEventListener('click', () => {
+        editor.focus();
+    });
+    
+    // Sync scroll between editor and highlight
     editor.addEventListener('scroll', () => {
+        highlight.scrollTop = editor.scrollTop;
+        highlight.scrollLeft = editor.scrollLeft;
         lineNumbers.scrollTop = editor.scrollTop;
     });
     
+    // Update syntax highlighting and autocomplete on input
     editor.addEventListener('input', () => {
+        updateSyntaxHighlight();
         updateLineNumbers();
+        // 暂时禁用自动完成功能，因为它可能导致输入问题
+        // showAutocomplete();
     });
     
+    // Handle keyboard navigation for autocomplete
+    editor.addEventListener('keydown', (e) => {
+        if (autocompleteVisible) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateAutocomplete(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateAutocomplete(-1);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                selectAutocompleteItem();
+            } else if (e.key === 'Escape') {
+                hideAutocomplete();
+            }
+        }
+        
+        // Handle tab key for indentation
+        if (e.key === 'Tab' && !autocompleteVisible) {
+            e.preventDefault();
+            insertAtCursor('    ');
+        }
+    });
+    
+    // Hide autocomplete when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!popup.contains(e.target) && e.target !== editor) {
+            hideAutocomplete();
+        }
+    });
+    
+    // Initial render
+    updateSyntaxHighlight();
     updateLineNumbers();
+    
+    // Fix: Make the editor focusable
+    editor.setAttribute('tabindex', '0');
+}
+
+function updateSyntaxHighlight() {
+    const editor = document.getElementById('queryEditor');
+    const highlight = document.getElementById('sqlHighlight');
+    if (!editor || !highlight) return;
+    
+    let code = editor.value;
+    
+    // Escape HTML
+    code = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Highlight comments (-- single line)
+    code = code.replace(/(--.*$)/gm, '<span class="comment">$1</span>');
+    
+    // Highlight multi-line comments /* ... */
+    code = code.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
+    
+    // Highlight strings (single and double quotes)
+    code = code.replace(/('(?:[^'\\]|\\.)*')/g, '<span class="string">$1</span>');
+    code = code.replace(/("(?:[^"\\]|\\.)*")/g, '<span class="string">$1</span>');
+    
+    // Highlight numbers
+    code = code.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
+    
+    // Highlight keywords
+    SQL_KEYWORDS.forEach(keyword => {
+        const regex = new RegExp(`\\b(${keyword})\\b`, 'gi');
+        code = code.replace(regex, (match) => {
+            // Don't highlight if already inside a span
+            return `<span class="keyword">${match}</span>`;
+        });
+    });
+    
+    // Highlight functions
+    SQL_FUNCTIONS.forEach(func => {
+        const regex = new RegExp(`\\b(${func})\\s*\\(`, 'gi');
+        code = code.replace(regex, (match, p1) => {
+            return `<span class="function">${p1}</span>(`;
+        });
+    });
+    
+    // Highlight operators
+    code = code.replace(/(\+|-|\*|\/|=|&lt;|&gt;|!|%)/g, '<span class="operator">$1</span>');
+    
+    highlight.innerHTML = code + '\n';
 }
 
 function updateLineNumbers() {
     const editor = document.getElementById('queryEditor');
     const lineNumbers = document.getElementById('lineNumbers');
+    if (!editor || !lineNumbers) return;
+    
     const lines = editor.value.split('\n').length;
     
     let html = '';
@@ -2044,6 +2274,189 @@ function updateLineNumbers() {
         html += `<span>${i}</span>`;
     }
     lineNumbers.innerHTML = html;
+}
+
+function showAutocomplete() {
+    const editor = document.getElementById('queryEditor');
+    const popup = document.getElementById('autocompletePopup');
+    const list = document.getElementById('autocompleteList');
+    if (!editor || !popup || !list) return;
+    
+    const cursorPos = editor.selectionStart;
+    const text = editor.value.substring(0, cursorPos);
+    
+    // Get the current word being typed
+    const match = text.match(/[`"']?([a-zA-Z_][a-zA-Z0-9_]*)$/);
+    if (!match || match[1].length < 1) {
+        hideAutocomplete();
+        return;
+    }
+    
+    const currentWord = match[1].toUpperCase();
+    
+    // Only show autocomplete if word is at least 2 characters
+    if (currentWord.length < 2) {
+        hideAutocomplete();
+        return;
+    }
+    
+    // Build autocomplete items
+    autocompleteItems = [];
+    
+    // Add SQL keywords
+    SQL_KEYWORDS.forEach(keyword => {
+        if (keyword.startsWith(currentWord) && keyword !== currentWord) {
+            autocompleteItems.push({ text: keyword, type: 'keyword' });
+        }
+    });
+    
+    // Add table names from current database
+    currentDatabaseTables.forEach(table => {
+        if (table.toUpperCase().startsWith(currentWord) && table.toUpperCase() !== currentWord) {
+            autocompleteItems.push({ text: table, type: 'table' });
+        }
+    });
+    
+    // Remove duplicates
+    autocompleteItems = autocompleteItems.filter((item, index, self) =>
+        index === self.findIndex(t => t.text === item.text)
+    );
+    
+    if (autocompleteItems.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+    
+    // Limit items shown
+    autocompleteItems = autocompleteItems.slice(0, 8);
+    autocompleteIndex = 0;
+    
+    // Render items - escape HTML to prevent XSS
+    list.innerHTML = autocompleteItems.map((item, index) => `
+        <div class="autocomplete-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="selectAutocompleteItemByIndex(${index})">
+            <span class="item-text">${escapeHtml(item.text)}</span>
+            <span class="item-type">${escapeHtml(item.type)}</span>
+        </div>
+    `).join('');
+    
+    // Position popup near cursor
+    const rect = editor.getBoundingClientRect();
+    const coords = getCaretCoordinates(editor, cursorPos);
+    
+    // Ensure popup stays within viewport
+    const popupLeft = Math.min(coords.left + rect.left - editor.scrollLeft, window.innerWidth - 250);
+    const popupTop = Math.min(coords.top + rect.top - editor.scrollTop + 20, window.innerHeight - 200);
+    
+    popup.style.left = popupLeft + 'px';
+    popup.style.top = popupTop + 'px';
+    popup.style.display = 'block';
+    autocompleteVisible = true;
+}
+
+function hideAutocomplete() {
+    const popup = document.getElementById('autocompletePopup');
+    if (popup) {
+        popup.style.display = 'none';
+    }
+    autocompleteVisible = false;
+    autocompleteItems = [];
+}
+
+function navigateAutocomplete(direction) {
+    autocompleteIndex += direction;
+    if (autocompleteIndex < 0) autocompleteIndex = autocompleteItems.length - 1;
+    if (autocompleteIndex >= autocompleteItems.length) autocompleteIndex = 0;
+    
+    const items = document.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        item.classList.toggle('selected', index === autocompleteIndex);
+    });
+    
+    // Scroll selected item into view
+    const selected = document.querySelector('.autocomplete-item.selected');
+    if (selected) {
+        selected.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function selectAutocompleteItem() {
+    if (autocompleteItems.length === 0) return;
+    selectAutocompleteItemByIndex(autocompleteIndex);
+}
+
+function selectAutocompleteItemByIndex(index) {
+    const editor = document.getElementById('queryEditor');
+    if (!editor || !autocompleteItems[index]) return;
+    
+    const item = autocompleteItems[index];
+    const cursorPos = editor.selectionStart;
+    const text = editor.value;
+    
+    // Find the start of the current word
+    const beforeCursor = text.substring(0, cursorPos);
+    const match = beforeCursor.match(/[`"']?([a-zA-Z_][a-zA-Z0-9_]*)$/);
+    if (!match) return;
+    
+    const wordStart = cursorPos - match[1].length;
+    const wordEnd = cursorPos;
+    
+    // Replace the word with the selected item
+    editor.value = text.substring(0, wordStart) + item.text + text.substring(wordEnd);
+    editor.selectionStart = editor.selectionEnd = wordStart + item.text.length;
+    
+    hideAutocomplete();
+    updateSyntaxHighlight();
+    updateLineNumbers();
+    editor.focus();
+}
+
+function insertAtCursor(text) {
+    const editor = document.getElementById('queryEditor');
+    if (!editor) return;
+    
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const value = editor.value;
+    
+    editor.value = value.substring(0, start) + text + value.substring(end);
+    editor.selectionStart = editor.selectionEnd = start + text.length;
+    
+    updateSyntaxHighlight();
+    updateLineNumbers();
+}
+
+function getCaretCoordinates(element, position) {
+    const div = document.createElement('div');
+    const style = getComputedStyle(element);
+    
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.whiteSpace = 'pre-wrap';
+    div.style.wordWrap = 'break-word';
+    div.style.width = style.width;
+    div.style.height = style.height;
+    div.style.padding = style.padding;
+    div.style.font = style.font;
+    div.style.lineHeight = style.lineHeight;
+    
+    div.textContent = element.value.substring(0, position);
+    document.body.appendChild(div);
+    
+    const span = document.createElement('span');
+    span.textContent = element.value.substring(position) || '.';
+    div.appendChild(span);
+    
+    const coordinates = {
+        top: span.offsetTop,
+        left: span.offsetLeft
+    };
+    
+    document.body.removeChild(div);
+    return coordinates;
+}
+
+function updateDatabaseTables(tables) {
+    currentDatabaseTables = tables || [];
 }
 
 async function executeQuery() {

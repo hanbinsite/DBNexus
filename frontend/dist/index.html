@@ -83,9 +83,13 @@
                             <path d="M5 12h14"/>
                         </svg>
                     </button>
-                    <button class="window-btn maximize" onclick="maximizeWindow()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="window-btn maximize" id="maximizeBtn" onclick="maximizeWindow()" title="最大化">
+                        <svg class="maximize-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        </svg>
+                        <svg class="restore-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                            <rect x="3" y="3" width="14" height="14" rx="2" fill="none"/>
+                            <rect x="7" y="7" width="14" height="14" rx="2"/>
                         </svg>
                     </button>
                     <button class="window-btn close" onclick="closeWindow()">
@@ -134,35 +138,51 @@
 
             <div class="resize-handle" id="sidebarResize"></div>
 
-            <!-- 工作区 -->
-            <section class="workspace">
-                <!-- 标签栏 -->
-                <div class="tab-bar" id="tabBar">
-                    <div class="tabs-container" id="tabsContainer">
-                        <div class="tab active" data-tab="query-1" data-type="query">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-                            </svg>
-                            <span>查询 1</span>
-                            <button class="tab-close" onclick="closeTab('query-1', event)">
+<!-- 工作区 -->
+                <section class="workspace">
+                    <!-- 标签栏 -->
+                    <div class="tab-bar" id="tabBar">
+                        <div class="tabs-container" id="tabsContainer">
+                            <!-- Tabs will be dynamically created -->
+                        </div>
+                        <div class="tab-actions">
+                            <button class="tab-action-btn" onclick="createNewTab()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M18 6 6 18M6 6l12 12"/>
+                                    <path d="M12 5v14M5 12h14"/>
                                 </svg>
                             </button>
                         </div>
                     </div>
-                    <div class="tab-actions">
-                        <button class="tab-action-btn" onclick="createNewTab()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 5v14M5 12h14"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
 
-                <!-- 查询编辑器面板 -->
-                <div class="editor-panel" id="editorPanel">
+                    <!-- 首页面板 -->
+                    <div class="welcome-panel" id="welcomePanel" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-primary);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 80px; height: 80px; color: var(--fg-muted); margin-bottom: 20px;">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                            <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+                            <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+                        </svg>
+                        <h2 style="color: var(--fg-secondary); font-size: 20px; margin-bottom: 8px;">DB Client</h2>
+                        <p style="color: var(--fg-muted); font-size: 14px; margin-bottom: 24px;">数据库管理工具</p>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn btn-primary" onclick="openConnectionDialog()" style="display: flex; align-items: center; gap: 6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 8v8M8 12h8"/>
+                                </svg>
+                                <span>新建连接</span>
+                            </button>
+                            <button class="btn btn-secondary" onclick="createNewTab()" style="display: flex; align-items: center; gap: 6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+                                </svg>
+                                <span>新建查询</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 查询编辑器面板 -->
+                    <div class="editor-panel" id="editorPanel" style="display: none;">
                     <div class="editor-toolbar">
                         <div class="editor-actions">
                             <button class="editor-btn" onclick="formatSQL()">
@@ -201,16 +221,22 @@
                             </select>
                         </div>
                     </div>
-                    <div class="editor-container">
+                    <div class="editor-container" id="editorContainer">
                         <div class="line-numbers" id="lineNumbers">
                             <span>1</span>
                         </div>
-                        <textarea class="query-editor" id="queryEditor" placeholder="-- 输入 SQL 查询语句...">SELECT * FROM users LIMIT 100;</textarea>
+                        <div class="sql-editor-wrapper">
+                            <pre class="sql-highlight" id="sqlHighlight"></pre>
+                            <textarea class="query-editor" id="queryEditor" placeholder="-- 输入 SQL 查询语句..." spellcheck="false">SELECT * FROM users LIMIT 100;</textarea>
+                        </div>
+                        <div class="autocomplete-popup" id="autocompletePopup" style="display: none;">
+                            <div class="autocomplete-list" id="autocompleteList"></div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 结果面板 -->
-                <div class="results-panel" id="resultsPanel">
+                <div class="results-panel" id="resultsPanel" style="display: none;">
                     <div class="results-header">
                         <div class="results-tabs">
                             <button class="results-tab active" data-results="grid" data-i18n="gridView">网格视图</button>
@@ -268,7 +294,7 @@
                     </div>
                 </div>
 
-                <div class="split-handle" id="editorResultsSplit"></div>
+                <div class="split-handle" id="editorResultsSplit" style="display: none;"></div>
                 
                 <!-- Navicat 风格数据表查看面板 (默认隐藏) -->
                 <div class="data-view-panel" id="dataViewPanel" style="display: none;">

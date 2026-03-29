@@ -2,22 +2,26 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"db-client/db"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App struct
 type App struct {
 	ctx           context.Context
 	driverManager *db.DriverManager
 	connections   []Connection
 	configPath    string
+	pool          *connectionPool
+	poolMutex     sync.RWMutex
 }
 
 // Connection represents a saved database connection
@@ -70,6 +74,7 @@ func NewApp() *App {
 		driverManager: db.NewDriverManager(),
 		connections:   make([]Connection, 0),
 		configPath:    configPath,
+		pool:          newConnectionPool(),
 	}
 }
 
@@ -81,7 +86,7 @@ func (a *App) startup(ctx context.Context) {
 
 // shutdown is called when the app closes
 func (a *App) shutdown(ctx context.Context) {
-	// Save any pending data
+	a.pool.closeAll()
 	a.saveConnections()
 }
 
@@ -106,25 +111,24 @@ func (a *App) GetLanguage() string {
 
 // SetLanguage sets the application language
 func (a *App) SetLanguage(lang string) error {
-	// Save to config file
 	homeDir, _ := os.UserHomeDir()
 	configDir := filepath.Join(homeDir, ".db-client")
 	os.MkdirAll(configDir, 0755)
 
 	configFile := filepath.Join(configDir, "config.json")
 
-	// Read existing config
 	config := make(map[string]interface{})
 	data, err := os.ReadFile(configFile)
 	if err == nil {
 		json.Unmarshal(data, &config)
 	}
 
-	// Update language
 	config["language"] = lang
 
-	// Save config
-	data, _ = json.MarshalIndent(config, "", "  ")
+	data, err = json.MarshalIndent(config, "", " ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
 	return os.WriteFile(configFile, data, 0644)
 }
 
@@ -214,18 +218,18 @@ func (a *App) DeleteConnection(id string) error {
 
 // TestConnection tests a database connection
 func (a *App) TestConnection(config Connection) (bool, string) {
-	// Validate config
+	lang := a.getCurrentLang()
+
 	if config.Host == "" && config.Type != "sqlite" {
-		return false, "请输入主机地址"
+		return false, a.t(MsgHostRequired, lang)
 	}
 	if config.Username == "" && config.Type != "redis" && config.Type != "sqlite" {
-		return false, "请输入用户名"
+		return false, a.t(MsgUsernameRequired, lang)
 	}
 	if config.Type == "sqlite" && config.Database == "" {
-		return false, "请选择 SQLite 数据库文件"
+		return false, a.t(MsgSQLiteFileRequired, lang)
 	}
 
-	// Use default database if not specified
 	database := config.Database
 	if database == "" {
 		database = a.getDefaultDatabase(config.Type)
@@ -243,17 +247,17 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 
 	driver, err := a.driverManager.Connect(dbConfig)
 	if err != nil {
-		return false, a.formatError("连接失败", err, config.Type)
+		return false, a.formatError(a.t(MsgConnectionFailed, lang), err, config.Type)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
 		driver.Close()
-		return false, a.formatError("连接超时或认证失败", err, config.Type)
+		return false, a.formatError(a.t(MsgConnectionTimeout, lang), err, config.Type)
 	}
 
 	driver.Close()
-	return true, fmt.Sprintf("连接成功！数据库: %s", database)
+	return true, fmt.Sprintf(a.t(MsgConnectionSuccess, lang), database)
 }
 
 // formatError formats error message with helpful hints
@@ -284,18 +288,7 @@ func (a *App) formatError(prefix string, err error, dbType string) string {
 
 // contains checks if string contains substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			len(s) > len(substr)+1 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(s, substr)
 }
 
 // getDefaultDatabase returns the default database for connection
@@ -436,6 +429,7 @@ type IndexInfo struct {
 	Type        string   `json:"type"` // PRIMARY, UNIQUE, INDEX, FULLTEXT
 	Columns     []string `json:"columns"`
 	Unique      bool     `json:"unique"`
+	PrimaryKey  bool     `json:"primary_key"`
 	Nullable    bool     `json:"nullable"`
 	Cardinality int64    `json:"cardinality"`
 	Comment     string   `json:"comment,omitempty"`
@@ -463,6 +457,12 @@ type TableStats struct {
 	Comment     string `json:"comment,omitempty"`
 }
 
+// sanitizeIdentifier sanitizes a SQL identifier (table/column name) to prevent SQL injection
+func sanitizeIdentifier(identifier string) string {
+	replacer := strings.NewReplacer("'", "''", "`", "``", `"`, `""`)
+	return replacer.Replace(identifier)
+}
+
 // GetTableIndexes returns indexes for a table
 func (a *App) GetTableIndexes(config Connection, database string, table string) ([]IndexInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
@@ -479,10 +479,12 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 
 	switch config.Type {
 	case "mysql":
-		query = fmt.Sprintf("SHOW INDEX FROM `%s`", table)
+		safeTable := sanitizeIdentifier(table)
+		query = fmt.Sprintf("SHOW INDEX FROM `%s`", safeTable)
 	case "postgresql", "polardb", "gaussdb":
+		safeTable := sanitizeIdentifier(table)
 		query = fmt.Sprintf(`
-			SELECT 
+			SELECT
 				i.relname as index_name,
 				ix.indisunique as is_unique,
 				ix.indisprimary as is_primary,
@@ -493,7 +495,7 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
 			WHERE t.relname = '%s'
 			GROUP BY i.relname, ix.indisunique, ix.indisprimary
-		`, table)
+		`, safeTable)
 	default:
 		return []IndexInfo{}, nil
 	}
@@ -596,10 +598,13 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 
 	var query string
 
+	safeTable := sanitizeIdentifier(table)
+	safeDatabase := sanitizeIdentifier(database)
+
 	switch config.Type {
 	case "mysql":
 		query = fmt.Sprintf(`
-			SELECT 
+			SELECT
 				CONSTRAINT_NAME,
 				COLUMN_NAME,
 				REFERENCED_TABLE_NAME,
@@ -607,13 +612,13 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 				UPDATE_RULE,
 				DELETE_RULE
 			FROM information_schema.KEY_COLUMN_USAGE kcu
-			JOIN information_schema.REFERENTIAL_CONSTRAINTS rc 
+			JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
 				ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
 				AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
-			WHERE kcu.TABLE_NAME = '%s' 
-				AND kcu.TABLE_SCHEMA = '%s'
-				AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-		`, table, database)
+			WHERE kcu.TABLE_NAME = '%s'
+			AND kcu.TABLE_SCHEMA = '%s'
+			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+		`, safeTable, safeDatabase)
 	case "postgresql", "polardb", "gaussdb":
 		query = fmt.Sprintf(`
 			SELECT
@@ -629,7 +634,7 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 			JOIN pg_class ref ON ref.oid = c.confrelid
 			JOIN pg_attribute af ON af.attrelid = ref.oid AND af.attnum = ANY(c.confkey)
 			WHERE c.contype = 'f' AND t.relname = '%s'
-		`, table)
+		`, safeTable)
 	default:
 		return []ForeignKeyInfo{}, nil
 	}
@@ -678,10 +683,11 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 
 	var stats TableStats
 
-	// Get row count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", table)
+	safeTable := sanitizeIdentifier(table)
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", safeTable)
 	if config.Type == "postgresql" || config.Type == "polardb" || config.Type == "gaussdb" {
-		countQuery = fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", table)
+		countQuery = fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", safeTable)
 	}
 
 	rows, err := driver.Query(a.ctx, countQuery)
@@ -690,17 +696,16 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 		rows.Close()
 	}
 
-	// Get table info
 	var infoQuery string
 	switch config.Type {
 	case "mysql":
-		infoQuery = fmt.Sprintf("SHOW TABLE STATUS LIKE '%s'", table)
+		infoQuery = fmt.Sprintf("SHOW TABLE STATUS LIKE '%s'", safeTable)
 	case "postgresql", "polardb", "gaussdb":
 		infoQuery = fmt.Sprintf(`
-			SELECT 
+			SELECT
 				pg_relation_size('%s') as data_length,
 				pg_indexes_size('%s') as index_length
-		`, table, table)
+		`, safeTable, safeTable)
 	}
 
 	rows2, err := driver.Query(a.ctx, infoQuery)
@@ -996,6 +1001,7 @@ type TestResult struct {
 // RunConnectionTest runs a connection test
 func (a *App) RunConnectionTest(config Connection) TestResult {
 	startTime := time.Now()
+	lang := a.getCurrentLang()
 
 	dbConfig := db.ConnectionConfig{
 		Type:     db.DBType(config.Type),
@@ -1012,7 +1018,7 @@ func (a *App) RunConnectionTest(config Connection) TestResult {
 		return TestResult{
 			Name:    config.Name,
 			Success: false,
-			Message: fmt.Sprintf("连接失败: %v", err),
+			Message: fmt.Sprintf("%s: %v", a.t(MsgConnectionFailed, lang), err),
 			Time:    time.Since(startTime).String(),
 		}
 	}
@@ -1023,7 +1029,7 @@ func (a *App) RunConnectionTest(config Connection) TestResult {
 		return TestResult{
 			Name:    config.Name,
 			Success: false,
-			Message: fmt.Sprintf("Ping 失败: %v", err),
+			Message: fmt.Sprintf(a.t(MsgPingFailed, lang), err),
 			Time:    time.Since(startTime).String(),
 		}
 	}
@@ -1031,7 +1037,7 @@ func (a *App) RunConnectionTest(config Connection) TestResult {
 	return TestResult{
 		Name:    config.Name,
 		Success: true,
-		Message: "连接成功",
+		Message: a.t(MsgConnected, lang),
 		Time:    time.Since(startTime).String(),
 	}
 }
