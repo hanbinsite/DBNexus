@@ -2752,3 +2752,101 @@ body {
     font-size: 11px;
     text-align: center;
 }
+
+/* ==========================================================================
+   Window Frameless Drag & Resize - Invisible & Clean
+   ========================================================================== */
+
+/* Window drag region - entire toolbar is draggable */
+.toolbar {
+    -webkit-app-region: drag !important;
+    user-select: none !important;
+}
+
+/* Only these specific elements should NOT be draggable */
+.toolbar-btn,
+.window-controls,
+.toolbar-divider,
+.theme-toggle,
+.sidebar-action-btn {
+    -webkit-app-region: no-drag !important;
+}
+
+/* Window resize handles - completely invisible */
+.resize-handle-top,
+.resize-handle-bottom,
+.resize-handle-left,
+.resize-handle-right,
+.resize-handle-top-left,
+.resize-handle-top-right,
+.resize-handle-bottom-left,
+.resize-handle-bottom-right {
+    position: fixed !important;
+    z-index: 999999 !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-app-region: no-drag !important;
+    pointer-events: auto !important;
+    transition: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Top and bottom edges */
+.resize-handle-top,
+.resize-handle-bottom {
+    left: 0 !important;
+    right: 0 !important;
+    height: 8px !important;
+}
+
+.resize-handle-top {
+    cursor: n-resize !important;
+}
+
+.resize-handle-bottom {
+    cursor: s-resize !important;
+}
+
+/* Left and right edges */
+.resize-handle-left,
+.resize-handle-right {
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 8px !important;
+}
+
+.resize-handle-left {
+    cursor: w-resize !important;
+}
+
+.resize-handle-right {
+    cursor: e-resize !important;
+}
+
+/* Corner handles */
+.resize-handle-top-left {
+    width: 12px !important;
+    height: 12px !important;
+    cursor: nw-resize !important;
+}
+
+.resize-handle-top-right {
+    width: 12px !important;
+    height: 12px !important;
+    cursor: ne-resize !important;
+}
+
+.resize-handle-bottom-left {
+    width: 12px !important;
+    height: 12px !important;
+    cursor: sw-resize !important;
+}
+
+.resize-handle-bottom-right {
+    width: 12px !important;
+    height: 12px !important;
+    cursor: se-resize !important;
+}

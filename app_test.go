@@ -1,6 +1,7 @@
 package main
 
 import (
+	"db-client/db"
 	"testing"
 )
 
@@ -9,10 +10,14 @@ func TestSanitizeIdentifier(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"table_name", "table_name"},
-		{"table`name", "table``name"},
-		{"table'name", "table''name"},
-		{`table"name`, `table""name`},
+		{"users", "users"},
+		{"user_data", "user_data"},
+		{"Table123", "Table123"},
+		{"public.users", "public.users"},
+		{"users123", "users123"},
+		{"table`name", "tablename"},
+		{"table'name", "tablename"},
+		{`table"name`, "tablename"},
 		{"normal_table", "normal_table"},
 	}
 
@@ -20,6 +25,28 @@ func TestSanitizeIdentifier(t *testing.T) {
 		result := sanitizeIdentifier(tt.input)
 		if result != tt.expected {
 			t.Errorf("sanitizeIdentifier(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestSanitizeIdentifierBlocksDangerous(t *testing.T) {
+	dangerous := []string{
+		"; DROP TABLE",
+		"-- comment",
+		"/* attack */",
+		"users; DROP",
+		"table' OR '1'='1",
+		"users UNION SELECT",
+		"table\x00name",
+		"table\nname",
+		"table\rname",
+		"table name",
+	}
+
+	for _, input := range dangerous {
+		result := sanitizeIdentifier(input)
+		if result == input || result == "" {
+			t.Errorf("sanitizeIdentifier(%q) was not properly sanitized, got %q", input, result)
 		}
 	}
 }
@@ -110,5 +137,33 @@ func TestConnectionPool(t *testing.T) {
 	}
 	if driver != nil {
 		t.Error("get on empty pool should return nil driver")
+	}
+}
+
+func TestBuildKey(t *testing.T) {
+	tests := []struct {
+		dbType      string
+		host        string
+		port        int
+		user        string
+		db          string
+		expectedKey string
+	}{
+		{"postgresql", "localhost", 5432, "postgres", "mydb", "postgresql:localhost:5432:postgres:mydb"},
+		{"mysql", "127.0.0.1", 3306, "root", "testdb", "mysql:127.0.0.1:3306:root:testdb"},
+	}
+
+	for _, tt := range tests {
+		config := db.ConnectionConfig{
+			Type:     db.DBType(tt.dbType),
+			Host:     tt.host,
+			Port:     tt.port,
+			Username: tt.user,
+			Database: tt.db,
+		}
+		key := buildKey(config)
+		if key != tt.expectedKey {
+			t.Errorf("buildKey() = %q, want %q", key, tt.expectedKey)
+		}
 	}
 }

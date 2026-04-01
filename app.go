@@ -81,6 +81,7 @@ func NewApp() *App {
 // startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	initEncryptionKey()
 	a.loadConnections()
 }
 
@@ -88,11 +89,6 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	a.pool.closeAll()
 	a.saveConnections()
-}
-
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, Welcome to DB Client!", name)
 }
 
 // ==========================================================================
@@ -188,10 +184,25 @@ func (a *App) SaveConnection(conn Connection) error {
 		conn.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
+	// Encrypt password before saving
+	if conn.SavePassword && conn.Password != "" {
+		encrypted, err := encryptPassword(conn.Password)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt password: %w", err)
+		}
+		conn.Password = encrypted
+	} else if !conn.SavePassword {
+		conn.Password = ""
+	}
+
 	// Find existing or add new
 	found := false
 	for i, c := range a.connections {
 		if c.ID == conn.ID {
+			// Preserve encrypted password if not changed
+			if conn.Password == "" && c.Password != "" && !conn.SavePassword {
+				conn.Password = c.Password
+			}
 			a.connections[i] = conn
 			found = true
 			break
@@ -220,6 +231,14 @@ func (a *App) DeleteConnection(id string) error {
 func (a *App) TestConnection(config Connection) (bool, string) {
 	lang := a.getCurrentLang()
 
+	// Decrypt password if it's saved encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
 	if config.Host == "" && config.Type != "sqlite" {
 		return false, a.t(MsgHostRequired, lang)
 	}
@@ -247,13 +266,13 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 
 	driver, err := a.driverManager.Connect(dbConfig)
 	if err != nil {
-		return false, a.formatError(a.t(MsgConnectionFailed, lang), err, config.Type)
+		return false, a.formatError(a.t(MsgConnectionFailed, lang), err, config.Type, lang)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
 		driver.Close()
-		return false, a.formatError(a.t(MsgConnectionTimeout, lang), err, config.Type)
+		return false, a.formatError(a.t(MsgConnectionTimeout, lang), err, config.Type, lang)
 	}
 
 	driver.Close()
@@ -261,26 +280,26 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 }
 
 // formatError formats error message with helpful hints
-func (a *App) formatError(prefix string, err error, dbType string) string {
+func (a *App) formatError(prefix string, err error, dbType string, lang string) string {
 	errMsg := err.Error()
 
 	// Add specific hints based on error type
 	hint := ""
 	switch {
 	case contains(errMsg, "connection refused"):
-		hint = "\n\n💡 提示: 请检查主机地址和端口是否正确，以及数据库服务是否正在运行"
+		hint = a.t(MsgHintConnection, lang)
 	case contains(errMsg, "authentication failed"):
-		hint = "\n\n💡 提示: 用户名或密码错误，请检查凭据"
+		hint = a.t(MsgHintAuth, lang)
 	case contains(errMsg, "no such host"):
-		hint = "\n\n💡 提示: 无法解析主机地址，请检查网络连接和主机名"
+		hint = a.t(MsgHintHost, lang)
 	case contains(errMsg, "timeout"):
-		hint = "\n\n💡 提示: 连接超时，请检查防火墙设置和网络连接"
+		hint = a.t(MsgHintTimeout, lang)
 	case contains(errMsg, "Unknown database"):
-		hint = "\n\n💡 提示: 数据库不存在，请检查数据库名称或留空以自动获取"
+		hint = a.t(MsgHintDatabase, lang)
 	case dbType == "mysql" && contains(errMsg, "Access denied"):
-		hint = "\n\n💡 提示: MySQL 访问被拒绝，请检查用户名和密码，以及用户是否有远程连接权限"
+		hint = a.t(MsgHintMySQLAccess, lang)
 	case dbType == "postgresql" && contains(errMsg, "no password supplied"):
-		hint = "\n\n💡 提示: PostgreSQL 需要密码认证，请提供密码"
+		hint = a.t(MsgHintPGPassword, lang)
 	}
 
 	return fmt.Sprintf("%s: %s%s", prefix, errMsg, hint)
@@ -309,6 +328,14 @@ func (a *App) getDefaultDatabase(dbType string) string {
 
 // ConnectToDatabase connects to a database and returns connection status
 func (a *App) ConnectToDatabase(config Connection) (bool, string) {
+	// Decrypt password if it's saved encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
 	// Use default database if not specified
 	database := config.Database
 	if database == "" {
@@ -325,14 +352,17 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		SSLMode:  config.SSLMode,
 	}
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	key := buildKey(dbConfig)
+	driver, err := a.pool.getOrConnect(key, func() (db.DatabaseDriver, error) {
+		return a.driverManager.Connect(dbConfig)
+	})
 	if err != nil {
 		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
 	err = driver.Ping(a.ctx)
 	if err != nil {
-		driver.Close()
+		a.pool.remove(key)
 		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
@@ -341,7 +371,8 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 
 // DisconnectFromDatabase disconnects from a database
 func (a *App) DisconnectFromDatabase(config Connection) error {
-	// In a real implementation, you'd close the specific connection
+	key := buildKey(a.connectionToDBConfig(config))
+	a.pool.remove(key)
 	return nil
 }
 
@@ -353,11 +384,10 @@ func (a *App) DisconnectFromDatabase(config Connection) error {
 func (a *App) GetDatabases(config Connection) ([]DatabaseInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer driver.Close()
 
 	databases, err := driver.GetDatabases(a.ctx)
 	if err != nil {
@@ -365,8 +395,8 @@ func (a *App) GetDatabases(config Connection) ([]DatabaseInfo, error) {
 	}
 
 	result := make([]DatabaseInfo, len(databases))
-	for i, db := range databases {
-		result[i] = DatabaseInfo{Name: db}
+	for i, d := range databases {
+		result[i] = DatabaseInfo{Name: d}
 	}
 
 	return result, nil
@@ -377,11 +407,10 @@ func (a *App) GetTables(config Connection, database string) ([]TableInfo, error)
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer driver.Close()
 
 	tables, err := driver.GetTables(a.ctx)
 	if err != nil {
@@ -398,27 +427,127 @@ func (a *App) GetTables(config Connection, database string) ([]TableInfo, error)
 
 // GetViews returns a list of views
 func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) {
-	// Views are typically returned with tables in most databases
-	// This is a simplified implementation
-	return []TableInfo{}, nil
+	dbConfig := a.connectionToDBConfig(config)
+	dbConfig.Database = database
+
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var query string
+	switch config.Type {
+	case "mysql":
+		query = `
+			SELECT TABLE_NAME 
+			FROM information_schema.VIEWS 
+			WHERE TABLE_SCHEMA = '` + dbConfig.Database + `'
+		`
+	case "postgresql", "polardb", "gaussdb":
+		query = `
+			SELECT viewname 
+			FROM pg_views 
+			WHERE schemaname = 'public'
+		`
+	case "sqlite":
+		query = `
+			SELECT name 
+			FROM sqlite_master 
+			WHERE type='view'
+		`
+	default:
+		return []TableInfo{}, nil
+	}
+
+	rows, err := driver.Query(a.ctx, query)
+	if err != nil {
+		return []TableInfo{}, nil
+	}
+	defer rows.Close()
+
+	var views []TableInfo
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err == nil {
+			views = append(views, TableInfo{Name: name, Type: "view"})
+		}
+	}
+
+	return views, nil
 }
 
 // GetFunctions returns a list of stored functions/procedures
 func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, error) {
-	// Simplified implementation
-	return []TableInfo{}, nil
+	dbConfig := a.connectionToDBConfig(config)
+	dbConfig.Database = database
+
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var query string
+	switch config.Type {
+	case "mysql":
+		query = `
+			SELECT ROUTINE_NAME 
+			FROM information_schema.ROUTINES 
+			WHERE ROUTINE_TYPE = 'FUNCTION' 
+			AND ROUTINE_SCHEMA = '` + dbConfig.Database + `'
+		`
+	case "postgresql", "polardb", "gaussdb":
+		query = `
+			SELECT proname 
+			FROM pg_proc 
+			JOIN pg_namespace n ON pg_proc.pronamespace = n.oid 
+			WHERE n.nspname = 'public' 
+			AND pg_proc.prokind = 'f'
+			LIMIT 100
+		`
+	case "sqlite":
+		query = `
+			SELECT name 
+			FROM sqlite_master 
+			WHERE type='view' AND name LIKE 'func_%'
+		`
+	default:
+		return []TableInfo{}, nil
+	}
+
+	rows, err := driver.Query(a.ctx, query)
+	if err != nil {
+		return []TableInfo{}, nil
+	}
+	defer rows.Close()
+
+	var functions []TableInfo
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err == nil {
+			functions = append(functions, TableInfo{Name: name, Type: "function"})
+		}
+	}
+
+	return functions, nil
 }
 
 // GetTableColumns returns column information for a table
 func (a *App) GetTableColumns(config Connection, database string, table string) ([]db.ColumnInfo, error) {
+	// Decrypt password if stored encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer driver.Close()
 
 	return driver.GetTableStructure(a.ctx, table)
 }
@@ -459,8 +588,21 @@ type TableStats struct {
 
 // sanitizeIdentifier sanitizes a SQL identifier (table/column name) to prevent SQL injection
 func sanitizeIdentifier(identifier string) string {
-	replacer := strings.NewReplacer("'", "''", "`", "``", `"`, `""`)
-	return replacer.Replace(identifier)
+	// Block dangerous characters
+	if strings.ContainsAny(identifier, ";--/*\\=(){}[]&|!<>") {
+		return "invalid_identifier"
+	}
+	// Only allow alphanumeric characters, underscores, and dots (for schema.table)
+	cleaned := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
+			return r
+		}
+		return -1
+	}, identifier)
+	if cleaned == "" {
+		return "invalid_identifier"
+	}
+	return cleaned
 }
 
 // GetTableIndexes returns indexes for a table
@@ -468,11 +610,10 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer driver.Close()
 
 	var query string
 	var indexes []IndexInfo
@@ -590,11 +731,10 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer driver.Close()
 
 	var query string
 
@@ -675,11 +815,10 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return TableStats{}, err
 	}
-	defer driver.Close()
 
 	var stats TableStats
 
@@ -800,17 +939,39 @@ func convertRefAction(action string) string {
 func (a *App) ExecuteQuery(config Connection, database string, query string) QueryResult {
 	startTime := time.Now()
 
+	// Decrypt password if stored encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
-	if err != nil {
-		return QueryResult{
-			Error:    fmt.Sprintf("Connection failed: %v", err),
-			Duration: time.Since(startTime).String(),
+	// Use connection pool
+	key := buildKey(dbConfig)
+	a.poolMutex.RLock()
+	driver, exists := a.pool.get(key)
+	a.poolMutex.RUnlock()
+
+	if !exists {
+		a.poolMutex.Lock()
+		if driver, exists = a.pool.get(key); !exists {
+			newDriver, err := a.driverManager.Connect(dbConfig)
+			if err != nil {
+				a.poolMutex.Unlock()
+				return QueryResult{
+					Error:    fmt.Sprintf("Connection failed: %v", err),
+					Duration: time.Since(startTime).String(),
+				}
+			}
+			driver = newDriver
+			a.pool.set(key, driver)
 		}
+		a.poolMutex.Unlock()
 	}
-	defer driver.Close()
 
 	rows, err := driver.Query(a.ctx, query)
 	if err != nil {
@@ -938,6 +1099,34 @@ func (a *App) connectionToDBConfig(conn Connection) db.ConnectionConfig {
 	}
 }
 
+// getDriverForConfig gets a driver from pool or creates a new one
+func (a *App) getDriverForConfig(dbConfig db.ConnectionConfig) (db.DatabaseDriver, error) {
+	key := buildKey(dbConfig)
+
+	a.poolMutex.RLock()
+	if driver, exists := a.pool.get(key); exists {
+		a.poolMutex.RUnlock()
+		return driver, nil
+	}
+	a.poolMutex.RUnlock()
+
+	a.poolMutex.Lock()
+	defer a.poolMutex.Unlock()
+
+	// Double check
+	if driver, exists := a.pool.get(key); exists {
+		return driver, nil
+	}
+
+	driver, err := a.driverManager.Connect(dbConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	a.pool.set(key, driver)
+	return driver, nil
+}
+
 func (a *App) loadConnections() error {
 	// Create config directory if not exists
 	configDir := filepath.Dir(a.configPath)
@@ -1002,6 +1191,14 @@ type TestResult struct {
 func (a *App) RunConnectionTest(config Connection) TestResult {
 	startTime := time.Now()
 	lang := a.getCurrentLang()
+
+	// Decrypt password if it's saved encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
 
 	dbConfig := db.ConnectionConfig{
 		Type:     db.DBType(config.Type),
@@ -1073,6 +1270,14 @@ func (a *App) GetServerInfo(config Connection) map[string]string {
 		"host":     config.Host,
 		"port":     fmt.Sprintf("%d", config.Port),
 		"database": config.Database,
+	}
+
+	// Decrypt password if it's saved encrypted
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
 	}
 
 	// Try to get version info

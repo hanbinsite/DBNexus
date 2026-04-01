@@ -1217,62 +1217,113 @@ async function loadTableData(tableName, database) {
         return;
     }
     
+    // Ensure database is set - use selectedDatabase as fallback
+    const activeDb = database || state.selectedDatabase;
+    if (!activeDb) {
+        showNotification('warning', '请先选择数据库');
+        hideLoading();
+        return;
+    }
+    
+    state.currentTable = state.currentTable || {};
+    state.currentTable.name = tableName;
+    state.currentTable.database = activeDb;
+    
     showLoading(`加载表数据: ${tableName}...`);
     
     try {
+        let columns = [];
+        // Determine connection type for proper SQL quoting
+        const connType = state.activeConnection.type || 'mysql';
+        
+        // Format table identifier based on database type
+        let quotedTableName;
+        if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
+            quotedTableName = `"${tableName}"`;
+        } else {
+            quotedTableName = `\`${tableName}\``;
+        }
+        
         // Load columns for filter dropdowns
         if (isWailsAvailable()) {
-            const columns = await WailsAPI.getTableColumns(state.activeConnection, database, tableName);
-            populateFilterDropdowns(columns);
-            populateStructureView(columns);
+            try {
+                columns = await WailsAPI.getTableColumns(state.activeConnection, activeDb, tableName);
+                if (columns && columns.length > 0) {
+                    populateFilterDropdowns(columns);
+                    populateStructureView(columns);
+                }
+            } catch (e) {
+                console.warn('Failed to load columns:', e);
+            }
+        }
+        
+        // Load table stats
+        if (isWailsAvailable()) {
+            try {
+                const stats = await WailsAPI.getTableStats(state.activeConnection, activeDb, tableName);
+                if (stats && stats.engine) {
+                    document.getElementById('dvTableEngine').textContent = stats.engine;
+                }
+            } catch (e) {
+                console.log('Stats not available:', e);
+            }
         }
         
         // Execute query to get data
-        const query = `SELECT * FROM \`${tableName}\` LIMIT 1000`;
+        const query = `SELECT * FROM ${quotedTableName} LIMIT 1000`;
         
         if (isWailsAvailable()) {
-            const result = await WailsAPI.executeQuery(state.activeConnection, database, query);
+            const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
             
-            if (result.error) {
+            if (result && result.error) {
                 showNotification('error', result.error);
+            } else if (result) {
+                // Store all data for pagination
+                pagination.allData = result.rows || [];
+                pagination.columns = result.columns || [];
+                pagination.totalRows = result.row_count || 0;
+                pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
+                pagination.currentPage = 1;
+                
+                updatePaginationUI();
+                renderCurrentPage();
             } else {
-                renderDataView(result);
+                showNotification('warning', '未获取到数据');
             }
         } else {
             // Mock data
             await new Promise(resolve => setTimeout(resolve, 300));
             
-            const mockResult = {
-                columns: ['id', 'name', 'email', 'created_at', 'status'],
-                rows: [
-                    [1, '张三', 'zhangsan@example.com', '2024-01-15 10:30:00', 'active'],
-                    [2, '李四', 'lisi@example.com', '2024-01-16 11:45:00', 'active'],
-                    [3, '王五', 'wangwu@example.com', '2024-01-17 14:20:00', 'inactive'],
-                    [4, '赵六', 'zhaoliu@example.com', '2024-01-18 09:15:00', 'active'],
-                    [5, '钱七', 'qianqi@example.com', '2024-01-19 16:30:00', 'pending'],
-                    [6, '孙八', 'sunba@example.com', '2024-01-20 13:25:00', 'active'],
-                    [7, '周九', 'zhoujiu@example.com', '2024-01-21 10:10:00', 'inactive'],
-                    [8, '吴十', 'wushi@example.com', '2024-01-22 15:45:00', 'active'],
-                ],
-                row_count: 8,
-                duration: '0.015s'
-            };
+            const mockColumns = ['id', 'name', 'email', 'created_at', 'status'];
+            const mockRows = [
+                [1, '张三', 'zhangsan@example.com', '2024-01-15 10:30:00', 'active'],
+                [2, '李四', 'lisi@example.com', '2024-01-16 11:45:00', 'active'],
+                [3, '王五', 'wangwu@example.com', '2024-01-17 14:20:00', 'inactive'],
+            ];
             
-            renderDataView(mockResult);
+            pagination.allData = mockRows;
+            pagination.columns = mockColumns;
+            pagination.totalRows = mockRows.length;
+            pagination.totalPages = 1;
+            pagination.currentPage = 1;
             
-            // Populate mock structure
-            const mockColumns = [
+            updatePaginationUI();
+            renderCurrentPage();
+            
+            const mockColumnsInfo = [
                 { name: 'id', type: 'INT', nullable: false, primary_key: true, default_value: 'auto_increment' },
                 { name: 'name', type: 'VARCHAR(100)', nullable: false, primary_key: false, default_value: '' },
                 { name: 'email', type: 'VARCHAR(255)', nullable: true, primary_key: false, default_value: '' },
                 { name: 'created_at', type: 'DATETIME', nullable: true, primary_key: false, default_value: 'CURRENT_TIMESTAMP' },
-                { name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" }
+                { name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" },
             ];
-            populateFilterDropdowns(mockColumns);
-            populateStructureView(mockColumns);
+            populateFilterDropdowns(mockColumnsInfo);
+            populateStructureView(mockColumnsInfo);
         }
     } catch (error) {
-        showNotification('error', `加载数据失败: ${error.message}`);
+        const msg = error?.message || error?.toString() || '未知错误';
+        console.error('Load table data error:', error);
+        showNotification('error', `加载数据失败: ${msg}`);
     }
     
     hideLoading();
@@ -1955,44 +2006,78 @@ async function loadTableData(tableName, database) {
         return;
     }
     
+    // Ensure database is set - use selectedDatabase as fallback
+    const activeDb = database || state.selectedDatabase;
+    if (!activeDb) {
+        showNotification('warning', '请先选择数据库');
+        hideLoading();
+        return;
+    }
+    
+    state.currentTable = state.currentTable || {};
+    state.currentTable.name = tableName;
+    state.currentTable.database = activeDb;
+    
     showLoading(`加载表数据: ${tableName}...`);
     
     try {
+        let columns = [];
+        // Determine connection type for proper SQL quoting
+        const connType = state.activeConnection.type || 'mysql';
+        
+        // Format table identifier based on database type
+        let quotedTableName;
+        if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
+            quotedTableName = `"${tableName}"`;
+        } else {
+            quotedTableName = `\`${tableName}\``;
+        }
+        
         // Load columns for filter dropdowns
         if (isWailsAvailable()) {
-            const columns = await WailsAPI.getTableColumns(state.activeConnection, database, tableName);
-            populateFilterDropdowns(columns);
-            populateStructureView(columns);
+            try {
+                columns = await WailsAPI.getTableColumns(state.activeConnection, activeDb, tableName);
+                if (columns && columns.length > 0) {
+                    populateFilterDropdowns(columns);
+                    populateStructureView(columns);
+                }
+            } catch (e) {
+                console.warn('Failed to load columns:', e);
+            }
         }
         
         // Load table stats
         if (isWailsAvailable()) {
             try {
-                const stats = await WailsAPI.getTableStats(state.activeConnection, database, tableName);
-                document.getElementById('dvTableEngine').textContent = stats.engine || 'InnoDB';
+                const stats = await WailsAPI.getTableStats(state.activeConnection, activeDb, tableName);
+                if (stats && stats.engine) {
+                    document.getElementById('dvTableEngine').textContent = stats.engine;
+                }
             } catch (e) {
                 console.log('Stats not available:', e);
             }
         }
         
-        // Execute query to get data
-        const query = `SELECT * FROM \`${tableName}\` LIMIT 10000`;
+        // Execute query to get data - using proper quoting
+        const query = `SELECT * FROM ${quotedTableName} LIMIT 10000`;
         
         if (isWailsAvailable()) {
-            const result = await WailsAPI.executeQuery(state.activeConnection, database, query);
+            const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
             
-            if (result.error) {
+            if (result && result.error) {
                 showNotification('error', result.error);
-            } else {
+            } else if (result) {
                 // Store all data for pagination
-                pagination.allData = result.rows;
-                pagination.columns = result.columns;
-                pagination.totalRows = result.row_count;
-                pagination.totalPages = Math.ceil(result.row_count / pagination.pageSize);
+                pagination.allData = result.rows || [];
+                pagination.columns = result.columns || [];
+                pagination.totalRows = result.row_count || 0;
+                pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
                 pagination.currentPage = 1;
                 
                 updatePaginationUI();
                 renderCurrentPage();
+            } else {
+                showNotification('warning', '未获取到数据');
             }
         } else {
             // Mock data
@@ -2036,7 +2121,9 @@ async function loadTableData(tableName, database) {
             populateStructureView(mockColumnsInfo);
         }
     } catch (error) {
-        showNotification('error', `加载数据失败: ${error.message}`);
+        const msg = error?.message || error?.toString() || '未知错误';
+        console.error('Load table data error:', error);
+        showNotification('error', `加载数据失败: ${msg}`);
     }
     
     hideLoading();
@@ -2221,45 +2308,56 @@ function updateSyntaxHighlight() {
     const highlight = document.getElementById('sqlHighlight');
     if (!editor || !highlight) return;
     
-    let code = editor.value;
+    // Get plain text from editor
+    const text = editor.value;
     
-    // Escape HTML
-    code = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Escape HTML to prevent XSS and display issues
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     
     // Highlight comments (-- single line)
-    code = code.replace(/(--.*$)/gm, '<span class="comment">$1</span>');
+    html = html.replace(/(--[^\n]*)/g, '<span class="comment">$1</span>');
     
     // Highlight multi-line comments /* ... */
-    code = code.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
+    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
     
-    // Highlight strings (single and double quotes)
-    code = code.replace(/('(?:[^'\\]|\\.)*')/g, '<span class="string">$1</span>');
-    code = code.replace(/("(?:[^"\\]|\\.)*")/g, '<span class="string">$1</span>');
+    // Highlight strings (single quotes)
+    html = html.replace(/('[^']*')/g, '<span class="string">$1</span>');
+    
+    // Highlight strings (double quotes)
+    html = html.replace(/("[^"]*")/g, '<span class="string">$1</span>');
     
     // Highlight numbers
-    code = code.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
+    html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
     
-    // Highlight keywords
-    SQL_KEYWORDS.forEach(keyword => {
+    // Highlight SQL keywords (case insensitive)
+    const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
+        'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP',
+        'INDEX', 'VIEW', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER', 
+        'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'AS', 'DISTINCT', 'CASE', 
+        'WHEN', 'THEN', 'ELSE', 'END', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES'];
+    
+    keywords.forEach(keyword => {
         const regex = new RegExp(`\\b(${keyword})\\b`, 'gi');
-        code = code.replace(regex, (match) => {
-            // Don't highlight if already inside a span
-            return `<span class="keyword">${match}</span>`;
-        });
+        html = html.replace(regex, '<span class="keyword">$1</span>');
     });
     
     // Highlight functions
-    SQL_FUNCTIONS.forEach(func => {
+    const functions = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
+        'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT', 'NOW', 'IFNULL'];
+    
+    functions.forEach(func => {
         const regex = new RegExp(`\\b(${func})\\s*\\(`, 'gi');
-        code = code.replace(regex, (match, p1) => {
-            return `<span class="function">${p1}</span>(`;
-        });
+        html = html.replace(regex, '<span class="function">$1</span>(');
     });
     
     // Highlight operators
-    code = code.replace(/(\+|-|\*|\/|=|&lt;|&gt;|!|%)/g, '<span class="operator">$1</span>');
+    html = html.replace(/(\+|-|\*|\/|=|&lt;|&gt;|!|%)/g, '<span class="operator">$1</span>');
     
-    highlight.innerHTML = code + '\n';
+    // Set the highlighted HTML
+    highlight.innerHTML = html;
 }
 
 function updateLineNumbers() {

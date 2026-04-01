@@ -27,6 +27,8 @@ func main() {
 			Assets: assets,
 		},
 		// Frameless removes the system title bar
+		// Frameless removes the system title bar and border
+		// This allows full control over window appearance, dragging, and resizing
 		Frameless:         true,
 		StartHidden:       false,
 		HideWindowOnClose: false,
@@ -34,6 +36,7 @@ func main() {
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			DisableWindowIcon:    false,
+			ResizeDebounceMS:     2,
 		},
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,

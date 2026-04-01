@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 
 	"db-client/db"
@@ -17,6 +18,11 @@ func newConnectionPool() *connectionPool {
 	}
 }
 
+// buildKey creates a unique key for a database connection
+func buildKey(config db.ConnectionConfig) string {
+	return fmt.Sprintf("%s:%s:%d:%s:%s", config.Type, config.Host, config.Port, config.Username, config.Database)
+}
+
 func (p *connectionPool) get(key string) (db.DatabaseDriver, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -27,20 +33,56 @@ func (p *connectionPool) get(key string) (db.DatabaseDriver, bool) {
 func (p *connectionPool) set(key string, driver db.DatabaseDriver) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	// Close existing connection if it exists
+	if existing, exists := p.connections[key]; exists {
+		existing.Close()
+	}
 	p.connections[key] = driver
 }
 
 func (p *connectionPool) remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if driver, exists := p.connections[key]; exists {
+		driver.Close()
+	}
 	delete(p.connections, key)
 }
 
 func (p *connectionPool) closeAll() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for _, driver := range p.connections {
+
+	for key, driver := range p.connections {
 		driver.Close()
+		delete(p.connections, key)
 	}
-	p.connections = make(map[string]db.DatabaseDriver)
+}
+
+// getOrConnect tries to get an existing connection from the pool,
+// or creates a new one if none exists.
+func (p *connectionPool) getOrConnect(key string, connectFn func() (db.DatabaseDriver, error)) (db.DatabaseDriver, error) {
+	// Try to get from pool first
+	if driver, exists := p.get(key); exists {
+		return driver, nil
+	}
+
+	// Create new connection
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Double check after acquiring write lock
+	if driver, exists := p.connections[key]; exists {
+		return driver, nil
+	}
+
+	driver, err := connectFn()
+	if err != nil {
+		return nil, err
+	}
+
+	p.connections[key] = driver
+	return driver, nil
 }

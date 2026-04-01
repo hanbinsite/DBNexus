@@ -39,8 +39,6 @@ export function GetTables(arg1:main.Connection,arg2:string):Promise<Array<main.T
 
 export function GetViews(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
 
-export function Greet(arg1:string):Promise<string>;
-
 export function OpenFileDialog(arg1:string,arg2:string):Promise<string>;
 
 export function RunAllTests():Promise<Array<main.TestResult>>;
