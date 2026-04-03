@@ -40,6 +40,7 @@ const WailsAPI = {
     
     // Query Execution
     executeQuery: (conn, db, query) => window.go.main.App.ExecuteQuery(conn, db, query),
+    executeMultiQuery: (conn, db, query) => window.go.main.App.ExecuteMultiQuery(conn, db, query),
     executeNonQuery: (conn, db, query) => window.go.main.App.ExecuteNonQuery(conn, db, query),
     
     // Window Controls
@@ -126,14 +127,17 @@ function toggleTheme() {
 }
 
 function setTheme(theme) {
-    state.currentTheme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('db-client-theme', theme);
-    
-    const themeSelect = document.getElementById('appearanceTheme');
-    if (themeSelect) {
-        themeSelect.value = theme;
-    }
+  state.currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('db-client-theme', theme);
+
+  const themeSelect = document.getElementById('appearanceTheme');
+  if (themeSelect) {
+    themeSelect.value = theme;
+  }
+
+  // Update Monaco editor theme
+  updateEditorTheme(theme);
 }
 
 function setThemeFromSettings(value) {
@@ -159,20 +163,25 @@ function initWindowControls() {
 }
 
 async function minimizeWindow() {
-    console.log('Minimize window');
+  try {
     if (isWailsAvailable()) {
-        await WailsAPI.windowMinimize();
+      await WailsAPI.windowMinimize();
     }
+  } catch (e) {
+    console.warn('Window minimize error:', e);
+  }
 }
 
 async function maximizeWindow() {
-    console.log('Maximize window');
+  try {
     if (isWailsAvailable()) {
-        await WailsAPI.windowMaximize();
-        // Toggle icon based on maximized state
-        const isMaximized = await WailsAPI.windowIsMaximized();
-        updateMaximizeIcon(isMaximized);
+      await WailsAPI.windowMaximize();
+      const isMaximized = await WailsAPI.windowIsMaximized();
+      updateMaximizeIcon(isMaximized);
     }
+  } catch (e) {
+    console.warn('Window maximize error:', e);
+  }
 }
 
 function updateMaximizeIcon(isMaximized) {
@@ -202,62 +211,66 @@ async function closeWindow() {
 // Resizable Panels
 // ==========================================================================
 function initResizablePanels() {
-    const sidebarResize = document.getElementById('sidebarResize');
-    const sidebar = document.querySelector('.sidebar');
-    const splitHandle = document.getElementById('editorResultsSplit');
-    const editorPanel = document.querySelector('.editor-panel');
-    const resultsPanel = document.querySelector('.results-panel');
-    
-    if (sidebarResize && sidebar) {
-        sidebarResize.addEventListener('mousedown', (e) => {
-            state.isResizing = true;
-            sidebarResize.classList.add('active');
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-        });
-    }
-    
-    if (splitHandle && editorPanel && resultsPanel) {
-        splitHandle.addEventListener('mousedown', (e) => {
-            state.isResizing = true;
-            splitHandle.classList.add('active');
-            document.body.style.cursor = 'row-resize';
-            document.body.style.userSelect = 'none';
-        });
-    }
-    
-    document.addEventListener('mousemove', (e) => {
-        if (!state.isResizing) return;
-        
-        if (sidebarResize.classList.contains('active')) {
-            const newWidth = e.clientX;
-            if (newWidth >= 180 && newWidth <= 400) {
-                sidebar.style.width = newWidth + 'px';
-            }
-        }
-        
-        if (splitHandle.classList.contains('active')) {
-            const workspace = document.querySelector('.workspace');
-            const workspaceRect = workspace.getBoundingClientRect();
-            const relativeY = e.clientY - workspaceRect.top;
-            const newEditorHeight = relativeY;
-            
-            if (newEditorHeight >= 150 && newEditorHeight <= workspaceRect.height - 150) {
-                editorPanel.style.minHeight = newEditorHeight + 'px';
-                resultsPanel.style.minHeight = (workspaceRect.height - newEditorHeight - 4) + 'px';
-            }
-        }
+  const sidebarResize = document.getElementById('sidebarResize');
+  const sidebar = document.querySelector('.sidebar');
+  const splitHandle = document.getElementById('splitHandle');
+  const editorPanel = document.getElementById('editorPanel');
+  const resultsPanel = document.getElementById('resultsPanel');
+
+  if (sidebarResize && sidebar) {
+    sidebarResize.addEventListener('mousedown', (e) => {
+      state.isResizing = true;
+      sidebarResize.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
     });
-    
-    document.addEventListener('mouseup', () => {
-        if (state.isResizing) {
-            state.isResizing = false;
-            document.getElementById('sidebarResize')?.classList.remove('active');
-            document.getElementById('editorResultsSplit')?.classList.remove('active');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        }
+  }
+
+  if (splitHandle && editorPanel && resultsPanel) {
+    splitHandle.addEventListener('mousedown', (e) => {
+      state.isResizing = true;
+      splitHandle.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
     });
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    if (!state.isResizing) return;
+
+    if (sidebarResize && sidebarResize.classList.contains('active')) {
+      const newWidth = e.clientX;
+      if (newWidth >= 180 && newWidth <= 400) {
+        sidebar.style.width = newWidth + 'px';
+      }
+    }
+
+    if (splitHandle && splitHandle.classList.contains('active')) {
+      const workspace = document.querySelector('.workspace');
+      const workspaceRect = workspace.getBoundingClientRect();
+      const relativeY = e.clientY - workspaceRect.top;
+      const totalHeight = workspaceRect.height;
+      const editorHeight = Math.max(100, Math.min(relativeY - 30, totalHeight - 120));
+      const resultsHeight = totalHeight - editorHeight - 6;
+
+      editorPanel.style.height = editorHeight + 'px';
+      editorPanel.style.flex = 'none';
+      resultsPanel.style.height = resultsHeight + 'px';
+      resultsPanel.style.flex = 'none';
+
+      if (monacoEditor) monacoEditor.layout();
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (state.isResizing) {
+      state.isResizing = false;
+      sidebarResize?.classList.remove('active');
+      splitHandle?.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
 }
 
 // ==========================================================================
@@ -275,169 +288,534 @@ function initTabs() {
 }
 
 function createNewTab() {
-    const tabNumber = document.querySelectorAll('.tab[data-type="query"]').length + 1;
-    const tabId = `query-${tabNumber}`;
-    
-    const tabHtml = `
-        <div class="tab" data-tab="${tabId}" data-type="query">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-            </svg>
-            <span>查询 ${tabNumber}</span>
-            <button class="tab-close" onclick="closeTab('${tabId}', event)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-    `;
-    
-    document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
-    activateTab(tabId);
-    
-    // Hide welcome panel, show query editor
-    const welcomePanel = document.getElementById('welcomePanel');
-    if (welcomePanel) welcomePanel.style.display = 'none';
-    document.querySelector('.editor-panel').style.display = 'block';
-    document.querySelector('.results-panel').style.display = 'block';
-    document.querySelector('.split-handle').style.display = 'block';
-    document.getElementById('dataViewPanel').style.display = 'none';
-    
-    // Clear editor for new tab
-    const editor = document.getElementById('queryEditor');
-    editor.value = '';
-    updateSyntaxHighlight();
-    updateLineNumbers();
-    
-    // Focus the editor
-    editor.focus();
+  const tabNumber = document.querySelectorAll('.tab[data-type="query"]').length + 1;
+  const tabId = `query-${tabNumber}`;
+
+  const tabHtml = `
+    <div class="tab" data-tab="${tabId}" data-type="query">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+      </svg>
+      <span>查询 ${tabNumber}</span>
+      <button class="tab-close" onclick="closeTab('${tabId}', event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
+  activateTab(tabId);
+
+  // Hide welcome panel, show query editor
+  const welcomePanel = document.getElementById('welcomePanel');
+  if (welcomePanel) welcomePanel.style.display = 'none';
+
+  const editorPanel = document.getElementById('editorPanel');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const splitHandle = document.getElementById('splitHandle');
+  const dataViewPanel = document.getElementById('dataViewPanel');
+
+  // Make editor panel visible with exact dimensions
+  editorPanel.style.display = 'flex';
+  editorPanel.style.flex = '1';
+  editorPanel.style.height = '100%';
+  resultsPanel.style.display = 'none';
+  splitHandle.style.display = 'none';
+  dataViewPanel.style.display = 'none';
+
+  const layoutAndFocus = () => {
+    if (!monacoEditor) return;
+    monacoEditor.layout();
+    // Force content re-render
+    const model = monacoEditor.getModel();
+    if (model) {
+      monacoEditor.setValue('');
+    }
+    monacoEditor.focus();
+  };
+
+  if (monacoLibraryLoaded && !monacoEditor) {
+    // Need to create editor now that container is visible
+    const tryCreate = () => {
+      createMonacoEditorIfNeeded();
+      if (monacoEditor) {
+        setTimeout(layoutAndFocus, 100);
+      } else {
+        // Container still not ready, retry
+        setTimeout(tryCreate, 100);
+      }
+    };
+    setTimeout(tryCreate, 200);
+  } else if (monacoEditor) {
+    layoutAndFocus();
+  }
 }
 
 function activateTab(tabId) {
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    const selectedTab = document.querySelector(`[data-tab="${tabId}"]`);
-    if (selectedTab) {
-        selectedTab.classList.add('active');
-        state.activeTab = tabId;
-        
-        // Hide welcome panel
-        const welcomePanel = document.getElementById('welcomePanel');
-        if (welcomePanel) welcomePanel.style.display = 'none';
-        
-        // Switch view based on tab type
-        const tabType = selectedTab.dataset.type;
-        
-        if (tabType === 'table') {
-            // Show data view panel
-            document.querySelector('.editor-panel').style.display = 'none';
-            document.querySelector('.results-panel').style.display = 'none';
-            document.querySelector('.split-handle').style.display = 'none';
-            document.getElementById('dataViewPanel').style.display = 'flex';
-        } else {
-            // Show query editor
-            document.querySelector('.editor-panel').style.display = 'block';
-            document.querySelector('.results-panel').style.display = 'block';
-            document.querySelector('.split-handle').style.display = 'block';
-            document.getElementById('dataViewPanel').style.display = 'none';
-            
-            // Focus the editor for query tabs
-            const editor = document.getElementById('queryEditor');
-            if (editor) {
-                editor.focus();
-            }
-        }
-    }
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+
+  const selectedTab = document.querySelector(`[data-tab="${tabId}"]`);
+  if (!selectedTab) return;
+
+  selectedTab.classList.add('active');
+  state.activeTab = tabId;
+
+  // Hide welcome panel
+  const welcomePanel = document.getElementById('welcomePanel');
+  if (welcomePanel) welcomePanel.style.display = 'none';
+
+  const editorPanel = document.getElementById('editorPanel');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const splitHandle = document.getElementById('splitHandle');
+  const dataViewPanel = document.getElementById('dataViewPanel');
+  const tabType = selectedTab.dataset.type;
+
+  if (tabType === 'table') {
+    editorPanel.style.display = 'none';
+    resultsPanel.style.display = 'none';
+    splitHandle.style.display = 'none';
+    dataViewPanel.style.display = 'flex';
+  } else {
+    // Query tab — only show editor, not results
+    editorPanel.style.display = 'flex';
+    editorPanel.style.flex = '1';
+    editorPanel.style.height = 'auto';
+    // Keep results hidden (only shown after query execution)
+    resultsPanel.style.display = 'none';
+    splitHandle.style.display = 'none';
+    dataViewPanel.style.display = 'none';
+
+    setTimeout(() => {
+      if (monacoEditor) {
+        monacoEditor.layout();
+        monacoEditor.focus();
+      }
+    }, 150);
+  }
 }
 
 function closeTab(tabId, event) {
-    if (event) {
-        event.stopPropagation();
+  if (event) {
+    event.stopPropagation();
+  }
+
+  const tab = document.querySelector(`[data-tab="${tabId}"]`);
+  const allTabs = document.querySelectorAll('.tab');
+  let activeWasClosed = false;
+
+  if (tab && tab.classList.contains('active')) {
+    activeWasClosed = true;
+
+    if (allTabs.length > 1) {
+      const tabArray = Array.from(allTabs);
+      const currentIndex = tabArray.indexOf(tab);
+      const prevTab = tabArray[currentIndex - 1] || tabArray[currentIndex + 1];
+      if (prevTab) {
+        activateTab(prevTab.dataset.tab);
+      }
+    } else {
+      // Last tab closed, show welcome panel
+      state.activeTab = null;
+      state.currentTable = null;
+      const welcomePanel = document.getElementById('welcomePanel');
+      if (welcomePanel) welcomePanel.style.display = 'flex';
+      document.getElementById('editorPanel').style.display = 'none';
+      document.getElementById('resultsPanel').style.display = 'none';
+      document.getElementById('splitHandle').style.display = 'none';
+      document.getElementById('dataViewPanel').style.display = 'none';
     }
-    
-    const tab = document.querySelector(`[data-tab="${tabId}"]`);
-    const allTabs = document.querySelectorAll('.tab');
-    
-    if (tab && tab.classList.contains('active')) {
-        if (allTabs.length > 1) {
-            const tabArray = Array.from(allTabs);
-            const currentIndex = tabArray.indexOf(tab);
-            const prevTab = tabArray[currentIndex - 1] || tabArray[currentIndex + 1];
-            if (prevTab) {
-                activateTab(prevTab.dataset.tab);
-            }
-        } else {
-            // Last tab closed, show welcome panel
-            state.activeTab = null;
-            const welcomePanel = document.getElementById('welcomePanel');
-            if (welcomePanel) welcomePanel.style.display = 'flex';
-            document.querySelector('.editor-panel').style.display = 'none';
-            document.querySelector('.results-panel').style.display = 'none';
-            document.querySelector('.split-handle').style.display = 'none';
-            document.getElementById('dataViewPanel').style.display = 'none';
-        }
-    }
-    
-    if (tab) {
-        tab.remove();
-    }
+  }
+
+  if (tab) {
+    tab.remove();
+  }
+
+  // After closing a tab, check what kind of tab is now active and restore correct view
+  if (activeWasClosed && state.activeTab) {
+    setTimeout(() => {
+      const activeTab = document.querySelector(`[data-tab="${state.activeTab}"]`);
+      if (!activeTab) return;
+
+      const tabType = activeTab.dataset.type;
+
+      const welcomePanel = document.getElementById('welcomePanel');
+      const editorPanel = document.getElementById('editorPanel');
+      const resultsPanel = document.getElementById('resultsPanel');
+      const splitHandle = document.getElementById('splitHandle');
+      const dataViewPanel = document.getElementById('dataViewPanel');
+
+      if (tabType === 'query') {
+        if (welcomePanel) welcomePanel.style.display = 'none';
+        editorPanel.style.display = 'flex';
+        editorPanel.style.flex = '1';
+        editorPanel.style.height = 'auto';
+        resultsPanel.style.display = 'none';
+        splitHandle.style.display = 'none';
+        dataViewPanel.style.display = 'none';
+
+        setTimeout(() => {
+          if (monacoEditor) {
+            monacoEditor.layout();
+            monacoEditor.focus();
+          }
+        }, 150);
+      } else if (tabType === 'table') {
+        if (welcomePanel) welcomePanel.style.display = 'none';
+        editorPanel.style.display = 'none';
+        resultsPanel.style.display = 'none';
+        splitHandle.style.display = 'none';
+        dataViewPanel.style.display = 'flex';
+      }
+    }, 50);
+  }
 }
 
 // ==========================================================================
 // Context Menu
 // ==========================================================================
+let contextMenuTarget = null; // 'connection', 'database', 'table', 'view'
+let contextMenuData = null; // Additional data for context menu
+
 function initContextMenu() {
-    const contextMenu = document.getElementById('contextMenu');
-    
-    document.addEventListener('click', () => {
-        contextMenu.classList.remove('active');
+  const contextMenu = document.getElementById('contextMenu');
+
+  document.addEventListener('click', () => {
+    contextMenu.classList.remove('active');
+  });
+
+  // Initial binding for connection items
+  bindConnectionContextMenu();
+}
+
+function bindConnectionContextMenu() {
+  document.querySelectorAll('.connection-item').forEach(item => {
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = item.dataset.id;
+      const connection = state.connections.find(c => c.id === id);
+      if (connection) {
+        selectConnection(id);
+        contextMenuTarget = 'connection';
+        contextMenuData = { connection };
+        showConnectionContextMenu(e.clientX, e.clientY, connection);
+      }
     });
-    
-    document.querySelectorAll('.connection-item, .tree-item').forEach(item => {
-        item.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e.clientX, e.clientY);
-        });
-    });
+  });
+}
+
+function showConnectionContextMenu(x, y, connection) {
+  const contextMenu = document.getElementById('contextMenu');
+  const isConnected = document.querySelector(`.connection-item[data-id="${connection.id}"]`)?.dataset.connected === 'true';
+  
+  let html = '';
+  
+  if (isConnected) {
+    html += `
+      <div class="context-menu-item" onclick="contextAction('disconnect')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        <span>断开连接</span>
+      </div>
+      <div class="context-menu-item" onclick="contextAction('new_query')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+        </svg>
+        <span>新查询</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" onclick="contextAction('refresh')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <span>刷新</span>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="context-menu-item" onclick="contextAction('connect')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <path d="M15 3h6v6M10 14L21 3"/>
+        </svg>
+        <span>连接</span>
+      </div>
+    `;
+  }
+  
+  html += `
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextAction('edit')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span>编辑</span>
+    </div>
+    <div class="context-menu-item" onclick="contextAction('duplicate')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      <span>复制</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="contextAction('delete')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      </svg>
+      <span>删除</span>
+    </div>
+  `;
+  
+  contextMenu.innerHTML = html;
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+  contextMenu.classList.add('active');
+}
+
+function showDatabaseContextMenu(x, y, dbName) {
+  const contextMenu = document.getElementById('contextMenu');
+  
+  contextMenu.innerHTML = `
+    <div class="context-menu-item" onclick="contextAction('new_query')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+      </svg>
+      <span>新查询</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextAction('refresh_db')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      <span>刷新表列表</span>
+    </div>
+    <div class="context-menu-item" onclick="contextAction('create_table')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M12 8v8M8 12h8"/>
+      </svg>
+      <span>创建表</span>
+    </div>
+  `;
+  
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+  contextMenu.classList.add('active');
+}
+
+function showTableContextMenu(x, y, tableName, dbName) {
+  const contextMenu = document.getElementById('contextMenu');
+  
+  contextMenu.innerHTML = `
+    <div class="context-menu-item" onclick="contextAction('open_table')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 21V9"/>
+      </svg>
+      <span>查看数据</span>
+    </div>
+    <div class="context-menu-item" onclick="contextAction('select_table')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+      </svg>
+      <span>生成 SELECT 语句</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextAction('describe_table')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 16v-4M12 8h.01"/>
+      </svg>
+      <span>查看表结构</span>
+    </div>
+    <div class="context-menu-item" onclick="contextAction('refresh_table')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      <span>刷新数据</span>
+    </div>
+  `;
+  
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+  contextMenu.classList.add('active');
 }
 
 function showContextMenu(x, y) {
-    const contextMenu = document.getElementById('contextMenu');
-    contextMenu.style.left = x + 'px';
-    contextMenu.style.top = y + 'px';
-    contextMenu.classList.add('active');
+  const contextMenu = document.getElementById('contextMenu');
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+  contextMenu.classList.add('active');
 }
 
 async function contextAction(action) {
-    console.log('Context action:', action);
-    document.getElementById('contextMenu').classList.remove('active');
-    
-    switch (action) {
-        case 'open':
-            if (state.activeConnection) {
-                await connectToSelectedConnection();
-            }
-            break;
-        case 'new_query':
-            createNewTab();
-            break;
-        case 'refresh':
-            await refreshConnection();
-            break;
-        case 'duplicate':
-            console.log('Duplicating connection...');
-            break;
-        case 'delete':
-            if (confirm('Are you sure you want to delete this connection?')) {
-                if (state.activeConnection) {
-                    await deleteConnection(state.activeConnection.id);
-                }
-            }
-            break;
+  console.log('Context action:', action);
+  document.getElementById('contextMenu').classList.remove('active');
+
+  switch (action) {
+    case 'connect':
+      if (state.activeConnection) {
+        await connectToSelectedConnection();
+      }
+      break;
+    case 'disconnect':
+      if (state.activeConnection) {
+        await disconnectConnection();
+      }
+      break;
+    case 'open':
+      if (state.activeConnection) {
+        await connectToSelectedConnection();
+      }
+      break;
+    case 'new_query':
+      createNewTab();
+      break;
+    case 'refresh':
+      await refreshConnection();
+      break;
+    case 'refresh_db':
+      if (contextMenuData && contextMenuData.dbName) {
+        await refreshDatabaseTables(contextMenuData.dbName);
+      }
+      break;
+    case 'edit':
+      if (state.activeConnection) {
+        editConnection(state.activeConnection);
+      }
+      break;
+    case 'duplicate':
+      if (state.activeConnection) {
+        await duplicateConnection(state.activeConnection);
+      }
+      break;
+    case 'delete':
+      if (state.activeConnection && confirm('确定要删除此连接吗？')) {
+        await deleteConnection(state.activeConnection.id);
+      }
+      break;
+    case 'open_table':
+      if (contextMenuData && contextMenuData.tableName) {
+        await openTable(contextMenuData.tableName, contextMenuData.dbName);
+      }
+      break;
+    case 'select_table':
+      if (contextMenuData && contextMenuData.tableName) {
+        generateSelectStatement(contextMenuData.tableName, contextMenuData.dbName);
+      }
+      break;
+    case 'describe_table':
+      if (contextMenuData && contextMenuData.tableName) {
+        await openTable(contextMenuData.tableName, contextMenuData.dbName);
+        // Switch to structure tab
+        document.querySelector('.data-view-tab[data-view="structure"]')?.click();
+      }
+      break;
+    case 'refresh_table':
+      if (state.currentTable) {
+        await loadTableData(state.currentTable.name, state.currentTable.database);
+      }
+      break;
+  }
+}
+
+async function disconnectConnection() {
+  if (!state.activeConnection) return;
+  
+  try {
+    if (isWailsAvailable()) {
+      await WailsAPI.disconnectFromDatabase(state.activeConnection);
+      updateConnectionStatusIcon(state.activeConnection.id, false);
+      
+      // Clear database tree
+      const dbTree = document.getElementById('databasesTree');
+      dbTree.innerHTML = '<div class="tree-empty-hint">选择一个连接以查看数据库</div>';
+      
+      showNotification('success', '已断开连接');
     }
+  } catch (error) {
+    showNotification('error', `断开连接失败: ${error.message}`);
+  }
+}
+
+function editConnection(connection) {
+  // Open connection dialog and populate with existing data
+  openConnectionDialog();
+  
+  // Populate form with existing connection data
+  document.getElementById('connName').value = connection.name;
+  document.getElementById('connName').dataset.id = connection.id;
+  document.getElementById('connHost').value = connection.host;
+  document.getElementById('connPort').value = connection.port;
+  document.getElementById('connUser').value = connection.username;
+  document.getElementById('connPassword').value = connection.password;
+  document.getElementById('connDatabase').value = connection.database;
+  document.getElementById('connSavePassword').checked = connection.save_password;
+  document.getElementById('connAutoConnect').checked = connection.auto_connect;
+  
+  // Set database type
+  const dbTypeBtn = document.querySelector(`.db-type-btn[data-type="${connection.type}"]`);
+  if (dbTypeBtn) {
+    document.querySelectorAll('.db-type-btn').forEach(b => b.classList.remove('active'));
+    dbTypeBtn.classList.add('active');
+    updateConnectionForm(connection.type);
+  }
+}
+
+async function duplicateConnection(connection) {
+  const newConnection = {
+    ...connection,
+    id: '',
+    name: connection.name + ' (副本)'
+  };
+  
+  openConnectionDialog();
+  document.getElementById('connName').value = newConnection.name;
+  document.getElementById('connHost').value = newConnection.host;
+  document.getElementById('connPort').value = newConnection.port;
+  document.getElementById('connUser').value = newConnection.username;
+  document.getElementById('connPassword').value = newConnection.password;
+  document.getElementById('connDatabase').value = newConnection.database;
+  document.getElementById('connSavePassword').checked = newConnection.save_password;
+  document.getElementById('connAutoConnect').checked = newConnection.auto_connect;
+  
+  const dbTypeBtn = document.querySelector(`.db-type-btn[data-type="${newConnection.type}"]`);
+  if (dbTypeBtn) {
+    document.querySelectorAll('.db-type-btn').forEach(b => b.classList.remove('active'));
+    dbTypeBtn.classList.add('active');
+    updateConnectionForm(newConnection.type);
+  }
+}
+
+function generateSelectStatement(tableName, dbName) {
+  createNewTab();
+  
+  const connType = state.activeConnection?.type || 'mysql';
+
+  let quotedTable;
+  if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
+    quotedTable = `"${tableName}"`;
+  } else {
+    quotedTable = `\`${tableName}\``;
+  }
+
+  setEditorValue(`SELECT * FROM ${quotedTable} LIMIT 100;`);
+  focusEditor();
 }
 
 // ==========================================================================
@@ -768,27 +1146,38 @@ function addConnectionToList(connection) {
         redis: 'linear-gradient(135deg, #dc382d, #a4201a)'
     };
     
-    const html = `
-        <div class="connection-item" data-id="${connection.id}" onclick="selectConnection('${connection.id}')" ondblclick="connectToConnection('${connection.id}')">
-            <div class="connection-icon" style="background: ${iconColors[connection.type] || iconColors.postgresql}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    ${typeIcons[connection.type] || typeIcons.postgresql}
-                </svg>
-            </div>
-            <div class="connection-info">
-                <span class="connection-name">${connection.name}</span>
-                <span class="connection-type">${connection.type.charAt(0).toUpperCase() + connection.type.slice(1)}</span>
-            </div>
-            <div class="connection-status disconnected">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M15 9l-6 6M9 9l6 6"/>
-                </svg>
-            </div>
-        </div>
-    `;
-    
-    connectionList.insertAdjacentHTML('beforeend', html);
+  const html = `
+<div class="connection-item" data-id="${connection.id}" onclick="selectConnection('${connection.id}')" ondblclick="connectToConnection('${connection.id}')">
+  <div class="connection-icon" style="background: ${iconColors[connection.type] || iconColors.postgresql}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      ${typeIcons[connection.type] || typeIcons.postgresql}
+    </svg>
+  </div>
+  <div class="connection-info">
+    <span class="connection-name">${connection.name}</span>
+    <span class="connection-type">${connection.type.charAt(0).toUpperCase() + connection.type.slice(1)}</span>
+  </div>
+  <div class="connection-status disconnected">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M15 9l-6 6M9 9l6 6"/>
+    </svg>
+  </div>
+</div>
+`;
+
+  connectionList.insertAdjacentHTML('beforeend', html);
+  
+  // Bind context menu to newly added connection
+  const newItem = connectionList.lastElementChild;
+  newItem.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectConnection(connection.id);
+    contextMenuTarget = 'connection';
+    contextMenuData = { connection };
+    showConnectionContextMenu(e.clientX, e.clientY, connection);
+  });
 }
 
 function selectConnection(id) {
@@ -945,23 +1334,29 @@ function initDatabaseTree() {
 }
 
 async function loadDatabaseTree() {
-    if (!state.activeConnection) return;
-    
-    showLoading('Loading databases...');
-    
-    try {
-        if (isWailsAvailable()) {
-            const databases = await WailsAPI.getDatabases(state.activeConnection);
-            renderDatabaseTree(databases);
-            populateDatabaseSelector(databases);
-        } else {
-            await loadMockDatabaseTree();
-        }
-    } catch (error) {
-        showNotification('error', `Failed to load databases: ${error.message}`);
+  if (!state.activeConnection) return;
+
+  showLoading('Loading databases...');
+
+  try {
+    if (isWailsAvailable()) {
+      const databases = await WailsAPI.getDatabases(state.activeConnection);
+      if (databases && databases.length > 0) {
+        renderDatabaseTree(databases);
+        populateDatabaseSelector(databases);
+      } else {
+        showNotification('warning', '未找到数据库');
+      }
+    } else {
+      await loadMockDatabaseTree();
     }
-    
-    hideLoading();
+  } catch (error) {
+    console.error('Load database tree error:', error);
+    const errorMsg = error?.message || error?.toString() || '未知错误';
+    showNotification('error', `加载数据库失败: ${errorMsg}`);
+  }
+
+  hideLoading();
 }
 
 function populateDatabaseSelector(databases) {
@@ -995,42 +1390,42 @@ async function loadMockDatabaseTree() {
 }
 
 function renderDatabaseTree(databases) {
-    const dbTree = document.getElementById('databasesTree');
-    dbTree.innerHTML = '';
-    
-    databases.forEach(db => {
-        const dbHtml = `
-            <div class="tree-node">
-                <div class="tree-item db-item" onclick="toggleDatabase('${db.name}')">
-                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="m9 18 6-6-6-6"/>
-                    </svg>
-                    <svg class="db-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                    <span>${db.name}</span>
-                </div>
-                <div class="tree-children collapsed" id="db-${db.name}-children">
-                    <div class="tree-branch">
-                        <div class="tree-item branch-item" onclick="toggleTreeSection('tables-${db.name}')">
-                            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="m9 18 6-6-6-6"/>
-                            </svg>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M3 9h18M9 21V9"/>
-                            </svg>
-                            <span>表</span>
-                        </div>
-                        <div class="tree-children collapsed" id="tables-${db.name}Tree">
-                            <div class="tree-loading">加载中...</div>
-                        </div>
-                    </div>
-                    <div class="tree-branch">
-                        <div class="tree-item branch-item" onclick="toggleTreeSection('views-${db.name}')">
-                            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="m9 18 6-6-6-6"/>
+  const dbTree = document.getElementById('databasesTree');
+  dbTree.innerHTML = '';
+
+  databases.forEach(db => {
+    const dbHtml = `
+<div class="tree-node">
+  <div class="tree-item db-item" onclick="toggleDatabase('${db.name}')" oncontextmenu="event.preventDefault(); event.stopPropagation(); contextMenuTarget='database'; contextMenuData={dbName:'${db.name}'}; showDatabaseContextMenu(event.clientX, event.clientY, '${db.name}');">
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m9 18 6-6-6-6"/>
+    </svg>
+    <svg class="db-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <ellipse cx="12" cy="5" rx="9" ry="3"/>
+      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+    </svg>
+    <span>${db.name}</span>
+  </div>
+  <div class="tree-children collapsed" id="db-${db.name}-children">
+    <div class="tree-branch">
+      <div class="tree-item branch-item" onclick="toggleTreeSection('tables-${db.name}')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m9 18 6-6-6-6"/>
+        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18M9 21V9"/>
+        </svg>
+        <span>表</span>
+      </div>
+      <div class="tree-children collapsed" id="tables-${db.name}Tree">
+        <div class="tree-loading">加载中...</div>
+      </div>
+    </div>
+    <div class="tree-branch">
+      <div class="tree-item branch-item" onclick="toggleTreeSection('views-${db.name}')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m9 18 6-6-6-6"/>
                             </svg>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -1075,47 +1470,89 @@ function toggleDatabase(dbName) {
 }
 
 async function loadTablesForDatabase(dbName) {
-    if (!state.activeConnection) return;
-    
-    try {
-        if (isWailsAvailable()) {
-            const tables = await WailsAPI.getTables(state.activeConnection, dbName);
-            renderTablesTree(tables, dbName);
-            // Update autocomplete with table names
-            updateDatabaseTables(tables.map(t => t.name));
-        } else {
-            // Mock tables
-            const tables = [
-                { name: 'users' },
-                { name: 'orders' },
-                { name: 'products' }
-            ];
-            renderTablesTree(tables, dbName);
-            updateDatabaseTables(tables.map(t => t.name));
+  if (!state.activeConnection) return;
+
+  try {
+    if (isWailsAvailable()) {
+      const tables = await WailsAPI.getTables(state.activeConnection, dbName);
+      renderTablesTree(tables, dbName);
+      // Update autocomplete with table names
+      updateDatabaseTables(tables.map(t => t.name));
+      
+      // Load columns for each table for autocomplete — do NOT await, run in parallel
+      // so that a single failing table doesn't block the entire tree rendering
+      tables.forEach(async (table) => {
+        try {
+          const columns = await WailsAPI.getTableColumns(state.activeConnection, dbName, table.name);
+          updateTableColumns(table.name, columns);
+        } catch (e) {
+          console.warn(`Failed to load columns for ${table.name}:`, e);
         }
-    } catch (error) {
-        console.error('Failed to load tables:', error);
+      });
+    } else {
+      // Mock tables
+      const tables = [
+        { name: 'users' },
+        { name: 'orders' },
+        { name: 'products' }
+      ];
+      renderTablesTree(tables, dbName);
+      updateDatabaseTables(tables.map(t => t.name));
+      
+      // Mock columns
+      updateTableColumns('users', ['id', 'name', 'email', 'created_at', 'status']);
+      updateTableColumns('orders', ['id', 'user_id', 'total', 'created_at']);
+      updateTableColumns('products', ['id', 'name', 'price', 'stock']);
     }
+  } catch (error) {
+    console.error('Failed to load tables:', error);
+  }
+}
+
+async function refreshDatabaseTables(dbName) {
+  if (!state.activeConnection) return;
+
+  try {
+    if (isWailsAvailable()) {
+      const tables = await WailsAPI.getTables(state.activeConnection, dbName);
+      renderTablesTree(tables, dbName);
+      updateDatabaseTables(tables.map(t => t.name));
+      
+      // Reload columns in background
+      tables.forEach(async (table) => {
+        try {
+          const columns = await WailsAPI.getTableColumns(state.activeConnection, dbName, table.name);
+          updateTableColumns(table.name, columns);
+        } catch (e) {
+          console.warn(`Failed to load columns for ${table.name}:`, e);
+        }
+      });
+      
+      showNotification('success', `已刷新数据库 "${dbName}" 的表列表`);
+    }
+  } catch (error) {
+    showNotification('error', `刷新表列表失败: ${error.message || error}`);
+  }
 }
 
 function renderTablesTree(tables, dbName) {
-    const tablesTree = document.getElementById(`tables-${dbName}Tree`);
-    if (!tablesTree) return;
-    
-    tablesTree.innerHTML = '';
-    
-    tables.forEach(table => {
-        const tableHtml = `
-            <div class="tree-item" onclick="openTable('${table.name}', '${dbName}')">
-                <svg class="table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18M9 21V9"/>
-                </svg>
-                <span>${table.name}</span>
-            </div>
-        `;
-        tablesTree.insertAdjacentHTML('beforeend', tableHtml);
-    });
+  const tablesTree = document.getElementById(`tables-${dbName}Tree`);
+  if (!tablesTree) return;
+
+  tablesTree.innerHTML = '';
+
+  tables.forEach(table => {
+    const tableHtml = `
+<div class="tree-item" onclick="openTable('${table.name}', '${dbName}')" oncontextmenu="event.preventDefault(); event.stopPropagation(); contextMenuTarget='table'; contextMenuData={tableName:'${table.name}', dbName:'${dbName}'}; showTableContextMenu(event.clientX, event.clientY, '${table.name}', '${dbName}');">
+  <svg class="table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M3 9h18M9 21V9"/>
+  </svg>
+  <span>${table.name}</span>
+</div>
+`;
+    tablesTree.insertAdjacentHTML('beforeend', tableHtml);
+  });
 }
 
 function toggleTreeSection(sectionId) {
@@ -2182,547 +2619,485 @@ function showSettingsSection(section) {
 }
 
 // ==========================================================================
-// Query Editor with Syntax Highlighting and Autocomplete
+// Monaco Editor - SQL Editor with Advanced Features
 // ==========================================================================
-
-// SQL Keywords for highlighting and autocomplete
-const SQL_KEYWORDS = [
-    'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
-    'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP',
-    'INDEX', 'VIEW', 'TRIGGER', 'PROCEDURE', 'FUNCTION', 'DATABASE', 'SCHEMA',
-    'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'CROSS', 'FULL', 'ON', 'USING',
-    'GROUP', 'BY', 'ORDER', 'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL',
-    'AS', 'DISTINCT', 'TOP', 'WITH', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
-    'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CONSTRAINT', 'UNIQUE', 'CHECK', 'DEFAULT',
-    'NOT', 'NULL', 'AUTO_INCREMENT', 'IDENTITY', 'SERIAL',
-    'INT', 'INTEGER', 'VARCHAR', 'CHAR', 'TEXT', 'BLOB', 'DECIMAL', 'FLOAT', 'DOUBLE',
-    'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'BOOLEAN', 'BOOL', 'BIT',
-    'IF', 'EXISTS', 'CASCADE', 'RESTRICT', 'ADD', 'COLUMN', 'RENAME', 'TO',
-    'BEGIN', 'COMMIT', 'ROLLBACK', 'TRANSACTION', 'GRANT', 'REVOKE',
-    'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
-    'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT',
-    'NOW', 'CURDATE', 'CURTIME', 'DATE_FORMAT', 'STR_TO_DATE', 'DATEDIFF', 'DATE_ADD', 'DATE_SUB',
-    'IFNULL', 'IF', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END'
-];
-
-const SQL_FUNCTIONS = [
-    'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
-    'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT',
-    'NOW', 'CURDATE', 'CURTIME', 'DATE_FORMAT', 'STR_TO_DATE', 'DATEDIFF',
-    'IFNULL', 'IF', 'ABS', 'CEIL', 'FLOOR', 'ROUND', 'MOD', 'POWER', 'SQRT'
-];
+let monacoEditor = null;
+let sqlCompletionProvider = null;
+let monacoReady = false;
+let monacoLibraryLoaded = false;
 
 // Global state for autocomplete
-let autocompleteIndex = 0;
-let autocompleteItems = [];
-let autocompleteVisible = false;
 let currentDatabaseTables = [];
+let currentTableColumns = {};
 
 function initEditor() {
-    const editor = document.getElementById('queryEditor');
-    const highlight = document.getElementById('sqlHighlight');
-    const lineNumbers = document.getElementById('lineNumbers');
-    const popup = document.getElementById('autocompletePopup');
-    const editorContainer = document.getElementById('editorContainer');
-    
-    if (!editor || !highlight) return;
-    
-    // Fix: Ensure the highlight element doesn't block pointer events
-    highlight.style.pointerEvents = 'none';
-    
-    // Fix: Ensure the textarea has proper z-index and is on top
-    editor.style.position = 'relative';
-    editor.style.zIndex = '1';
-    
-    // Fix: Focus the editor when clicking anywhere in the editor container
-    if (editorContainer) {
-        editorContainer.addEventListener('click', (e) => {
-            // Only focus if clicking directly on the container or the wrapper, not on buttons
-            if (e.target === editorContainer || e.target.classList.contains('sql-editor-wrapper')) {
-                editor.focus();
+  // Start loading Monaco library during page load (but don't create editor yet)
+  if (typeof require !== 'undefined') {
+    require(['vs/editor/editor.main'], function () {
+      // Register SQL language and provider
+      monaco.languages.register({ id: 'sql' });
+
+      monaco.languages.setMonarchTokensProvider('sql', {
+        ignoreCase: true,
+        defaultToken: '',
+        tokenPostfix: '.sql',
+
+        keywords: [
+          'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
+          'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP',
+          'INDEX', 'VIEW', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER',
+          'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'AS', 'DISTINCT',
+          'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'UNIQUE', 'CHECK', 'DEFAULT',
+          'AUTO_INCREMENT', 'IDENTITY', 'SERIAL', 'INT', 'INTEGER', 'VARCHAR', 'CHAR', 'TEXT',
+          'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'BOOLEAN'
+        ],
+
+        operators: [
+          '=', '>', '<', '<=', '>=', '<>', '!=', '+', '-', '*', '/', '||'
+        ],
+
+        symbols: /[=><!~&|\+\-\*\/\^]+/,
+
+        tokenizer: {
+          root: [
+            [/@?[a-zA-Z_]\w*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+            [/'/, { token: 'string', next: '@string' }],
+            [/"/, { token: 'string', next: '@stringDouble' }],
+            [/--.*$/, 'comment'],
+            [/\/\*/, 'comment', '@comment'],
+            [/\d+\.?\d*/, 'number'],
+            [/[{}()\[\]]/, '@brackets'],
+            [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }]
+          ],
+          string: [
+            [/[^']+/, 'string'], [/''/, 'string'], [/'/, { token: 'string', next: '@pop' }]
+          ],
+          stringDouble: [
+            [/[^"]+/, 'string'], [/""/, 'string'], [/"/, { token: 'string', next: '@pop' }]
+          ],
+          comment: [
+            [/\*\//, 'comment', '@pop'], [/[^*]+/, 'comment'], [/\*/, 'comment']
+          ]
+        }
+      });
+
+      monaco.languages.setLanguageConfiguration('sql', {
+        comments: { lineComment: '--', blockComment: ['/*', '*/'] },
+        brackets: [['{', '}'], ['[', ']'], ['(', ')']],
+        autoClosingPairs: [
+          { open: '{', close: '}' }, { open: '[', close: ']' }, { open: '(', close: ')' },
+          { open: "'", close: "'", notIn: ['string', 'comment'] },
+          { open: '"', close: '"', notIn: ['string', 'comment'] }
+        ],
+        surroundingPairs: [
+          { open: '{', close: '}' }, { open: '[', close: ']' }, { open: '(', close: ')' },
+          { open: "'", close: "'" }, { open: '"', close: '"' }
+        ]
+      });
+
+      sqlCompletionProvider = monaco.languages.registerCompletionItemProvider('sql', {
+        provideCompletionItems: function (model, position) {
+          const word = model.getWordUntilPosition(position);
+          const range = {
+            startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+            startColumn: word.startColumn, endColumn: word.endColumn
+          };
+
+          const suggestions = [];
+
+          ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN',
+            'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE',
+            'DROP', 'ALTER', 'INDEX', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON',
+            'GROUP BY', 'ORDER BY', 'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET'
+          ].forEach(keyword => {
+            suggestions.push({
+              label: keyword, kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: keyword, documentation: `SQL keyword: ${keyword}`, range: range
+            });
+          });
+
+          currentDatabaseTables.forEach(table => {
+            suggestions.push({
+              label: table, kind: monaco.languages.CompletionItemKind.Class,
+              insertText: table, documentation: `Table: ${table}`, range: range, detail: 'Table'
+            });
+            if (currentTableColumns[table]) {
+              currentTableColumns[table].forEach(column => {
+                suggestions.push({
+                  label: column, kind: monaco.languages.CompletionItemKind.Field,
+                  insertText: column, documentation: `Column from ${table}`, range: range, detail: `Column (${table})`
+                });
+              });
             }
-        });
-    }
-    
-    // Fix: Ensure the editor gets focus when clicked
-    editor.addEventListener('click', () => {
-        editor.focus();
-    });
-    
-    // Sync scroll between editor and highlight
-    editor.addEventListener('scroll', () => {
-        highlight.scrollTop = editor.scrollTop;
-        highlight.scrollLeft = editor.scrollLeft;
-        lineNumbers.scrollTop = editor.scrollTop;
-    });
-    
-    // Update syntax highlighting and autocomplete on input
-    editor.addEventListener('input', () => {
-        updateSyntaxHighlight();
-        updateLineNumbers();
-        // 暂时禁用自动完成功能，因为它可能导致输入问题
-        // showAutocomplete();
-    });
-    
-    // Handle keyboard navigation for autocomplete
-    editor.addEventListener('keydown', (e) => {
-        if (autocompleteVisible) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                navigateAutocomplete(1);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                navigateAutocomplete(-1);
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                selectAutocompleteItem();
-            } else if (e.key === 'Escape') {
-                hideAutocomplete();
-            }
+          });
+
+          return { suggestions: suggestions };
         }
-        
-        // Handle tab key for indentation
-        if (e.key === 'Tab' && !autocompleteVisible) {
-            e.preventDefault();
-            insertAtCursor('    ');
-        }
+      });
+
+      monacoLibraryLoaded = true;
+      console.log('Monaco library loaded');
+
+      // If editor is already visible, create it now
+      createMonacoEditorIfNeeded();
     });
-    
-    // Hide autocomplete when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!popup.contains(e.target) && e.target !== editor) {
-            hideAutocomplete();
-        }
-    });
-    
-    // Initial render
-    updateSyntaxHighlight();
-    updateLineNumbers();
-    
-    // Fix: Make the editor focusable
-    editor.setAttribute('tabindex', '0');
+  } else {
+    console.error('Monaco Editor loader not found');
+  }
 }
 
-function updateSyntaxHighlight() {
-    const editor = document.getElementById('queryEditor');
-    const highlight = document.getElementById('sqlHighlight');
-    if (!editor || !highlight) return;
-    
-    // Get plain text from editor
-    const text = editor.value;
-    
-    // Escape HTML to prevent XSS and display issues
-    let html = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-    
-    // Highlight comments (-- single line)
-    html = html.replace(/(--[^\n]*)/g, '<span class="comment">$1</span>');
-    
-    // Highlight multi-line comments /* ... */
-    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
-    
-    // Highlight strings (single quotes)
-    html = html.replace(/('[^']*')/g, '<span class="string">$1</span>');
-    
-    // Highlight strings (double quotes)
-    html = html.replace(/("[^"]*")/g, '<span class="string">$1</span>');
-    
-    // Highlight numbers
-    html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
-    
-    // Highlight SQL keywords (case insensitive)
-    const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
-        'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP',
-        'INDEX', 'VIEW', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER', 
-        'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'AS', 'DISTINCT', 'CASE', 
-        'WHEN', 'THEN', 'ELSE', 'END', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES'];
-    
-    keywords.forEach(keyword => {
-        const regex = new RegExp(`\\b(${keyword})\\b`, 'gi');
-        html = html.replace(regex, '<span class="keyword">$1</span>');
-    });
-    
-    // Highlight functions
-    const functions = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'CONVERT',
-        'SUBSTRING', 'LENGTH', 'TRIM', 'UPPER', 'LOWER', 'REPLACE', 'CONCAT', 'NOW', 'IFNULL'];
-    
-    functions.forEach(func => {
-        const regex = new RegExp(`\\b(${func})\\s*\\(`, 'gi');
-        html = html.replace(regex, '<span class="function">$1</span>(');
-    });
-    
-    // Highlight operators
-    html = html.replace(/(\+|-|\*|\/|=|&lt;|&gt;|!|%)/g, '<span class="operator">$1</span>');
-    
-    // Set the highlighted HTML
-    highlight.innerHTML = html;
-}
+function createMonacoEditorIfNeeded() {
+  if (monacoEditor) return;
+  if (!monacoLibraryLoaded) return;
 
-function updateLineNumbers() {
-    const editor = document.getElementById('queryEditor');
-    const lineNumbers = document.getElementById('lineNumbers');
-    if (!editor || !lineNumbers) return;
-    
-    const lines = editor.value.split('\n').length;
-    
-    let html = '';
-    for (let i = 1; i <= Math.max(lines, 10); i++) {
-        html += `<span>${i}</span>`;
-    }
-    lineNumbers.innerHTML = html;
-}
+  const editorContainer = document.getElementById('monacoEditor');
+  if (!editorContainer) return;
+  if (editorContainer.offsetParent === null) return;
 
-function showAutocomplete() {
-    const editor = document.getElementById('queryEditor');
-    const popup = document.getElementById('autocompletePopup');
-    const list = document.getElementById('autocompleteList');
-    if (!editor || !popup || !list) return;
-    
-    const cursorPos = editor.selectionStart;
-    const text = editor.value.substring(0, cursorPos);
-    
-    // Get the current word being typed
-    const match = text.match(/[`"']?([a-zA-Z_][a-zA-Z0-9_]*)$/);
-    if (!match || match[1].length < 1) {
-        hideAutocomplete();
-        return;
-    }
-    
-    const currentWord = match[1].toUpperCase();
-    
-    // Only show autocomplete if word is at least 2 characters
-    if (currentWord.length < 2) {
-        hideAutocomplete();
-        return;
-    }
-    
-    // Build autocomplete items
-    autocompleteItems = [];
-    
-    // Add SQL keywords
-    SQL_KEYWORDS.forEach(keyword => {
-        if (keyword.startsWith(currentWord) && keyword !== currentWord) {
-            autocompleteItems.push({ text: keyword, type: 'keyword' });
-        }
-    });
-    
-    // Add table names from current database
-    currentDatabaseTables.forEach(table => {
-        if (table.toUpperCase().startsWith(currentWord) && table.toUpperCase() !== currentWord) {
-            autocompleteItems.push({ text: table, type: 'table' });
-        }
-    });
-    
-    // Remove duplicates
-    autocompleteItems = autocompleteItems.filter((item, index, self) =>
-        index === self.findIndex(t => t.text === item.text)
-    );
-    
-    if (autocompleteItems.length === 0) {
-        hideAutocomplete();
-        return;
-    }
-    
-    // Limit items shown
-    autocompleteItems = autocompleteItems.slice(0, 8);
-    autocompleteIndex = 0;
-    
-    // Render items - escape HTML to prevent XSS
-    list.innerHTML = autocompleteItems.map((item, index) => `
-        <div class="autocomplete-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="selectAutocompleteItemByIndex(${index})">
-            <span class="item-text">${escapeHtml(item.text)}</span>
-            <span class="item-type">${escapeHtml(item.type)}</span>
-        </div>
-    `).join('');
-    
-    // Position popup near cursor
-    const rect = editor.getBoundingClientRect();
-    const coords = getCaretCoordinates(editor, cursorPos);
-    
-    // Ensure popup stays within viewport
-    const popupLeft = Math.min(coords.left + rect.left - editor.scrollLeft, window.innerWidth - 250);
-    const popupTop = Math.min(coords.top + rect.top - editor.scrollTop + 20, window.innerHeight - 200);
-    
-    popup.style.left = popupLeft + 'px';
-    popup.style.top = popupTop + 'px';
-    popup.style.display = 'block';
-    autocompleteVisible = true;
-}
+  // Force reflow to ensure dimensions are computed
+  void editorContainer.offsetHeight;
 
-function hideAutocomplete() {
-    const popup = document.getElementById('autocompletePopup');
-    if (popup) {
-        popup.style.display = 'none';
-    }
-    autocompleteVisible = false;
-    autocompleteItems = [];
-}
+  const rect = editorContainer.getBoundingClientRect();
+  if (rect.width < 10 || rect.height < 10) {
+    // Container visible but still no dimensions — wait a bit more
+    return;
+  }
 
-function navigateAutocomplete(direction) {
-    autocompleteIndex += direction;
-    if (autocompleteIndex < 0) autocompleteIndex = autocompleteItems.length - 1;
-    if (autocompleteIndex >= autocompleteItems.length) autocompleteIndex = 0;
-    
-    const items = document.querySelectorAll('.autocomplete-item');
-    items.forEach((item, index) => {
-        item.classList.toggle('selected', index === autocompleteIndex);
-    });
-    
-    // Scroll selected item into view
-    const selected = document.querySelector('.autocomplete-item.selected');
-    if (selected) {
-        selected.scrollIntoView({ block: 'nearest' });
-    }
-}
+  monacoEditor = monaco.editor.create(editorContainer, {
+    value: '',
+    language: 'sql',
+    theme: state.currentTheme === 'dark' ? 'vs-dark' : 'vs',
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: 13,
+    fontFamily: 'JetBrains Mono, Consolas, monospace',
+    fontLigatures: true,
+    lineNumbers: 'on',
+    scrollBeyondLastLine: false,
+    wordWrap: 'on',
+    folding: false,
+    renderLineHighlight: 'line',
+    cursorBlinking: 'smooth',
+    cursorStyle: 'line',
+    smoothScrolling: true,
+    padding: { top: 10 },
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: true,
+    suggest: { showKeywords: true, showClasses: true, showFields: true, showFunctions: true },
+    domReadOnly: false,
+    readOnly: false,
+    contextmenu: true,
+    mouseWheelZoom: true,
+    tabSize: 2,
+    insertSpaces: true,
+    detectIndentation: false,
+  });
 
-function selectAutocompleteItem() {
-    if (autocompleteItems.length === 0) return;
-    selectAutocompleteItemByIndex(autocompleteIndex);
-}
+  monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
+    executeQuery();
+  });
 
-function selectAutocompleteItemByIndex(index) {
-    const editor = document.getElementById('queryEditor');
-    if (!editor || !autocompleteItems[index]) return;
-    
-    const item = autocompleteItems[index];
-    const cursorPos = editor.selectionStart;
-    const text = editor.value;
-    
-    // Find the start of the current word
-    const beforeCursor = text.substring(0, cursorPos);
-    const match = beforeCursor.match(/[`"']?([a-zA-Z_][a-zA-Z0-9_]*)$/);
-    if (!match) return;
-    
-    const wordStart = cursorPos - match[1].length;
-    const wordEnd = cursorPos;
-    
-    // Replace the word with the selected item
-    editor.value = text.substring(0, wordStart) + item.text + text.substring(wordEnd);
-    editor.selectionStart = editor.selectionEnd = wordStart + item.text.length;
-    
-    hideAutocomplete();
-    updateSyntaxHighlight();
-    updateLineNumbers();
-    editor.focus();
-}
-
-function insertAtCursor(text) {
-    const editor = document.getElementById('queryEditor');
-    if (!editor) return;
-    
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const value = editor.value;
-    
-    editor.value = value.substring(0, start) + text + value.substring(end);
-    editor.selectionStart = editor.selectionEnd = start + text.length;
-    
-    updateSyntaxHighlight();
-    updateLineNumbers();
-}
-
-function getCaretCoordinates(element, position) {
-    const div = document.createElement('div');
-    const style = getComputedStyle(element);
-    
-    div.style.position = 'absolute';
-    div.style.visibility = 'hidden';
-    div.style.whiteSpace = 'pre-wrap';
-    div.style.wordWrap = 'break-word';
-    div.style.width = style.width;
-    div.style.height = style.height;
-    div.style.padding = style.padding;
-    div.style.font = style.font;
-    div.style.lineHeight = style.lineHeight;
-    
-    div.textContent = element.value.substring(0, position);
-    document.body.appendChild(div);
-    
-    const span = document.createElement('span');
-    span.textContent = element.value.substring(position) || '.';
-    div.appendChild(span);
-    
-    const coordinates = {
-        top: span.offsetTop,
-        left: span.offsetLeft
-    };
-    
-    document.body.removeChild(div);
-    return coordinates;
+  monacoReady = true;
+  console.log('Monaco Editor created in container:', rect.width.toFixed(0), 'x', rect.height.toFixed(0));
 }
 
 function updateDatabaseTables(tables) {
-    currentDatabaseTables = tables || [];
+  currentDatabaseTables = tables || [];
+}
+
+function updateTableColumns(tableName, columns) {
+  if (columns && columns.length > 0) {
+    currentTableColumns[tableName] = columns.map(col => {
+      if (typeof col === 'object' && col.name) {
+        return col.name;
+      }
+      return String(col);
+    });
+  }
+}
+
+function getEditorValue() {
+  if (monacoEditor) {
+    return monacoEditor.getValue();
+  }
+  return '';
+}
+
+function setEditorValue(value) {
+  if (monacoEditor) {
+    monacoEditor.setValue(value);
+  }
+}
+
+function focusEditor() {
+  if (monacoEditor) {
+    monacoEditor.focus();
+  }
+}
+
+function updateEditorTheme(theme) {
+  if (monacoEditor) {
+    monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+  }
+}
+
+// Legacy compatibility functions
+function updateSyntaxHighlight() {
+  // No longer needed with Monaco
+}
+
+function updateLineNumbers() {
+  // No longer needed with Monaco
 }
 
 async function executeQuery() {
-    const editor = document.getElementById('queryEditor');
-    const query = editor.value.trim();
-    let database = document.getElementById('queryDatabase').value;
-    
-    if (!query) {
-        showNotification('warning', '请输入查询语句');
-        return;
+  let selected = getSelectedText();
+  let query = selected || getEditorValue().trim();
+  if (!query) {
+    showNotification('warning', '请输入查询语句');
+    return;
+  }
+
+  if (!state.activeConnection) {
+    showNotification('warning', '请先选择一个数据库连接');
+    return;
+  }
+
+  let database = document.getElementById('queryDatabase').value;
+  if (!database && state.selectedDatabase) {
+    database = state.selectedDatabase;
+    document.getElementById('queryDatabase').value = database;
+  }
+
+  if (!database) {
+    showNotification('warning', '请先在左侧选择一个数据库');
+    return;
+  }
+
+  showLoading('执行查询中...');
+
+  try {
+    if (isWailsAvailable()) {
+      // Use multi-query execution to support multiple SQL statements
+      const result = await WailsAPI.executeMultiQuery(state.activeConnection, database, query);
+      renderMultiQueryResults(result);
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      renderMultiQueryResults({
+        results: [
+          { query: 'SELECT * FROM users LIMIT 100', columns: ['id', 'name', 'email'], rows: [[1, '张三', 'zhang@example.com']], row_count: 1, duration: '0.023s', status: 'success', error: '' },
+        ],
+        total_count: 1,
+        success_count: 1,
+        error_count: 0,
+        total_duration: '0.023s',
+        start_time: new Date().toLocaleTimeString(),
+        end_time: new Date().toLocaleTimeString()
+      });
     }
-    
-    if (!state.activeConnection) {
-        showNotification('warning', '请先选择一个数据库连接');
-        return;
-    }
-    
-    // Check if database is selected, try to use from state
-    if (!database && state.selectedDatabase) {
-        database = state.selectedDatabase;
-        document.getElementById('queryDatabase').value = database;
-    }
-    
-    if (!database) {
-        showNotification('warning', '请先在左侧选择一个数据库');
-        return;
-    }
-    
-    showLoading('执行查询中...');
-    
-    const resultCount = document.getElementById('resultCount');
-    const resultTime = document.getElementById('resultTime');
-    const resultsBody = document.getElementById('resultsBody');
-    
-    try {
-        if (isWailsAvailable()) {
-            const result = await WailsAPI.executeQuery(state.activeConnection, database, query);
-            
-            if (result.error) {
-                showNotification('error', result.error);
-                resultCount.textContent = '错误';
-                resultTime.textContent = '';
-            } else {
-                renderQueryResult(result);
-                resultCount.textContent = `${result.row_count} 行数据`;
-                resultTime.textContent = result.duration;
-            }
-        } else {
-            // Mock result
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            const mockResult = {
-                columns: ['id', 'name', 'email', 'created_at', 'status'],
-                rows: [
-                    [1, '张三', 'zhangsan@example.com', '2024-01-15', 'active'],
-                    [2, '李四', 'lisi@example.com', '2024-01-16', 'active'],
-                    [3, '王五', 'wangwu@example.com', '2024-01-17', 'inactive'],
-                    [4, '赵六', 'zhaoliu@example.com', '2024-01-18', 'active'],
-                    [5, '钱七', 'qianqi@example.com', '2024-01-19', 'pending']
-                ],
-                row_count: 5,
-                duration: '0.023s'
-            };
-            
-            renderQueryResult(mockResult);
-            resultCount.textContent = `${mockResult.row_count} 行数据`;
-            resultTime.textContent = mockResult.duration;
-        }
-    } catch (error) {
-        showNotification('error', `查询失败: ${error.message}`);
-        resultCount.textContent = '错误';
-        resultTime.textContent = '';
-    }
-    
-    hideLoading();
+  } catch (error) {
+    showNotification('error', `查询失败: ${error.message}`);
+  }
+
+  hideLoading();
 }
 
-function renderQueryResult(result) {
-    const tableHead = document.querySelector('.results-table thead tr');
-    const resultsBody = document.getElementById('resultsBody');
-    
-    // Render headers
-    let headerHtml = '<th><input type="checkbox"></th>';
-    result.columns.forEach(col => {
-        headerHtml += `
-            <th>${col} <svg class="sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>
-            </svg></th>
-        `;
-    });
-    headerHtml += '<th>Actions</th>';
-    tableHead.innerHTML = headerHtml;
-    
-    // Render rows
-    let rowsHtml = '';
-    result.rows.forEach((row, index) => {
-        rowsHtml += '<tr>';
-        rowsHtml += '<td><input type="checkbox"></td>';
-        row.forEach(cell => {
-            const displayValue = cell === null ? '<em>NULL</em>' : escapeHtml(String(cell));
-            rowsHtml += `<td>${displayValue}</td>`;
+function renderMultiQueryResults(data) {
+  const results = data.results || [];
+  if (results.length === 0) return;
+
+  // Show results panel and split handle
+  const editorPanel = document.getElementById('editorPanel');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const splitHandle = document.getElementById('splitHandle');
+  editorPanel.style.flex = 'none';
+  editorPanel.style.height = '50%';
+  splitHandle.style.display = 'block';
+  resultsPanel.style.display = 'flex';
+  resultsPanel.style.flex = 'none';
+  resultsPanel.style.height = '50%';
+  setTimeout(() => { if (monacoEditor) monacoEditor.layout(); }, 50);
+
+  // === Messages Tab (first tab - with summary info at top) ===
+  const summaryBar = `<div class="msg-summary-bar">
+    <span class="msg-summary-item"><span class="msg-summary-label">已处理的查询</span>${data.total_count}</span>
+    <span class="msg-summary-item"><span class="msg-summary-label">成功</span>${data.success_count}</span>
+    <span class="msg-summary-item"><span class="msg-summary-label">错误</span>${data.error_count}</span>
+    <span class="msg-summary-item"><span class="msg-summary-label">运行时间</span>${data.total_duration}</span>
+  </div>`;
+
+  let messagesHtml = '';
+  results.forEach((r, i) => {
+    if (r.status === 'error') {
+      messagesHtml += `<div class="msg-item msg-error">
+        <div class="msg-query">${escapeHtml(r.query)}</div>
+        <div class="msg-text msg-error-text">✖ ${escapeHtml(r.error)}</div>
+      </div>`;
+    } else {
+      messagesHtml += `<div class="msg-item msg-success">
+        <div class="msg-query">${escapeHtml(r.query)}</div>
+        <div class="msg-text">✔ OK — ${r.row_count !== undefined ? r.row_count + ' 行' : '已执行'} — 查询时间: ${r.duration}</div>
+      </div>`;
+    }
+  });
+
+  // === Summary Tab ===
+  const summaryHtml = `
+    <div class="summary-container">
+      <div class="summary-grid">
+        <div class="summary-card"><label>已处理的查询</label><span>${data.total_count}</span></div>
+        <div class="summary-card success"><label>成功</label><span>${data.success_count}</span></div>
+        <div class="summary-card error"><label>错误</label><span>${data.error_count}</span></div>
+        <div class="summary-card"><label>开始时间</label><span>${data.start_time}</span></div>
+        <div class="summary-card"><label>结束时间</label><span>${data.end_time}</span></div>
+        <div class="summary-card"><label>运行时间</label><span>${data.total_duration}</span></div>
+      </div>
+      <div class="summary-list">
+        ${results.map(r => `
+          <div class="summary-item ${r.status === 'error' ? 'summary-error' : ''}">
+            <div class="summary-item-query">${escapeHtml(r.query)}</div>
+            <div class="summary-item-status">
+              ${r.status === 'error'
+                ? `<span class="badge badge-error">错误 ${escapeHtml(r.error)}</span>`
+                : `<span class="badge badge-ok">OK 查询时间: ${r.duration}</span>`}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // === Result Tabs (结果1, 结果2, ...) ===
+  const dataResults = results.filter(r => r.columns && r.columns.length > 0);
+  let resultTabsSection = '';
+
+  if (dataResults.length > 0) {
+    const resultTabs = dataResults.map((r, i) =>
+      `<button class="result-sub-tab ${i === 0 ? 'active' : ''}" data-idx="${i}" onclick="switchResultTab(${i})">${dataResults.length > 1 ? `结果 ${i + 1}` : `结果`}</button>`
+    );
+
+    const resultPanels = dataResults.map((r, i) => {
+      let theadHtml = r.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
+      let tbodyHtml = r.rows.map(row => {
+        let cells = '';
+        (row || []).forEach(cell => {
+          cells += `<td>${cell === 'NULL' ? '<em class="null-val">NULL</em>' : escapeHtml(String(cell))}</td>`;
         });
-        rowsHtml += `
-            <td class="row-actions">
-                <button class="action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                <button class="action-btn" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-            </td>
-        `;
-        rowsHtml += '</tr>';
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      return `<div class="result-sub-panel" data-rp="${i}" style="display:${i === 0 ? 'block' : 'none'};">
+        <div class="result-sub-info">${r.row_count} 行数据 — ${r.duration}</div>
+        <div class="result-sub-table-wrap"><table class="results-table"><thead><tr>${theadHtml}</tr></thead><tbody>${tbodyHtml}</tbody></table></div>
+      </div>`;
     });
-    resultsBody.innerHTML = rowsHtml;
+
+    resultTabsSection = `<div class="result-tabs-bar">${resultTabs.join('')}</div><div class="result-tabs-panels">${resultPanels.join('')}</div>`;
+  } else {
+    resultTabsSection = '<div class="result-no-data">没有返回数据的查询</div>';
+  }
+
+  // Show/hide the Results tab based on whether there are data results
+  const resultsTab = document.getElementById('resultsPanel').querySelector('.rv-tab[data-rv="results"]');
+  if (resultsTab) resultsTab.style.display = dataResults.length > 0 ? '' : 'none';
+
+  // Reset to Messages tab
+  document.querySelectorAll('.results-container .rv-tab').forEach(t => t.classList.toggle('active', t.dataset.rv === 'messages'));
+
+  // Inject into results panel
+  const rvMessages = document.getElementById('rv-messages');
+  const rvSummary = document.getElementById('rv-summary');
+  const rvResults = document.getElementById('rv-results');
+
+  if (rvMessages) rvMessages.innerHTML = `${summaryBar}<div class="messages-container">${messagesHtml}</div>`;
+  if (rvSummary) rvSummary.innerHTML = summaryHtml;
+  if (rvResults) rvResults.innerHTML = resultTabsSection;
+
+  // Show messages, hide others
+  document.getElementById('rv-messages').style.display = 'block';
+  document.getElementById('rv-summary').style.display = 'none';
+  document.getElementById('rv-results').style.display = 'none';
 }
+
+window.switchResultsView = function(view) {
+  document.querySelectorAll('.results-container .rv-tab').forEach(t => t.classList.toggle('active', t.dataset.rv === view));
+  ['summary', 'messages', 'results'].forEach(v => {
+    const el = document.getElementById('rv-' + v);
+    if (el) el.style.display = v === view ? 'block' : 'none';
+  });
+};
+
+window.switchResultTab = function(idx) {
+  document.querySelectorAll('.result-sub-tab').forEach(t => t.classList.toggle('active', parseInt(t.dataset.idx) === idx));
+  document.querySelectorAll('.result-sub-panel').forEach(p => p.style.display = parseInt(p.dataset.rp) === idx ? 'block' : 'none');
+};
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function getSelectedText() {
+  if (monacoEditor) {
+    const sel = monacoEditor.getSelection();
+    if (sel && !sel.isEmpty()) {
+      const model = monacoEditor.getModel();
+      return model.getValueInRange(sel);
+    }
+  }
+  return '';
 }
 
 function formatSQL() {
-    const editor = document.getElementById('queryEditor');
-    let sql = editor.value;
-    
-    const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 'GROUP BY', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM'];
-    
-    keywords.forEach(keyword => {
-        const regex = new RegExp('\\b' + keyword + '\\b', 'gi');
-        sql = sql.replace(regex, keyword);
-    });
-    
-    editor.value = sql;
-    updateLineNumbers();
+  if (!monacoEditor) return;
+  
+  let sql = getEditorValue();
+  
+  const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 'GROUP BY', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM'];
+  
+  keywords.forEach(keyword => {
+    const regex = new RegExp('\\b' + keyword + '\\b', 'gi');
+    sql = sql.replace(regex, keyword);
+  });
+  
+  setEditorValue(sql);
 }
 
 function explainQuery() {
-    const editor = document.getElementById('queryEditor');
-    const query = editor.value.trim();
-    
-    if (!query) return;
-    
-    if (!query.toUpperCase().startsWith('EXPLAIN')) {
-        editor.value = 'EXPLAIN ' + query;
-        updateLineNumbers();
-    }
-    
-    executeQuery();
+  if (!monacoEditor) return;
+  
+  const query = getEditorValue().trim();
+  
+  if (!query) return;
+  
+  if (!query.toUpperCase().startsWith('EXPLAIN')) {
+    setEditorValue('EXPLAIN ' + query);
+  }
+  
+  executeQuery();
 }
 
 async function saveQuery() {
-    if (isWailsAvailable()) {
-        const path = await WailsAPI.saveFileDialog('Save Query', 'query.sql');
-        if (path) {
-            const query = document.getElementById('queryEditor').value;
-            // In a real implementation, save to file
-            showNotification('success', 'Query saved!');
-        }
-    } else {
-        // Mock save - download as file
-        const query = document.getElementById('queryEditor').value;
-        const blob = new Blob([query], { type: 'text/sql' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'query.sql';
-        a.click();
-        URL.revokeObjectURL(url);
-        showNotification('success', 'Query saved!');
+  const query = getEditorValue();
+  
+  if (isWailsAvailable()) {
+    const path = await WailsAPI.saveFileDialog('Save Query', 'query.sql');
+    if (path) {
+      // In a real implementation, save to file
+      showNotification('success', 'Query saved!');
     }
+  } else {
+    // Mock save - download as file
+    const blob = new Blob([query], { type: 'text/sql' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'query.sql';
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('success', 'Query saved!');
+  }
 }
 
 async function loadQuery() {

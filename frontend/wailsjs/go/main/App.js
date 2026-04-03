@@ -14,6 +14,10 @@ export function DisconnectFromDatabase(arg1) {
   return window['go']['main']['App']['DisconnectFromDatabase'](arg1);
 }
 
+export function ExecuteMultiQuery(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExecuteMultiQuery'](arg1, arg2, arg3);
+}
+
 export function ExecuteNonQuery(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteNonQuery'](arg1, arg2, arg3);
 }

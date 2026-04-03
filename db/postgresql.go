@@ -32,6 +32,15 @@ func (d *PostgreSQLDriver) Connect(config ConnectionConfig) error {
 	return nil
 }
 
+// UseDatabase switches the current database context
+func (d *PostgreSQLDriver) UseDatabase(ctx context.Context, database string) error {
+	// PostgreSQL doesn't have a 'USE' command.
+	// Connection is established to a specific DB.
+	// For a real client, we would need to re-connect or use a different connection from the pool.
+	// For now, we return nil as PostgreSQL usually handles this via connection string.
+	return nil
+}
+
 // Close closes the PostgreSQL connection
 func (d *PostgreSQLDriver) Close() error {
 	if d.sqlDB != nil {

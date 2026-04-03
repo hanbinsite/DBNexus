@@ -33,6 +33,15 @@ func (d *RedisDriver) Connect(config ConnectionConfig) error {
 	return nil
 }
 
+// UseDatabase switches the current database context
+func (d *RedisDriver) UseDatabase(ctx context.Context, database string) error {
+	// Redis uses numeric DBs (0-15). If "db0", extract 0.
+	var dbNum int
+	fmt.Sscanf(database, "db%d", &dbNum)
+	_, err := d.client.Do(ctx, "SELECT", dbNum).Result()
+	return err
+}
+
 // Close closes the Redis connection
 func (d *RedisDriver) Close() error {
 	if d.client != nil {

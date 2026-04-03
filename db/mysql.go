@@ -32,6 +32,12 @@ func (d *MySQLDriver) Connect(config ConnectionConfig) error {
 	return nil
 }
 
+// UseDatabase switches the current database context
+func (d *MySQLDriver) UseDatabase(ctx context.Context, database string) error {
+	_, err := d.Exec(ctx, fmt.Sprintf("USE `%s`", database))
+	return err
+}
+
 // Close closes the MySQL connection
 func (d *MySQLDriver) Close() error {
 	if d.sqlDB != nil {

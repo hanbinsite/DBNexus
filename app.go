@@ -50,6 +50,26 @@ type QueryResult struct {
 	Error    string          `json:"error,omitempty"`
 }
 
+type SingleQueryResult struct {
+	Query    string          `json:"query"`
+	Columns  []string        `json:"columns"`
+	Rows     [][]interface{} `json:"rows"`
+	RowCount int             `json:"row_count"`
+	Duration string          `json:"duration"`
+	Error    string          `json:"error,omitempty"`
+	Status   string          `json:"status"` // "success", "error"
+}
+
+type MultiQueryResult struct {
+	Results       []SingleQueryResult `json:"results"`
+	TotalCount    int                 `json:"total_count"`
+	SuccessCount  int                 `json:"success_count"`
+	ErrorCount    int                 `json:"error_count"`
+	TotalDuration string              `json:"total_duration"`
+	StartTime     string              `json:"start_time"`
+	EndTime       string              `json:"end_time"`
+}
+
 // TableInfo represents table information
 type TableInfo struct {
 	Name    string `json:"name"`
@@ -352,20 +372,47 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		SSLMode:  config.SSLMode,
 	}
 
-	key := buildKey(dbConfig)
-	driver, err := a.pool.getOrConnect(key, func() (db.DatabaseDriver, error) {
-		return a.driverManager.Connect(dbConfig)
-	})
-	if err != nil {
-		return false, fmt.Sprintf("连接失败: %v", err)
-	}
+	// We use a simplified key for the connection pool that doesn't depend on the database name,
+	// allowing us to reuse the same physical connection for different databases in the same server.
+	key := buildConnectionKey(dbConfig)
 
-	err = driver.Ping(a.ctx)
-	if err != nil {
+	// Check if we already have a valid connection in pool
+	a.poolMutex.RLock()
+	existingDriver, exists := a.pool.get(key)
+	a.poolMutex.RUnlock()
+
+	if exists {
+		// Test existing connection with retry
+		err := existingDriver.Ping(a.ctx)
+		if err == nil {
+			return true, "Connected successfully"
+		}
+		// Connection is stale, remove it
 		a.pool.remove(key)
+	}
+
+	// Create fresh connection
+	driver, err := a.driverManager.Connect(dbConfig)
+	if err != nil {
 		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
+	// Ping with retry logic (up to 3 attempts)
+	var pingErr error
+	for i := 0; i < 3; i++ {
+		pingErr = driver.Ping(a.ctx)
+		if pingErr == nil {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if pingErr != nil {
+		driver.Close()
+		return false, fmt.Sprintf("连接失败: %v", pingErr)
+	}
+
+	a.pool.set(key, driver)
 	return true, "Connected successfully"
 }
 
@@ -405,11 +452,18 @@ func (a *App) GetDatabases(config Connection) ([]DatabaseInfo, error) {
 // GetTables returns a list of tables
 func (a *App) GetTables(config Connection, database string) ([]TableInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
+
+	// IMPORTANT: Set the database for this operation
 	dbConfig.Database = database
 
 	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	// Ensure the driver is actually pointing to the requested database
+	if err := driver.UseDatabase(a.ctx, database); err != nil {
+		return nil, fmt.Errorf("切换数据库 %s 失败: %v", database, err)
 	}
 
 	tables, err := driver.GetTables(a.ctx)
@@ -939,7 +993,6 @@ func convertRefAction(action string) string {
 func (a *App) ExecuteQuery(config Connection, database string, query string) QueryResult {
 	startTime := time.Now()
 
-	// Decrypt password if stored encrypted
 	if config.SavePassword && config.Password != "" {
 		decrypted, err := decryptPassword(config.Password)
 		if err == nil {
@@ -950,7 +1003,6 @@ func (a *App) ExecuteQuery(config Connection, database string, query string) Que
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	// Use connection pool
 	key := buildKey(dbConfig)
 	a.poolMutex.RLock()
 	driver, exists := a.pool.get(key)
@@ -982,7 +1034,6 @@ func (a *App) ExecuteQuery(config Connection, database string, query string) Que
 	}
 	defer rows.Close()
 
-	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
 		return QueryResult{
@@ -991,17 +1042,13 @@ func (a *App) ExecuteQuery(config Connection, database string, query string) Que
 		}
 	}
 
-	// Prepare result rows
 	var resultRows [][]interface{}
-
-	// Create slice of interface{} to hold each row's values
 	values := make([]interface{}, len(columns))
 	valuePtrs := make([]interface{}, len(columns))
 	for i := range values {
 		valuePtrs[i] = &values[i]
 	}
 
-	// Scan rows
 	for rows.Next() {
 		err = rows.Scan(valuePtrs...)
 		if err != nil {
@@ -1011,18 +1058,14 @@ func (a *App) ExecuteQuery(config Connection, database string, query string) Que
 			}
 		}
 
-		// Convert row values to interface{} slice
 		row := make([]interface{}, len(columns))
 		for i, v := range values {
 			if v == nil {
-				row[i] = nil
+				row[i] = "NULL"
+			} else if b, ok := v.([]byte); ok {
+				row[i] = string(b)
 			} else {
-				// Convert []byte to string for display
-				if b, ok := v.([]byte); ok {
-					row[i] = string(b)
-				} else {
-					row[i] = v
-				}
+				row[i] = v
 			}
 		}
 		resultRows = append(resultRows, row)
@@ -1034,6 +1077,198 @@ func (a *App) ExecuteQuery(config Connection, database string, query string) Que
 		RowCount: len(resultRows),
 		Duration: time.Since(startTime).String(),
 	}
+}
+
+func (a *App) ExecuteMultiQuery(config Connection, database string, query string) MultiQueryResult {
+	startTime := time.Now()
+
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
+	dbConfig := a.connectionToDBConfig(config)
+	dbConfig.Database = database
+
+	key := buildKey(dbConfig)
+	a.poolMutex.RLock()
+	driver, exists := a.pool.get(key)
+	a.poolMutex.RUnlock()
+
+	if !exists {
+		a.poolMutex.Lock()
+		if driver, exists = a.pool.get(key); !exists {
+			newDriver, err := a.driverManager.Connect(dbConfig)
+			if err != nil {
+				a.poolMutex.Unlock()
+				return MultiQueryResult{TotalDuration: time.Since(startTime).String()}
+			}
+			driver = newDriver
+			a.pool.set(key, driver)
+		}
+		a.poolMutex.Unlock()
+	}
+
+	// Split queries by semicolon (handling multi-line queries)
+	queries := splitQueries(query)
+
+	var results []SingleQueryResult
+	var totalDuration time.Duration
+
+	for _, q := range queries {
+		q = strings.TrimSpace(q)
+		if q == "" {
+			continue
+		}
+
+		queryStart := time.Now()
+		result := SingleQueryResult{
+			Query:  q,
+			Status: "success",
+		}
+
+		// Check if it's a SELECT query
+		upperQuery := strings.ToUpper(strings.TrimSpace(q))
+		isSelect := strings.HasPrefix(upperQuery, "SELECT") ||
+			strings.HasPrefix(upperQuery, "SHOW") ||
+			strings.HasPrefix(upperQuery, "DESCRIBE") ||
+			strings.HasPrefix(upperQuery, "EXPLAIN") ||
+			strings.HasPrefix(upperQuery, "WITH")
+
+		if isSelect {
+			rows, err := driver.Query(a.ctx, q)
+			if err != nil {
+				result.Error = err.Error()
+				result.Status = "error"
+				result.Duration = time.Since(queryStart).String()
+				results = append(results, result)
+				continue
+			}
+
+			columns, err := rows.Columns()
+			if err == nil {
+				result.Columns = columns
+				values := make([]interface{}, len(columns))
+				valuePtrs := make([]interface{}, len(columns))
+				for i := range values {
+					valuePtrs[i] = &values[i]
+				}
+
+				for rows.Next() {
+					if err := rows.Scan(valuePtrs...); err != nil {
+						break
+					}
+					row := make([]interface{}, len(columns))
+					for i, v := range values {
+						if v == nil {
+							row[i] = "NULL"
+						} else if b, ok := v.([]byte); ok {
+							row[i] = string(b)
+						} else {
+							row[i] = v
+						}
+					}
+					result.Rows = append(result.Rows, row)
+				}
+				result.RowCount = len(result.Rows)
+			}
+			rows.Close()
+		} else {
+			// Non-SELECT: INSERT, UPDATE, DELETE, etc.
+			sqlResult, err := driver.Exec(a.ctx, q)
+			if err != nil {
+				result.Error = err.Error()
+				result.Status = "error"
+				result.Duration = time.Since(queryStart).String()
+				results = append(results, result)
+				continue
+			}
+			if sqlResult != nil {
+				if affected, err := sqlResult.RowsAffected(); err == nil {
+					result.RowCount = int(affected)
+				}
+			}
+		}
+
+		result.Duration = time.Since(queryStart).String()
+		results = append(results, result)
+	}
+
+	totalDuration = time.Since(startTime)
+	successCount := 0
+	errorCount := 0
+	for _, r := range results {
+		if r.Status == "success" {
+			successCount++
+		} else {
+			errorCount++
+		}
+	}
+
+	return MultiQueryResult{
+		Results:       results,
+		TotalCount:    len(results),
+		SuccessCount:  successCount,
+		ErrorCount:    errorCount,
+		TotalDuration: totalDuration.String(),
+		StartTime:     time.Now().Format("15:04:05"),
+		EndTime:       time.Now().Add(totalDuration).Format("15:04:05"),
+	}
+}
+
+func splitQueries(query string) []string {
+	var queries []string
+	var current strings.Builder
+	inSingleQuote := false
+	inDoubleQuote := false
+	escaped := false
+
+	for _, ch := range query {
+		if escaped {
+			current.WriteRune(ch)
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' {
+			escaped = true
+			current.WriteRune(ch)
+			continue
+		}
+
+		if ch == '\'' && !inDoubleQuote {
+			inSingleQuote = !inSingleQuote
+			current.WriteRune(ch)
+			continue
+		}
+
+		if ch == '"' && !inSingleQuote {
+			inDoubleQuote = !inDoubleQuote
+			current.WriteRune(ch)
+			continue
+		}
+
+		if ch == ';' && !inSingleQuote && !inDoubleQuote {
+			stmt := strings.TrimSpace(current.String())
+			if stmt != "" {
+				queries = append(queries, stmt)
+			}
+			current.Reset()
+			continue
+		}
+
+		current.WriteRune(ch)
+	}
+
+	// Handle remaining text (last statement without semicolon)
+	stmt := strings.TrimSpace(current.String())
+	if stmt != "" {
+		queries = append(queries, stmt)
+	}
+
+	return queries
 }
 
 // ExecuteNonQuery executes a non-query SQL statement
@@ -1088,12 +1323,21 @@ func (a *App) SaveFileDialog(title string, defaultName string) string {
 // ==========================================================================
 
 func (a *App) connectionToDBConfig(conn Connection) db.ConnectionConfig {
+	// Decrypt password if it's saved encrypted
+	password := conn.Password
+	if conn.SavePassword && conn.Password != "" {
+		decrypted, err := decryptPassword(conn.Password)
+		if err == nil {
+			password = decrypted
+		}
+	}
+
 	return db.ConnectionConfig{
 		Type:     db.DBType(conn.Type),
 		Host:     conn.Host,
 		Port:     conn.Port,
 		Username: conn.Username,
-		Password: conn.Password,
+		Password: password,
 		Database: conn.Database,
 		SSLMode:  conn.SSLMode,
 	}
@@ -1101,7 +1345,7 @@ func (a *App) connectionToDBConfig(conn Connection) db.ConnectionConfig {
 
 // getDriverForConfig gets a driver from pool or creates a new one
 func (a *App) getDriverForConfig(dbConfig db.ConnectionConfig) (db.DatabaseDriver, error) {
-	key := buildKey(dbConfig)
+	key := buildConnectionKey(dbConfig)
 
 	a.poolMutex.RLock()
 	if driver, exists := a.pool.get(key); exists {

@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DB Client - 数据库管理工具</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DB Client - 数据库管理工具</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="lib/monaco-editor/min/vs/editor/editor.main.css">
+  <script src="lib/monaco-editor/min/vs/loader.js"></script>
+  <script>
+    require.config({ paths: { 'vs': 'lib/monaco-editor/min/vs' } });
+  </script>
 </head>
 <body>
     <!-- Resize handles for window borders and corners -->
@@ -193,66 +198,70 @@
 
                     <!-- 查询编辑器面板 -->
                     <div class="editor-panel" id="editorPanel" style="display: none;">
-                    <div class="editor-toolbar">
+                      <div class="editor-toolbar">
                         <div class="editor-actions">
-                            <button class="editor-btn" onclick="formatSQL()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
-                                </svg>
-                            </button>
-                            <button class="editor-btn" onclick="executeQuery()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="5 3 19 12 5 21 5 3"/>
-                                </svg>
-                            </button>
-                            <button class="editor-btn" onclick="explainQuery()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 16v-4M12 8h.01"/>
-                                </svg>
-                            </button>
-                            <div class="editor-divider"></div>
-                            <button class="editor-btn" onclick="saveQuery()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                    <path d="M17 21v-8H7v8M7 3v5h8"/>
-                                </svg>
-                            </button>
-                            <button class="editor-btn" onclick="loadQuery()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                                </svg>
-                            </button>
+                          <button class="editor-btn" onclick="formatSQL()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="executeQuery()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="explainQuery()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                          </button>
+                          <div class="editor-divider"></div>
+                          <button class="editor-btn" onclick="saveQuery()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                              <path d="M17 21v-8H7v8M7 3v5h8"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="loadQuery()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            </svg>
+                          </button>
                         </div>
                         <div class="editor-db-selector">
-                            <label data-i18n="database">数据库:</label>
-                            <select id="queryDatabase">
-                                <option value="">选择数据库</option>
-                            </select>
+                          <label data-i18n="database">数据库:</label>
+                          <select id="queryDatabase">
+                            <option value="">选择数据库</option>
+                          </select>
                         </div>
+                      </div>
+                      <div class="editor-container" id="editorContainer">
+                        <div id="monacoEditor"></div>
+                        <textarea id="fallbackEditor" class="fallback-sql-editor" placeholder="-- 输入 SQL 查询语句..." spellcheck="false"></textarea>
+                      </div>
                     </div>
-                    <div class="editor-container" id="editorContainer">
-                        <div class="line-numbers" id="lineNumbers">
-                            <span>1</span>
-                        </div>
-                        <div class="sql-editor-wrapper">
-                            <pre class="sql-highlight" id="sqlHighlight"></pre>
-                            <textarea class="query-editor" id="queryEditor" placeholder="-- 输入 SQL 查询语句..." spellcheck="false">SELECT * FROM users LIMIT 100;</textarea>
-                        </div>
-                        <div class="autocomplete-popup" id="autocompletePopup" style="display: none;">
-                            <div class="autocomplete-list" id="autocompleteList"></div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 结果面板 -->
-                <div class="results-panel" id="resultsPanel" style="display: none;">
-                    <div class="results-header">
-                        <div class="results-tabs">
-                            <button class="results-tab active" data-results="grid" data-i18n="gridView">网格视图</button>
-                            <button class="results-tab" data-results="text" data-i18n="textView">文本视图</button>
-                            <button class="results-tab" data-results="history" data-i18n="history">历史记录</button>
+                    <!-- 拖拽手柄 -->
+                    <div class="split-handle" id="splitHandle" style="display: none;"></div>
+
+                    <!-- 结果面板 -->
+                    <div class="results-panel" id="resultsPanel" style="display: none;">
+                    <div class="results-container">
+                        <div class="results-view-tabs" id="resultViewTabs">
+                            <button class="rv-tab active" data-rv="messages" onclick="switchResultsView('messages')">消息</button>
+                            <button class="rv-tab" data-rv="summary" onclick="switchResultsView('summary')">摘要</button>
+                            <button class="rv-tab" data-rv="results" onclick="switchResultsView('results')" style="display:none;">结果</button>
                         </div>
+                        <div class="results-view-panel" id="rv-messages" style="display:block;">
+                            <div class="messages-container">
+                                <p class="results-placeholder">执行 SQL 查询后，结果将显示在这里</p>
+                            </div>
+                        </div>
+                        <div class="results-view-panel" id="rv-summary" style="display:none;"></div>
+                        <div class="results-view-panel" id="rv-results" style="display:none;"></div>
+                    </div>
+                    </div>
                         <div class="results-info">
                             <span class="result-count" id="resultCount">等待查询...</span>
                             <span class="result-time" id="resultTime"></span>
@@ -899,9 +908,9 @@
             </svg>
             <span>删除</span>
         </div>
-    </div>
+  </div>
 
-    <script src="i18n.js"></script>
-    <script src="app.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

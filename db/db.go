@@ -49,6 +49,9 @@ type DatabaseDriver interface {
 	// Ping tests the database connection
 	Ping(ctx context.Context) error
 
+	// UseDatabase switches the current database context
+	UseDatabase(ctx context.Context, database string) error
+
 	// Query executes a query that returns rows
 	Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 

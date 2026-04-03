@@ -18,9 +18,14 @@ func newConnectionPool() *connectionPool {
 	}
 }
 
-// buildKey creates a unique key for a database connection
+// buildKey creates a unique key for a database connection (includes database name)
 func buildKey(config db.ConnectionConfig) string {
 	return fmt.Sprintf("%s:%s:%d:%s:%s", config.Type, config.Host, config.Port, config.Username, config.Database)
+}
+
+// buildConnectionKey creates a unique key for a physical server connection (excludes database name)
+func buildConnectionKey(config db.ConnectionConfig) string {
+	return fmt.Sprintf("%s:%s:%d:%s", config.Type, config.Host, config.Port, config.Username)
 }
 
 func (p *connectionPool) get(key string) (db.DatabaseDriver, bool) {

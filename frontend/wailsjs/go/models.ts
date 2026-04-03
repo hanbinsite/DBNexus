@@ -127,6 +127,72 @@ export namespace main {
 	        this.comment = source["comment"];
 	    }
 	}
+	export class SingleQueryResult {
+	    query: string;
+	    columns: string[];
+	    rows: any[][];
+	    row_count: number;
+	    duration: string;
+	    error?: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SingleQueryResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.columns = source["columns"];
+	        this.rows = source["rows"];
+	        this.row_count = source["row_count"];
+	        this.duration = source["duration"];
+	        this.error = source["error"];
+	        this.status = source["status"];
+	    }
+	}
+	export class MultiQueryResult {
+	    results: SingleQueryResult[];
+	    total_count: number;
+	    success_count: number;
+	    error_count: number;
+	    total_duration: string;
+	    start_time: string;
+	    end_time: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MultiQueryResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], SingleQueryResult);
+	        this.total_count = source["total_count"];
+	        this.success_count = source["success_count"];
+	        this.error_count = source["error_count"];
+	        this.total_duration = source["total_duration"];
+	        this.start_time = source["start_time"];
+	        this.end_time = source["end_time"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class QueryResult {
 	    columns: string[];
 	    rows: any[][];
@@ -147,6 +213,7 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
+	
 	export class TableInfo {
 	    name: string;
 	    type: string;

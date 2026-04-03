@@ -9,6 +9,8 @@ export function DeleteConnection(arg1:string):Promise<void>;
 
 export function DisconnectFromDatabase(arg1:main.Connection):Promise<void>;
 
+export function ExecuteMultiQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.MultiQueryResult>;
+
 export function ExecuteNonQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<number>;
 
 export function ExecuteQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.QueryResult>;

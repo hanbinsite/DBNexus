@@ -34,6 +34,12 @@ func (d *SQLiteDriver) Connect(config ConnectionConfig) error {
 	return nil
 }
 
+// UseDatabase switches the current database context
+func (d *SQLiteDriver) UseDatabase(ctx context.Context, database string) error {
+	// SQLite usually uses a single file.
+	return nil
+}
+
 // Close closes the SQLite connection
 func (d *SQLiteDriver) Close() error {
 	if d.sqlDB != nil {
