@@ -1,0 +1,37 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - typecheck
+    - gosimple
+    - gosec
+    - unused
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: db-server
+  govet:
+    check-shadowing: true
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked
+      - G304 # File path provided as taint input
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+    - path: crypto\.go
+      linters:
+        - gosec

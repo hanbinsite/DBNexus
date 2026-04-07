@@ -1,4 +1,4 @@
-module db-client
+module db-server
 
 go 1.22.0
 

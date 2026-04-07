@@ -3,10 +3,14 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
 )
+
+// ErrRedisUnsupportedOperation is returned when a SQL operation is attempted on Redis
+var ErrRedisUnsupportedOperation = errors.New("query operation not supported for Redis")
 
 // RedisDriver implements the DatabaseDriver interface for Redis
 type RedisDriver struct {
@@ -55,22 +59,34 @@ func (d *RedisDriver) Ping(ctx context.Context) error {
 	return d.client.Ping(ctx).Err()
 }
 
-// Query executes a query that returns rows (not applicable for Redis)
+// Query executes a query that returns rows (Redis does not support SQL)
 func (d *RedisDriver) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return nil, fmt.Errorf("query operation not supported for Redis")
+	return nil, ErrRedisUnsupportedOperation
 }
 
-// Exec executes a query that doesn't return rows (not applicable for Redis)
+// Exec executes a query that doesn't return rows (Redis does not support SQL)
 func (d *RedisDriver) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return nil, fmt.Errorf("exec operation not supported for Redis")
+	return nil, ErrRedisUnsupportedOperation
 }
 
-// GetTables returns a list of keys in Redis
+// GetTables returns a list of keys in Redis (uses SCAN instead of KEYS for safety)
 func (d *RedisDriver) GetTables(ctx context.Context) ([]string, error) {
-	keys, err := d.client.Keys(ctx, "*").Result()
-	if err != nil {
-		return nil, err
+	var keys []string
+	var cursor uint64
+
+	for {
+		var scannedKeys []string
+		var err error
+		scannedKeys, cursor, err = d.client.Scan(ctx, cursor, "*", 100).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, scannedKeys...)
+		if cursor == 0 {
+			break
+		}
 	}
+
 	return keys, nil
 }
 

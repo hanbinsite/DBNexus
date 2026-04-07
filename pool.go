@@ -1,20 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
+	"time"
 
-	"db-client/db"
+	"db-server/db"
 )
 
 type connectionPool struct {
 	mu          sync.RWMutex
-	connections map[string]db.DatabaseDriver
+	connections map[string]*pooledDriver
+}
+
+type pooledDriver struct {
+	driver    db.DatabaseDriver
+	createdAt time.Time
+	lastPing  time.Time
 }
 
 func newConnectionPool() *connectionPool {
 	return &connectionPool{
-		connections: make(map[string]db.DatabaseDriver),
+		connections: make(map[string]*pooledDriver),
 	}
 }
 
@@ -28,7 +36,7 @@ func buildConnectionKey(config db.ConnectionConfig) string {
 	return fmt.Sprintf("%s:%s:%d:%s", config.Type, config.Host, config.Port, config.Username)
 }
 
-func (p *connectionPool) get(key string) (db.DatabaseDriver, bool) {
+func (p *connectionPool) get(key string) (*pooledDriver, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	driver, exists := p.connections[key]
@@ -41,17 +49,23 @@ func (p *connectionPool) set(key string, driver db.DatabaseDriver) {
 
 	// Close existing connection if it exists
 	if existing, exists := p.connections[key]; exists {
-		existing.Close()
+		existing.driver.Close()
 	}
-	p.connections[key] = driver
+	p.connections[key] = &pooledDriver{
+		driver:    driver,
+		createdAt: time.Now(),
+		lastPing:  time.Now(),
+	}
 }
 
 func (p *connectionPool) remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if driver, exists := p.connections[key]; exists {
-		driver.Close()
+	if pooled, exists := p.connections[key]; exists {
+		if pooled.driver != nil {
+			pooled.driver.Close()
+		}
 	}
 	delete(p.connections, key)
 }
@@ -60,34 +74,67 @@ func (p *connectionPool) closeAll() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	for key, driver := range p.connections {
-		driver.Close()
+	for key, pooled := range p.connections {
+		if pooled.driver != nil {
+			pooled.driver.Close()
+		}
 		delete(p.connections, key)
 	}
 }
 
-// getOrConnect tries to get an existing connection from the pool,
-// or creates a new one if none exists.
-func (p *connectionPool) getOrConnect(key string, connectFn func() (db.DatabaseDriver, error)) (db.DatabaseDriver, error) {
-	// Try to get from pool first
-	if driver, exists := p.get(key); exists {
-		return driver, nil
+// pingWithTimeout attempts to ping the driver with a timeout
+func (p *connectionPool) pingWithTimeout(ctx context.Context, driver db.DatabaseDriver) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- driver.Ping(ctx)
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Get returns a driver after validating its health, or false if invalid
+// Validates connection before returning to prevent stale connection issues
+func (p *connectionPool) GetHealthy(ctx context.Context, key string) (db.DatabaseDriver, bool) {
+	p.mu.RLock()
+	pooled, exists := p.connections[key]
+	p.mu.RUnlock()
+
+	if !exists {
+		return nil, false
 	}
 
-	// Create new connection
+	// Check connection health with ping
+	if err := p.pingWithTimeout(ctx, pooled.driver); err != nil {
+		// Connection is stale, remove it
+		p.remove(key)
+		return nil, false
+	}
+
+	// Update last ping time
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	if pooled, exists := p.connections[key]; exists {
+		pooled.lastPing = time.Now()
+	}
+	p.mu.Unlock()
 
-	// Double check after acquiring write lock
-	if driver, exists := p.connections[key]; exists {
-		return driver, nil
+	return pooled.driver, true
+}
+
+// SetWithHealth adds a driver to the pool and verifies it's alive
+func (p *connectionPool) SetWithHealth(ctx context.Context, key string, driver db.DatabaseDriver) error {
+	if err := p.pingWithTimeout(ctx, driver); err != nil {
+		driver.Close()
+		return err
 	}
 
-	driver, err := connectFn()
-	if err != nil {
-		return nil, err
-	}
-
-	p.connections[key] = driver
-	return driver, nil
+	p.set(key, driver)
+	return nil
 }

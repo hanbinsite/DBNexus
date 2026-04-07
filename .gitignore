@@ -29,7 +29,11 @@ Thumbs.db
 
 # Frontend
 frontend/dist/assets/
+frontend/dist/lib/
 node_modules/
 
 # Logs
 *.log
+
+# Development
+dev/
