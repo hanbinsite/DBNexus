@@ -38,12 +38,20 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	initEncryptionKey()
 	a.loadConnections()
+
+	// 初始化审计日志
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventLogin, "应用程序启动", nil)
 }
 
 // shutdown is called when the app closes
 func (a *App) shutdown(ctx context.Context) {
 	a.pool.closeAll()
 	a.saveConnections()
+
+	// 记录关闭日志
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventLogout, "应用程序关闭", nil)
 }
 
 // ==========================================================================

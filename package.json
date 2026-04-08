@@ -1,0 +1,20 @@
+{
+  "name": "db-server",
+  "version": "1.0.0",
+  "description": "A modern, cross-platform database client built with Go and Wails, featuring a beautiful UI and support for multiple database systems.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://cnb.cool/hanbin.site/db-server"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "monaco-editor": "^0.45.0"
+  }
+}

@@ -60,17 +60,38 @@ func (a *App) SaveConnection(conn Connection) error {
 		a.connections = append(a.connections, conn)
 	}
 
+	// 记录审计日志
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventConnectionSave,
+		fmt.Sprintf("保存连接配置: %s", conn.Name),
+		map[string]interface{}{
+			"connection_id":   conn.ID,
+			"connection_name": conn.Name,
+			"database_type":   conn.Type,
+		})
+
 	return a.saveConnections()
 }
 
 // DeleteConnection deletes a connection
 func (a *App) DeleteConnection(id string) error {
+	var connName string
 	for i, c := range a.connections {
 		if c.ID == id {
+			connName = c.Name
 			a.connections = append(a.connections[:i], a.connections[i+1:]...)
 			break
 		}
 	}
+
+	// 记录审计日志
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelWarning, AuditEventConnectionDelete,
+		fmt.Sprintf("删除连接配置: %s", connName),
+		map[string]interface{}{
+			"connection_id": id,
+		})
+
 	return a.saveConnections()
 }
 
@@ -199,9 +220,9 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		SSLMode:  config.SSLMode,
 	}
 
-	// We use a simplified key for the connection pool that doesn't depend on the database name,
-	// allowing us to reuse the same physical connection for different databases in the same server.
-	key := buildConnectionKey(dbConfig)
+	// Use buildKey (includes database name) for consistent connection pooling
+	// This ensures each database has its own connection in the pool
+	key := buildKey(dbConfig)
 
 	// Check if we already have a valid connection in pool
 	a.poolMutex.RLock()

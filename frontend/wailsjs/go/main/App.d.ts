@@ -3,27 +3,71 @@
 import {main} from '../models';
 import {db} from '../models';
 
+export function AnalyzeQuery(arg1:string):Promise<main.QueryAnalysis>;
+
+export function AnalyzeTableUsage(arg1:main.Connection,arg2:string):Promise<Array<Record<string, any>>>;
+
+export function BatchEdit(arg1:main.Connection,arg2:Array<main.EditRequest>):Promise<Array<main.EditResult>>;
+
+export function BeautifySQL(arg1:string):Promise<string>;
+
+export function CompactSQL(arg1:string):Promise<string>;
+
+export function CompareQueries(arg1:main.Connection,arg2:main.CompareRequest):Promise<main.CompareResult>;
+
+export function CompareTables(arg1:main.Connection,arg2:main.CompareRequest):Promise<main.CompareResult>;
+
 export function ConnectToDatabase(arg1:main.Connection):Promise<boolean|string>;
 
 export function DeleteConnection(arg1:string):Promise<void>;
 
 export function DisconnectFromDatabase(arg1:main.Connection):Promise<void>;
 
+export function EditTableData(arg1:main.Connection,arg2:main.EditRequest):Promise<main.EditResult>;
+
 export function ExecuteMultiQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.MultiQueryResult>;
+
+export function ExecuteMultiQueryWithTimeout(arg1:main.Connection,arg2:string,arg3:string,arg4:main.QueryOptions):Promise<main.MultiQueryResult>;
 
 export function ExecuteNonQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<number>;
 
 export function ExecuteQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.QueryResult>;
 
+export function ExecuteQueryWithTimeout(arg1:main.Connection,arg2:string,arg3:string,arg4:main.QueryOptions):Promise<main.QueryResult>;
+
+export function ExportCompareResult(arg1:main.CompareResult,arg2:string):Promise<Array<number>>;
+
+export function ExportData(arg1:main.Connection,arg2:main.ExportRequest):Promise<main.ExportResult>;
+
+export function FormatSQL(arg1:string,arg2:main.FormatOptions):Promise<string>;
+
+export function GenerateInsertStatement(arg1:string,arg2:Record<string, any>):Promise<string>;
+
+export function GenerateUpdateStatement(arg1:string,arg2:Record<string, any>,arg3:string):Promise<string>;
+
+export function GetAutoCompleteSuggestions(arg1:main.Connection,arg2:string,arg3:string,arg4:number):Promise<main.AutoCompleteResult>;
+
+export function GetCompareReport(arg1:main.CompareResult):Promise<string>;
+
 export function GetConnections():Promise<Array<main.Connection>>;
 
 export function GetDatabases(arg1:main.Connection):Promise<Array<main.DatabaseInfo>>;
+
+export function GetEditableColumns(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<db.ColumnInfo>>;
+
+export function GetExplainPlan(arg1:main.Connection,arg2:string,arg3:string):Promise<main.ExplainResult>;
 
 export function GetFunctions(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
 
 export function GetLanguage():Promise<string>;
 
+export function GetQuickSuggestions(arg1:string):Promise<Array<main.AutoCompleteItem>>;
+
+export function GetSQLStructure(arg1:string):Promise<Record<string, any>>;
+
 export function GetServerInfo(arg1:main.Connection):Promise<Record<string, string>>;
+
+export function GetSlowQueries(arg1:main.Connection,arg2:string,arg3:number):Promise<Array<Record<string, any>>>;
 
 export function GetSupportedDatabases():Promise<Array<Record<string, string>>>;
 
@@ -31,15 +75,23 @@ export function GetSupportedFeatures():Promise<Record<string, Array<string>>>;
 
 export function GetTableColumns(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<db.ColumnInfo>>;
 
+export function GetTableColumnsForAutoComplete(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<main.AutoCompleteItem>>;
+
 export function GetTableForeignKeys(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<main.ForeignKeyInfo>>;
 
 export function GetTableIndexes(arg1:main.Connection,arg2:string,arg3:string):Promise<Array<main.IndexInfo>>;
+
+export function GetTableStatistics(arg1:main.Connection,arg2:string,arg3:string):Promise<Record<string, any>>;
 
 export function GetTableStats(arg1:main.Connection,arg2:string,arg3:string):Promise<main.TableStats>;
 
 export function GetTables(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
 
 export function GetViews(arg1:main.Connection,arg2:string):Promise<Array<main.TableInfo>>;
+
+export function ImportData(arg1:main.Connection,arg2:main.ImportRequest):Promise<main.ImportResult>;
+
+export function MinifySQL(arg1:string):Promise<string>;
 
 export function OpenFileDialog(arg1:string,arg2:string):Promise<string>;
 
@@ -54,6 +106,8 @@ export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
 export function SetLanguage(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:main.Connection):Promise<boolean|string>;
+
+export function ValidateSQL(arg1:string):Promise<boolean|Array<string>>;
 
 export function WindowClose():Promise<void>;
 

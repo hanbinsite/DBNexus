@@ -213,10 +213,18 @@ func TestBuildConnectionKey(t *testing.T) {
 		Username: "postgres",
 		Database: "mydb",
 	}
+	// buildConnectionKey excludes database name
 	key := buildConnectionKey(config)
 	expected := "postgresql:localhost:5432:postgres"
 	if key != expected {
 		t.Errorf("buildConnectionKey() = %q, want %q", key, expected)
+	}
+
+	// Test that buildKey includes database name
+	keyWithDB := buildKey(config)
+	expectedWithDB := "postgresql:localhost:5432:postgres:mydb"
+	if keyWithDB != expectedWithDB {
+		t.Errorf("buildKey() = %q, want %q", keyWithDB, expectedWithDB)
 	}
 }
 

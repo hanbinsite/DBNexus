@@ -29,8 +29,9 @@ func (a *App) connectionToDBConfig(conn Connection) db.ConnectionConfig {
 }
 
 // getDriverForConfig gets a driver from pool or creates a new one
+// Uses buildKey (includes database name) for consistent connection pooling
 func (a *App) getDriverForConfig(dbConfig db.ConnectionConfig) (db.DatabaseDriver, error) {
-	key := buildConnectionKey(dbConfig)
+	key := buildKey(dbConfig)
 
 	a.poolMutex.RLock()
 	if pooled, exists := a.pool.get(key); exists {

@@ -15,19 +15,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Improved Redis driver: replaced dangerous `KEYS *` with safe `SCAN` command to prevent blocking on large datasets
 - Added proper error handling for nil driver checks in connection pool
 
+### Added
+
+- **SQL Auto-Complete System**: Comprehensive auto-completion for SQL queries
+  - Keyword suggestions (70+ SQL keywords)
+  - Function suggestions (100+ built-in functions)
+  - Table and column name suggestions
+  - Database name suggestions
+  - Context-aware completion based on query position
+  - Support for MySQL and PostgreSQL specific functions
+  - `GetAutoCompleteSuggestions()` API for frontend integration
+  
+- **Data Editing**: Full CRUD operations for table data
+  - Insert new rows with validation
+  - Update existing rows with WHERE clause or primary key
+  - Delete rows with safety checks
+  - Batch edit operations
+  - SQL statement preview before execution
+  - `EditTableData()` API with full audit logging
+  
+- **Data Export**: Multiple format support for query results
+  - CSV export with proper escaping
+  - JSON export with formatting
+  - Excel (.xlsx) export with auto-column-width
+  - SQL INSERT statement generation
+  - Export to `~/.db-client/exports/` directory
+  - `ExportData()` API with audit logging
+  
+- **Data Import**: Import data from external files
+  - CSV import with header detection
+  - JSON import with array/object support
+  - Batch insert with error handling
+  - Import from `~/.db-client/imports/` directory
+  - `ImportData()` API with progress tracking
+  
+- **Query Timeout Control**: Configurable timeout to prevent interface freezing
+  - Default 30 seconds timeout
+  - Maximum 300 seconds timeout
+  - Helpful timeout messages with optimization suggestions
+  - `ExecuteQueryWithTimeout()` and `ExecuteMultiQueryWithTimeout()` APIs
+  
+- **Audit Logging System**: Comprehensive audit trail for enterprise compliance
+  - Records all SQL query executions (success/failure)
+  - Tracks connection events (connect/disconnect)
+  - Logs connection configuration changes (save/delete)
+  - Captures application lifecycle events (startup/shutdown)
+  - Supports log filtering, export, and automatic cleanup
+  - Logs stored in `~/.db-client/logs/audit_YYYY-MM-DD.log`
+
 ### Changed
 
+- **CRITICAL FIX**: Fixed connection pool cache key inconsistency
+  - Unified connection pool to use `buildKey()` (includes database name) instead of `buildConnectionKey()` (excludes database name)
+  - This fix prevents querying wrong database when switching databases
+  - Updated `config.go:getDriverForConfig()` and `connection.go:ConnectToDatabase()` to use consistent key strategy
 - Refactored `app.go` (1565 lines) into multiple smaller files for better maintainability:
   - `app.go` - App struct, lifecycle, i18n
   - `config.go` - Configuration management
   - `connection.go` - Connection management methods
   - `schema.go` - Database schema operations
   - `query.go` - Query execution
+  - `query_timeout.go` - Query timeout control
+  - `audit.go` - Audit logging system
+  - `autocomplete.go` - SQL auto-completion
+  - `data_editor.go` - Data editing operations
+  - `data_export.go` - Data import/export
   - `test.go` - Test services
   - `window.go` - Window controls
   - `filedialog.go` - File dialogs
   - `types.go` - Type definitions
 - Fixed module name inconsistency (`db-client` → `db-server`)
+- Added excelize/v2 dependency for Excel export functionality
+- Upgraded Go version to 1.24.0 for better performance
 - Added `pooledDriver` wrapper struct for connection pool with health tracking
 - Added connection health check with ping timeout (3 seconds)
 - Replaced hardcoded Chinese error messages with i18n system
