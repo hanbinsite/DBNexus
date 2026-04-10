@@ -2320,11 +2320,13 @@ function deleteSelectedForeignKeys() {
 
 // Update loadTableData to store all data for pagination
 async function loadTableData(tableName, database) {
- if (!state.activeConnection) {
- showNotification('warning', '请先选择一个数据库连接');
- hideLoading();
- return;
- }
+	console.log('loadTableData called:', { tableName, database, activeConnection: state.activeConnection });
+	
+	if (!state.activeConnection) {
+		showNotification('warning', '请先选择一个数据库连接');
+		hideLoading();
+		return;
+	}
     
     // Ensure database is set - use selectedDatabase as fallback
     const activeDb = database || state.selectedDatabase;
@@ -2381,25 +2383,30 @@ async function loadTableData(tableName, database) {
         // Execute query to get data - using proper quoting
         const query = `SELECT * FROM ${quotedTableName} LIMIT 10000`;
         
-        if (isWailsAvailable()) {
-            const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
-            
-            if (result && result.error) {
-                showNotification('error', result.error);
-            } else if (result) {
-                // Store all data for pagination
-                pagination.allData = result.rows || [];
-                pagination.columns = result.columns || [];
-                pagination.totalRows = result.row_count || 0;
-                pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
-                pagination.currentPage = 1;
-                
-                updatePaginationUI();
-                renderCurrentPage();
-            } else {
-                showNotification('warning', '未获取到数据');
-            }
-        } else {
+	if (isWailsAvailable()) {
+		const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
+		console.log('Query result:', result);
+		console.log('Result type:', typeof result);
+		console.log('Result keys:', result ? Object.keys(result) : 'null');
+		console.log('Result error:', result?.error);
+		console.log('Result rows:', result?.rows);
+		console.log('Result columns:', result?.columns);
+
+		if (result && result.error) {
+			showNotification('error', result.error);
+		} else if (result && result.rows) {
+			pagination.allData = result.rows || [];
+			pagination.columns = result.columns || [];
+			pagination.totalRows = result.row_count || 0;
+			pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
+			pagination.currentPage = 1;
+
+			updatePaginationUI();
+			renderCurrentPage();
+		} else {
+			showNotification('warning', '未获取到数据');
+		}
+	} else {
             // Mock data
             await new Promise(resolve => setTimeout(resolve, 300));
             

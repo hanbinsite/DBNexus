@@ -10,7 +10,8 @@ import (
 
 // PostgreSQLDriver implements the DatabaseDriver interface for PostgreSQL
 type PostgreSQLDriver struct {
-	sqlDB *sql.DB
+	sqlDB  *sql.DB
+	config ConnectionConfig // 保存配置以便重新连接
 }
 
 // NewPostgreSQLDriver creates a new PostgreSQLDriver
@@ -29,15 +30,44 @@ func (d *PostgreSQLDriver) Connect(config ConnectionConfig) error {
 	}
 
 	d.sqlDB = sqlDB
+	d.config = config // 保存配置
 	return nil
 }
 
 // UseDatabase switches the current database context
+// PostgreSQL doesn't have a 'USE' command, so we need to reconnect to the new database
 func (d *PostgreSQLDriver) UseDatabase(ctx context.Context, database string) error {
-	// PostgreSQL doesn't have a 'USE' command.
-	// Connection is established to a specific DB.
-	// For a real client, we would need to re-connect or use a different connection from the pool.
-	// For now, we return nil as PostgreSQL usually handles this via connection string.
+	// 如果已经是同一个数据库，无需切换
+	if d.config.Database == database {
+		return nil
+	}
+
+	// 关闭当前连接
+	if d.sqlDB != nil {
+		d.sqlDB.Close()
+	}
+
+	// 创建新的连接配置
+	newConfig := d.config
+	newConfig.Database = database
+
+	// 重新连接到新数据库
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		newConfig.Host, newConfig.Port, newConfig.Username, newConfig.Password, newConfig.Database, newConfig.SSLMode)
+
+	sqlDB, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database %s: %w", database, err)
+	}
+
+	// 测试新连接
+	if err := sqlDB.PingContext(ctx); err != nil {
+		sqlDB.Close()
+		return fmt.Errorf("failed to ping database %s: %w", database, err)
+	}
+
+	d.sqlDB = sqlDB
+	d.config = newConfig
 	return nil
 }
 
@@ -135,7 +165,6 @@ func (d *PostgreSQLDriver) GetTableStructure(ctx context.Context, tableName stri
 	return columns, nil
 }
 
-// GetDatabases returns a list of databases in PostgreSQL
 func (d *PostgreSQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	query := "SELECT datname FROM pg_database WHERE datistemplate = false"
 	rows, err := d.Query(ctx, query)
@@ -154,4 +183,8 @@ func (d *PostgreSQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	}
 
 	return databases, nil
+}
+
+func (d *PostgreSQLDriver) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return d.sqlDB.BeginTx(ctx, opts)
 }

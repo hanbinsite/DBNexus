@@ -86,9 +86,26 @@ func (a *App) EditTableData(config Connection, req EditRequest) EditResult {
 				}
 			}
 			a.pool.set(key, newDriver)
-			pooledDriver, _ = a.pool.get(key)
+			pooledDriver, exists = a.pool.get(key)
+			if !exists || pooledDriver == nil {
+				a.poolMutex.Unlock()
+				return EditResult{
+					Success: false,
+					Message: "连接池设置失败",
+					Error:   "无法从连接池获取连接",
+				}
+			}
 		}
 		a.poolMutex.Unlock()
+	}
+
+	// 双重检查：确保 pooledDriver 和 driver 都不为 nil
+	if pooledDriver == nil || pooledDriver.driver == nil {
+		return EditResult{
+			Success: false,
+			Message: "连接无效",
+			Error:   "连接池返回了无效的连接",
+		}
 	}
 
 	var result EditResult

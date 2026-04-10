@@ -40,32 +40,16 @@ type ColumnInfo struct {
 
 // DatabaseDriver defines the interface for database operations
 type DatabaseDriver interface {
-	// Connect establishes a connection to the database
 	Connect(config ConnectionConfig) error
-
-	// Close closes the database connection
 	Close() error
-
-	// Ping tests the database connection
 	Ping(ctx context.Context) error
-
-	// UseDatabase switches the current database context
 	UseDatabase(ctx context.Context, database string) error
-
-	// Query executes a query that returns rows
 	Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-
-	// Exec executes a query that doesn't return rows
 	Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-
-	// GetTables returns a list of tables in the database
 	GetTables(ctx context.Context) ([]string, error)
-
-	// GetTableStructure returns the structure of a table
 	GetTableStructure(ctx context.Context, tableName string) ([]ColumnInfo, error)
-
-	// GetDatabases returns a list of databases
 	GetDatabases(ctx context.Context) ([]string, error)
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
 // DriverManager manages database drivers

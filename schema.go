@@ -188,10 +188,21 @@ func (a *App) GetTableColumns(config Connection, database string, table string) 
 
 // sanitizeIdentifier sanitizes a SQL identifier (table/column name) to prevent SQL injection
 func sanitizeIdentifier(identifier string) string {
+	// Check for empty input
+	if identifier == "" {
+		return "invalid_identifier"
+	}
+
+	// Block path traversal attempts
+	if strings.Contains(identifier, "..") {
+		return "invalid_identifier"
+	}
+
 	// Block dangerous characters
 	if strings.ContainsAny(identifier, ";--/*\\=(){}[]&|!<>") {
 		return "invalid_identifier"
 	}
+
 	// Only allow alphanumeric characters, underscores, and dots (for schema.table)
 	cleaned := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
@@ -199,9 +210,21 @@ func sanitizeIdentifier(identifier string) string {
 		}
 		return -1
 	}, identifier)
+
 	if cleaned == "" {
 		return "invalid_identifier"
 	}
+
+	// Limit identifier length to prevent DOS attacks
+	if len(cleaned) > 64 {
+		cleaned = cleaned[:64]
+	}
+
+	// Validate schema.table format (at most one dot)
+	if dotCount := strings.Count(cleaned, "."); dotCount > 1 {
+		return "invalid_identifier"
+	}
+
 	return cleaned
 }
 
@@ -492,22 +515,41 @@ func parsePostgresArray(arr string) []string {
 	}
 
 	var result []string
-	current := ""
+	var current strings.Builder
 	inQuote := false
+	escaped := false
 
 	for i := 0; i < len(content); i++ {
 		c := content[i]
+
+		if escaped {
+			current.WriteByte(c)
+			escaped = false
+			continue
+		}
+
+		if c == '\\' {
+			escaped = true
+			current.WriteByte(c)
+			continue
+		}
+
 		if c == '"' {
 			inQuote = !inQuote
-		} else if c == ',' && !inQuote {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(c)
+			continue
 		}
+
+		if c == ',' && !inQuote {
+			result = append(result, current.String())
+			current.Reset()
+			continue
+		}
+
+		current.WriteByte(c)
 	}
-	if current != "" {
-		result = append(result, current)
+
+	if current.Len() > 0 {
+		result = append(result, current.String())
 	}
 
 	return result

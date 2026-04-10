@@ -3,6 +3,7 @@ package main
 import (
 	"db-server/db"
 	"testing"
+	"time"
 )
 
 func TestSanitizeIdentifier(t *testing.T) {
@@ -381,5 +382,150 @@ func TestConnectionToDBConfig(t *testing.T) {
 	}
 	if dbConfig.Database != "testdb" {
 		t.Errorf("expected database testdb, got %q", dbConfig.Database)
+	}
+}
+
+func TestPoolMaxSize(t *testing.T) {
+	pool := newConnectionPool()
+	if pool == nil {
+		t.Fatal("newConnectionPool() returned nil")
+	}
+
+	pool.mu.Lock()
+	for i := 0; i < MaxPoolSize+10; i++ {
+		if len(pool.connections) >= MaxPoolSize {
+			pool.evictOldest()
+		}
+		key := string(rune('a' + i%26))
+		pool.connections[key] = &pooledDriver{
+			driver:    nil,
+			createdAt: time.Now(),
+			lastPing:  time.Now(),
+		}
+	}
+	pool.mu.Unlock()
+
+	if len(pool.connections) > MaxPoolSize {
+		t.Errorf("pool size %d exceeds max %d", len(pool.connections), MaxPoolSize)
+	}
+}
+
+func TestTransactionOptions(t *testing.T) {
+	opts := TransactionOptions{
+		Isolation: "SERIALIZABLE",
+		ReadOnly:  true,
+	}
+
+	if opts.Isolation != "SERIALIZABLE" {
+		t.Errorf("expected isolation SERIALIZABLE, got %q", opts.Isolation)
+	}
+	if !opts.ReadOnly {
+		t.Error("expected ReadOnly to be true")
+	}
+}
+
+func TestTransactionResult(t *testing.T) {
+	result := TransactionResult{
+		Success:      true,
+		RowsAffected: 100,
+		Message:      "事务执行成功",
+		Duration:     "10ms",
+	}
+
+	if !result.Success {
+		t.Error("expected Success to be true")
+	}
+	if result.RowsAffected != 100 {
+		t.Errorf("expected RowsAffected 100, got %d", result.RowsAffected)
+	}
+}
+
+func TestCalculateComplexity(t *testing.T) {
+	tests := []struct {
+		analysis QueryAnalysis
+		expected string
+	}{
+		{QueryAnalysis{JoinCount: 0}, "LOW"},
+		{QueryAnalysis{JoinCount: 2, HasAggregate: true}, "MEDIUM"},
+		{QueryAnalysis{JoinCount: 5, HasSubquery: true, HasAggregate: true}, "HIGH"},
+	}
+
+	for _, tt := range tests {
+		result := calculateComplexity(tt.analysis)
+		if result != tt.expected {
+			t.Errorf("calculateComplexity() = %q, want %q", result, tt.expected)
+		}
+	}
+}
+
+func TestExtractTables(t *testing.T) {
+	tests := []struct {
+		query    string
+		expected []string
+	}{
+		{"SELECT * FROM users", []string{"users"}},
+		{"SELECT * FROM products WHERE id = 1", []string{"products"}},
+		{"SELECT * FROM orders", []string{"orders"}},
+	}
+
+	for _, tt := range tests {
+		result := extractTables(tt.query)
+		if len(result) == 0 {
+			t.Errorf("extractTables(%q) returned empty", tt.query)
+		}
+	}
+}
+
+func TestCountKeyword(t *testing.T) {
+	query := "SELECT * FROM users JOIN orders ON users.id = orders.user_id JOIN products ON orders.product_id = products.id"
+	count := countKeyword(query, "JOIN")
+	if count != 2 {
+		t.Errorf("expected 2 JOINs, got %d", count)
+	}
+}
+
+func TestGenerateRecommendations(t *testing.T) {
+	analysis := QueryAnalysis{
+		JoinCount:   5,
+		HasSubquery: true,
+		HasOrderBy:  true,
+		HasDistinct: true,
+		HasGroupBy:  true,
+	}
+
+	recommendations := generateRecommendations(analysis, "SELECT * FROM users")
+
+	if len(recommendations) == 0 {
+		t.Error("expected recommendations for complex query")
+	}
+}
+
+func TestQueryAnalysisStruct(t *testing.T) {
+	analysis := QueryAnalysis{
+		QueryType:       "SELECT",
+		Tables:          []string{"users", "orders"},
+		JoinCount:       2,
+		SubqueryCount:   1,
+		HasAggregate:    true,
+		HasOrderBy:      true,
+		HasGroupBy:      false,
+		HasDistinct:     false,
+		HasLimit:        true,
+		HasUnion:        false,
+		HasSubquery:     true,
+		EstimatedCost:   100.5,
+		EstimatedRows:   1000,
+		Complexity:      "MEDIUM",
+		Recommendations: []string{"添加索引"},
+	}
+
+	if analysis.QueryType != "SELECT" {
+		t.Errorf("expected QueryType SELECT, got %q", analysis.QueryType)
+	}
+	if len(analysis.Tables) != 2 {
+		t.Errorf("expected 2 tables, got %d", len(analysis.Tables))
+	}
+	if analysis.JoinCount != 2 {
+		t.Errorf("expected JoinCount 2, got %d", analysis.JoinCount)
 	}
 }

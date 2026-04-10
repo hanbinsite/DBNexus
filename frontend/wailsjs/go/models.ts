@@ -666,8 +666,8 @@ export namespace main {
 	    }
 	}
 	export class QueryResult {
-	    columns: string[];
-	    rows: any[][];
+	    columns?: string[];
+	    rows?: any[][];
 	    row_count: number;
 	    duration: string;
 	    error?: string;
@@ -745,6 +745,112 @@ export namespace main {
 	        this.message = source["message"];
 	        this.time = source["time"];
 	    }
+	}
+	export class TransactionOptions {
+	    isolation: string;
+	    readOnly: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TransactionOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isolation = source["isolation"];
+	        this.readOnly = source["readOnly"];
+	    }
+	}
+	export class TransactionQuery {
+	    query: string;
+	    rowsAffected: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TransactionQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.rowsAffected = source["rowsAffected"];
+	        this.error = source["error"];
+	    }
+	}
+	export class TransactionRequest {
+	    config: Connection;
+	    database: string;
+	    queries: string[];
+	    options: TransactionOptions;
+	
+	    static createFrom(source: any = {}) {
+	        return new TransactionRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.config = this.convertValues(source["config"], Connection);
+	        this.database = source["database"];
+	        this.queries = source["queries"];
+	        this.options = this.convertValues(source["options"], TransactionOptions);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TransactionResult {
+	    success: boolean;
+	    rowsAffected: number;
+	    message: string;
+	    error?: string;
+	    duration: string;
+	    queries: TransactionQuery[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TransactionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.rowsAffected = source["rowsAffected"];
+	        this.message = source["message"];
+	        this.error = source["error"];
+	        this.duration = source["duration"];
+	        this.queries = this.convertValues(source["queries"], TransactionQuery);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

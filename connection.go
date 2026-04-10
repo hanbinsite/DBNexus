@@ -102,9 +102,11 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 	// Decrypt password if it's saved encrypted
 	if config.SavePassword && config.Password != "" {
 		decrypted, err := decryptPassword(config.Password)
-		if err == nil {
-			config.Password = decrypted
+		if err != nil {
+			return false, fmt.Sprintf("%s: %v", a.t(MsgConnectionFailed, lang),
+				fmt.Sprintf("密码解密失败，请重新输入密码 (错误: %v)", err))
 		}
+		config.Password = decrypted
 	}
 
 	if config.Host == "" && config.Type != "sqlite" {
@@ -221,46 +223,38 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 	}
 
 	// Use buildKey (includes database name) for consistent connection pooling
-	// This ensures each database has its own connection in the pool
 	key := buildKey(dbConfig)
 
-	// Check if we already have a valid connection in pool
-	a.poolMutex.RLock()
-	existingPooled, exists := a.pool.get(key)
-	a.poolMutex.RUnlock()
-
-	if exists {
-		// Test existing connection with retry
-		err := existingPooled.driver.Ping(a.ctx)
-		if err == nil {
-			return true, "Connected successfully"
+	// 使用原子性的getOrCreate方法，避免竞态条件
+	_, err := a.pool.getOrCreate(key, func() (db.DatabaseDriver, error) {
+		// 创建新连接
+		driver, err := a.driverManager.Connect(dbConfig)
+		if err != nil {
+			return nil, err
 		}
-		// Connection is stale, remove it
-		a.pool.remove(key)
-	}
 
-	// Create fresh connection
-	driver, err := a.driverManager.Connect(dbConfig)
+		// Ping with retry logic (up to 3 attempts)
+		var pingErr error
+		for i := 0; i < 3; i++ {
+			pingErr = driver.Ping(a.ctx)
+			if pingErr == nil {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		if pingErr != nil {
+			driver.Close()
+			return nil, pingErr
+		}
+
+		return driver, nil
+	})
+
 	if err != nil {
 		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
-	// Ping with retry logic (up to 3 attempts)
-	var pingErr error
-	for i := 0; i < 3; i++ {
-		pingErr = driver.Ping(a.ctx)
-		if pingErr == nil {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	if pingErr != nil {
-		driver.Close()
-		return false, fmt.Sprintf("连接失败: %v", pingErr)
-	}
-
-	a.pool.set(key, driver)
 	return true, "Connected successfully"
 }
 

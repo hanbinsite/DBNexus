@@ -18,6 +18,14 @@ export function BeautifySQL(arg1) {
   return window['go']['main']['App']['BeautifySQL'](arg1);
 }
 
+export function BeginTransaction(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BeginTransaction'](arg1, arg2, arg3);
+}
+
+export function CommitTransaction(arg1) {
+  return window['go']['main']['App']['CommitTransaction'](arg1);
+}
+
 export function CompactSQL(arg1) {
   return window['go']['main']['App']['CompactSQL'](arg1);
 }
@@ -46,6 +54,10 @@ export function EditTableData(arg1, arg2) {
   return window['go']['main']['App']['EditTableData'](arg1, arg2);
 }
 
+export function ExecuteInTransaction(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteInTransaction'](arg1, arg2);
+}
+
 export function ExecuteMultiQuery(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteMultiQuery'](arg1, arg2, arg3);
 }
@@ -64,6 +76,10 @@ export function ExecuteQuery(arg1, arg2, arg3) {
 
 export function ExecuteQueryWithTimeout(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExecuteQueryWithTimeout'](arg1, arg2, arg3, arg4);
+}
+
+export function ExecuteTransactionBatch(arg1) {
+  return window['go']['main']['App']['ExecuteTransactionBatch'](arg1);
 }
 
 export function ExportCompareResult(arg1, arg2) {
@@ -184,6 +200,10 @@ export function MinifySQL(arg1) {
 
 export function OpenFileDialog(arg1, arg2) {
   return window['go']['main']['App']['OpenFileDialog'](arg1, arg2);
+}
+
+export function RollbackTransaction(arg1) {
+  return window['go']['main']['App']['RollbackTransaction'](arg1);
 }
 
 export function RunAllTests() {

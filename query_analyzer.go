@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -16,6 +18,16 @@ const (
 	ExplainTypeTime     ExplainType = "time"
 	ExplainTypeIndex    ExplainType = "index"
 	ExplainTypeSequence ExplainType = "sequence"
+)
+
+// 预编译的正则表达式，用于解析 PostgreSQL EXPLAIN 输出
+var (
+	costRegex       = regexp.MustCompile(`cost=(\d+\.?\d*)\.\.(\d+\.?\d*)`)
+	rowsRegex       = regexp.MustCompile(`rows=(\d+)`)
+	timeRegex       = regexp.MustCompile(`actual time=(\d+\.?\d*)\.\.(\d+\.?\d*)`)
+	actualRowsRegex = regexp.MustCompile(`rows=(\d+)\s+loops`)
+	onMatchRegex    = regexp.MustCompile(`on\s+([^\s]+)`)
+	indexMatchRegex = regexp.MustCompile(`Index.*?on\s+([^\s]+)`)
 )
 
 // ExplainNode EXPLAIN 结果节点
@@ -161,19 +173,376 @@ func (a *App) GetExplainPlan(config Connection, database string, query string) E
 
 // parseExplainResult 解析 EXPLAIN 结果
 func (a *App) parseExplainResult(dbType string, rows interface{}) ExplainResult {
-	// 简化版本，实际需要根据不同数据库类型解析
-	// 这里返回一个基础结构
-	rootNode := &ExplainNode{
-		ID:      1,
-		Type:    "QUERY",
-		Details: make(map[string]string),
+	result := ExplainResult{
+		Success: true,
+		RootNode: &ExplainNode{
+			ID:      1,
+			Type:    "QUERY",
+			Details: make(map[string]string),
+		},
+		Warnings:    []string{},
+		Suggestions: []string{},
 	}
 
-	return ExplainResult{
-		Success:  true,
-		RootNode: rootNode,
-		Query:    "",
+	// 类型断言获取 Rows 接口
+	type Rows interface {
+		Columns() ([]string, error)
+		Next() bool
+		Scan(dest ...interface{}) error
+		Close() error
 	}
+
+	var dbRows Rows
+	switch r := rows.(type) {
+	case Rows:
+		dbRows = r
+	default:
+		// 尝试其他类型
+		result.Success = false
+		result.Error = fmt.Sprintf("不支持的 rows 类型: %T", rows)
+		return result
+	}
+
+	columns, err := dbRows.Columns()
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("获取列信息失败: %v", err)
+		return result
+	}
+
+	// 根据数据库类型解析
+	switch dbType {
+	case "mysql":
+		result = a.parseMySQLExplain(dbRows, columns, result)
+	case "postgresql", "polardb", "gaussdb":
+		result = a.parsePostgresExplain(dbRows, columns, result)
+	default:
+		result = a.parseGenericExplain(dbRows, columns, result)
+	}
+
+	return result
+}
+
+// parseMySQLExplain 解析 MySQL EXPLAIN 结果
+func (a *App) parseMySQLExplain(rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+}, columns []string, result ExplainResult) ExplainResult {
+	var nodes []*ExplainNode
+	totalRows := int64(0)
+	totalCost := float64(0)
+
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+
+		node := &ExplainNode{
+			ID:      len(nodes) + 1,
+			Details: make(map[string]string),
+		}
+
+		// 解析列
+		for i, col := range columns {
+			val := values[i]
+			var strVal string
+			switch v := val.(type) {
+			case []byte:
+				strVal = string(v)
+			case string:
+				strVal = v
+			case int64:
+				strVal = fmt.Sprintf("%d", v)
+			case float64:
+				strVal = fmt.Sprintf("%.2f", v)
+			case nil:
+				strVal = ""
+			default:
+				strVal = fmt.Sprintf("%v", v)
+			}
+
+			colUpper := strings.ToUpper(col)
+			switch colUpper {
+			case "ID":
+				if id, err := strconv.Atoi(strVal); err == nil {
+					node.ID = id
+				}
+			case "SELECT_TYPE", "SELECT TYPE":
+				node.Details["select_type"] = strVal
+			case "TABLE":
+				node.Relation = strVal
+			case "TYPE":
+				node.Type = strVal
+			case "POSSIBLE_KEYS":
+				node.Details["possible_keys"] = strVal
+			case "KEY":
+				node.Index = strVal
+			case "KEY_LEN", "KEY_LENGTH":
+				node.Details["key_length"] = strVal
+			case "REF":
+				node.Details["ref"] = strVal
+			case "ROWS":
+				if rows, err := strconv.ParseInt(strVal, 10, 64); err == nil {
+					node.Rows = rows
+					totalRows += rows
+				}
+			case "FILTERED":
+				if filtered, err := strconv.ParseFloat(strVal, 64); err == nil {
+					node.Details["filtered"] = fmt.Sprintf("%.1f%%", filtered)
+				}
+			case "EXTRA":
+				node.Details["extra"] = strVal
+				// 检查警告
+				if strings.Contains(strVal, "Using filesort") {
+					result.Warnings = append(result.Warnings, "使用了文件排序(filesort)，可能影响性能")
+				}
+				if strings.Contains(strVal, "Using temporary") {
+					result.Warnings = append(result.Warnings, "使用了临时表，可能影响性能")
+				}
+				if strings.Contains(strVal, "Using join buffer") {
+					result.Warnings = append(result.Warnings, "使用了连接缓冲区，建议添加索引")
+				}
+			default:
+				node.Details[strings.ToLower(col)] = strVal
+			}
+		}
+
+		// 检查全表扫描
+		if node.Type == "ALL" && node.Relation != "" {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("表 '%s' 使用了全表扫描，建议添加索引", node.Relation))
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	// 构建树结构
+	if len(nodes) > 0 {
+		result.RootNode = nodes[0]
+		if len(nodes) > 1 {
+			result.RootNode.Children = nodes[1:]
+		}
+	}
+
+	result.TotalRows = totalRows
+	result.TotalCost = totalCost
+
+	return result
+}
+
+// parsePostgresExplain 解析 PostgreSQL EXPLAIN ANALYZE 结果
+func (a *App) parsePostgresExplain(rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+}, columns []string, result ExplainResult) ExplainResult {
+	var explainText strings.Builder
+
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+
+		// PostgreSQL 通常返回单列的 TEXT 格式
+		if len(values) > 0 {
+			switch v := values[0].(type) {
+			case []byte:
+				explainText.WriteString(string(v))
+				explainText.WriteString("\n")
+			case string:
+				explainText.WriteString(v)
+				explainText.WriteString("\n")
+			}
+		}
+	}
+
+	// 解析文本格式的 EXPLAIN 输出
+	text := explainText.String()
+	result = a.parsePostgresExplainText(text, result)
+
+	return result
+}
+
+// parsePostgresExplainText 解析 PostgreSQL EXPLAIN 文本输出
+func (a *App) parsePostgresExplainText(text string, result ExplainResult) ExplainResult {
+	lines := strings.Split(text, "\n")
+
+	var currentNode *ExplainNode
+	var nodeStack []*ExplainNode
+	totalCost := float64(0)
+	totalRows := int64(0)
+	totalTime := float64(0)
+
+	for _, line := range lines {
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		level := indent / 2
+
+		// 调整栈深度
+		for len(nodeStack) > level {
+			nodeStack = nodeStack[:len(nodeStack)-1]
+		}
+
+		// 创建新节点
+		node := &ExplainNode{
+			ID:      len(result.Warnings) + 1,
+			Details: make(map[string]string),
+		}
+
+		// 提取节点类型
+		trimmedLine := strings.TrimSpace(line)
+		if idx := strings.Index(trimmedLine, "  "); idx > 0 {
+			node.Type = trimmedLine[:idx]
+		} else if idx := strings.Index(trimmedLine, " "); idx > 0 {
+			node.Type = trimmedLine[:idx]
+		} else {
+			node.Type = trimmedLine
+		}
+
+		// 解析成本
+		if matches := costRegex.FindStringSubmatch(line); len(matches) > 2 {
+			if startCost, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				node.Details["start_cost"] = fmt.Sprintf("%.2f", startCost)
+			}
+			if endCost, err := strconv.ParseFloat(matches[2], 64); err == nil {
+				node.Cost = endCost
+				if endCost > totalCost {
+					totalCost = endCost
+				}
+			}
+		}
+
+		// 解析估计行数
+		if matches := rowsRegex.FindStringSubmatch(line); len(matches) > 1 {
+			if rows, err := strconv.ParseInt(matches[1], 10, 64); err == nil {
+				node.Rows = rows
+			}
+		}
+
+		// 解析实际执行时间
+		if matches := timeRegex.FindStringSubmatch(line); len(matches) > 2 {
+			if startTime, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				node.Details["actual_start_time"] = fmt.Sprintf("%.3f", startTime)
+			}
+			if endTime, err := strconv.ParseFloat(matches[2], 64); err == nil {
+				node.Time = endTime
+				if endTime > totalTime {
+					totalTime = endTime
+				}
+			}
+		}
+
+		// 解析实际行数
+		if matches := actualRowsRegex.FindStringSubmatch(line); len(matches) > 1 {
+			if rows, err := strconv.ParseInt(matches[1], 10, 64); err == nil {
+				node.Details["actual_rows"] = fmt.Sprintf("%d", rows)
+				totalRows += rows
+			}
+		}
+
+		// 检查关系名
+		onMatch := onMatchRegex.FindStringSubmatch(line)
+		if len(onMatch) > 1 {
+			node.Relation = onMatch[1]
+		}
+
+		// 检查索引扫描
+		if strings.Contains(line, "Index Scan") || strings.Contains(line, "Index Only Scan") {
+			idxMatch := indexMatchRegex.FindStringSubmatch(line)
+			if len(idxMatch) > 1 {
+				node.Index = idxMatch[1]
+			}
+		}
+
+		// 检查 Seq Scan（全表扫描）
+		if strings.Contains(line, "Seq Scan") {
+			if node.Relation != "" {
+				result.Warnings = append(result.Warnings, fmt.Sprintf("表 '%s' 使用了顺序扫描(Seq Scan)，建议添加索引", node.Relation))
+			}
+		}
+
+		// 添加到树结构
+		if len(nodeStack) == 0 {
+			result.RootNode = node
+		} else {
+			parent := nodeStack[len(nodeStack)-1]
+			parent.Children = append(parent.Children, node)
+			node.ParentID = parent.ID
+		}
+
+		currentNode = node
+		nodeStack = append(nodeStack, currentNode)
+	}
+
+	result.TotalCost = totalCost
+	result.TotalRows = totalRows
+	result.TotalTime = totalTime
+
+	return result
+}
+
+// parseGenericExplain 解析通用 EXPLAIN 结果
+func (a *App) parseGenericExplain(rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+}, columns []string, result ExplainResult) ExplainResult {
+	var nodes []*ExplainNode
+
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+
+		node := &ExplainNode{
+			ID:      len(nodes) + 1,
+			Details: make(map[string]string),
+		}
+
+		for i, col := range columns {
+			var strVal string
+			switch v := values[i].(type) {
+			case []byte:
+				strVal = string(v)
+			case string:
+				strVal = v
+			case int64:
+				strVal = fmt.Sprintf("%d", v)
+			case float64:
+				strVal = fmt.Sprintf("%.2f", v)
+			case nil:
+				strVal = ""
+			default:
+				strVal = fmt.Sprintf("%v", v)
+			}
+			node.Details[strings.ToLower(col)] = strVal
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	if len(nodes) > 0 {
+		result.RootNode = nodes[0]
+		if len(nodes) > 1 {
+			result.RootNode.Children = nodes[1:]
+		}
+	}
+
+	return result
 }
 
 // AnalyzeQuery 分析查询

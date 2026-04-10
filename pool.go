@@ -3,15 +3,74 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"db-server/db"
 )
 
+const (
+	MaxPoolSize = 50 // 最大连接池大小
+)
+
 type connectionPool struct {
 	mu          sync.RWMutex
 	connections map[string]*pooledDriver
+}
+
+// getOrCreate原子性地获取或创建连接，避免竞态条件
+// 如果连接不存在或已失效，调用createFunc创建新连接
+func (p *connectionPool) getOrCreate(key string, createFunc func() (db.DatabaseDriver, error)) (*pooledDriver, error) {
+	// 第一次检查：读锁
+	p.mu.RLock()
+	if pooled, exists := p.connections[key]; exists {
+		// 检查连接是否有效
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := pooled.driver.Ping(ctx); err == nil {
+			p.mu.RUnlock()
+			return pooled, nil
+		}
+	}
+	p.mu.RUnlock()
+
+	// 需要创建或替换连接：写锁
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// 双重检查：可能在等待写锁期间已被其他goroutine创建
+	if pooled, exists := p.connections[key]; exists {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := pooled.driver.Ping(ctx); err == nil {
+			return pooled, nil
+		}
+		// 连接无效，清理它
+		if pooled.driver != nil {
+			pooled.driver.Close()
+		}
+		delete(p.connections, key)
+	}
+
+	// 创建新连接
+	driver, err := createFunc()
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查连接池大小限制
+	if len(p.connections) >= MaxPoolSize {
+		p.evictOldest()
+	}
+
+	pooled := &pooledDriver{
+		driver:    driver,
+		createdAt: time.Now(),
+		lastPing:  time.Now(),
+	}
+	p.connections[key] = pooled
+	return pooled, nil
 }
 
 type pooledDriver struct {
@@ -51,10 +110,48 @@ func (p *connectionPool) set(key string, driver db.DatabaseDriver) {
 	if existing, exists := p.connections[key]; exists {
 		existing.driver.Close()
 	}
+
+	// 检查连接池大小限制，超过限制时淘汰最旧的连接
+	if len(p.connections) >= MaxPoolSize {
+		p.evictOldest()
+	}
+
 	p.connections[key] = &pooledDriver{
 		driver:    driver,
 		createdAt: time.Now(),
 		lastPing:  time.Now(),
+	}
+}
+
+// evictOldest 淘汰最旧的连接（在持有锁的情况下调用）
+func (p *connectionPool) evictOldest() {
+	if len(p.connections) == 0 {
+		return
+	}
+
+	// 找到最旧的连接
+	type connInfo struct {
+		key       string
+		createdAt time.Time
+	}
+
+	var conns []connInfo
+	for k, v := range p.connections {
+		conns = append(conns, connInfo{key: k, createdAt: v.createdAt})
+	}
+
+	// 按创建时间排序
+	sort.Slice(conns, func(i, j int) bool {
+		return conns[i].createdAt.Before(conns[j].createdAt)
+	})
+
+	// 淘汰最旧的连接（至少淘汰一个）
+	oldest := conns[0]
+	if pooled, exists := p.connections[oldest.key]; exists {
+		if pooled.driver != nil {
+			pooled.driver.Close()
+		}
+		delete(p.connections, oldest.key)
 	}
 }
 

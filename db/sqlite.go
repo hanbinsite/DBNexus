@@ -117,8 +117,10 @@ func (d *SQLiteDriver) GetTableStructure(ctx context.Context, tableName string) 
 	return columns, nil
 }
 
-// GetDatabases returns a list of databases in SQLite
 func (d *SQLiteDriver) GetDatabases(ctx context.Context) ([]string, error) {
-	// SQLite doesn't support multiple databases in the same way
 	return []string{"main"}, nil
+}
+
+func (d *SQLiteDriver) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return d.sqlDB.BeginTx(ctx, opts)
 }

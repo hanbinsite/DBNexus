@@ -11,6 +11,10 @@ export function BatchEdit(arg1:main.Connection,arg2:Array<main.EditRequest>):Pro
 
 export function BeautifySQL(arg1:string):Promise<string>;
 
+export function BeginTransaction(arg1:main.Connection,arg2:string,arg3:main.TransactionOptions):Promise<string>;
+
+export function CommitTransaction(arg1:string):Promise<void>;
+
 export function CompactSQL(arg1:string):Promise<string>;
 
 export function CompareQueries(arg1:main.Connection,arg2:main.CompareRequest):Promise<main.CompareResult>;
@@ -25,6 +29,8 @@ export function DisconnectFromDatabase(arg1:main.Connection):Promise<void>;
 
 export function EditTableData(arg1:main.Connection,arg2:main.EditRequest):Promise<main.EditResult>;
 
+export function ExecuteInTransaction(arg1:string,arg2:string):Promise<number>;
+
 export function ExecuteMultiQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.MultiQueryResult>;
 
 export function ExecuteMultiQueryWithTimeout(arg1:main.Connection,arg2:string,arg3:string,arg4:main.QueryOptions):Promise<main.MultiQueryResult>;
@@ -34,6 +40,8 @@ export function ExecuteNonQuery(arg1:main.Connection,arg2:string,arg3:string):Pr
 export function ExecuteQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.QueryResult>;
 
 export function ExecuteQueryWithTimeout(arg1:main.Connection,arg2:string,arg3:string,arg4:main.QueryOptions):Promise<main.QueryResult>;
+
+export function ExecuteTransactionBatch(arg1:main.TransactionRequest):Promise<main.TransactionResult>;
 
 export function ExportCompareResult(arg1:main.CompareResult,arg2:string):Promise<Array<number>>;
 
@@ -94,6 +102,8 @@ export function ImportData(arg1:main.Connection,arg2:main.ImportRequest):Promise
 export function MinifySQL(arg1:string):Promise<string>;
 
 export function OpenFileDialog(arg1:string,arg2:string):Promise<string>;
+
+export function RollbackTransaction(arg1:string):Promise<void>;
 
 export function RunAllTests():Promise<Array<main.TestResult>>;
 

@@ -19,8 +19,8 @@ type Connection struct {
 
 // QueryResult represents the result of a query execution
 type QueryResult struct {
-	Columns  []string        `json:"columns"`
-	Rows     [][]interface{} `json:"rows"`
+	Columns  []string        `json:"columns,omitempty"`
+	Rows     [][]interface{} `json:"rows,omitempty"`
 	RowCount int             `json:"row_count"`
 	Duration string          `json:"duration"`
 	Error    string          `json:"error,omitempty"`
