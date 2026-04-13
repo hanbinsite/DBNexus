@@ -53,50 +53,38 @@ type DatabaseDriver interface {
 }
 
 // DriverManager manages database drivers
-type DriverManager struct {
-	drivers map[DBType]DatabaseDriver
-}
+type DriverManager struct{}
 
-// NewDriverManager creates a new DriverManager with all available drivers
+// NewDriverManager creates a new DriverManager
 func NewDriverManager() *DriverManager {
-	dm := &DriverManager{
-		drivers: make(map[DBType]DatabaseDriver),
-	}
-
-	// Register all available drivers
-	dm.RegisterDriver(PostgreSQL, NewPostgreSQLDriver())
-	dm.RegisterDriver(PolarDB, NewPostgreSQLDriver()) // PolarDB is compatible with PostgreSQL
-	dm.RegisterDriver(GaussDB, NewPostgreSQLDriver()) // GaussDB is compatible with PostgreSQL
-	dm.RegisterDriver(MySQL, NewMySQLDriver())
-	dm.RegisterDriver(SQLite, NewSQLiteDriver())
-	dm.RegisterDriver(Redis, NewRedisDriver())
-
-	return dm
+	return &DriverManager{}
 }
 
-// RegisterDriver registers a database driver
-func (dm *DriverManager) RegisterDriver(dbType DBType, driver DatabaseDriver) {
-	dm.drivers[dbType] = driver
-}
-
-// GetDriver returns the driver for the given database type
-func (dm *DriverManager) GetDriver(dbType DBType) (DatabaseDriver, error) {
-	driver, exists := dm.drivers[dbType]
-	if !exists {
+// newDriver creates a fresh driver instance for the given database type.
+// Each call returns a new instance so that concurrent connections never share state.
+func (dm *DriverManager) newDriver(dbType DBType) (DatabaseDriver, error) {
+	switch dbType {
+	case PostgreSQL, PolarDB, GaussDB:
+		return NewPostgreSQLDriver(), nil
+	case MySQL:
+		return NewMySQLDriver(), nil
+	case SQLite:
+		return NewSQLiteDriver(), nil
+	case Redis:
+		return NewRedisDriver(), nil
+	default:
 		return nil, fmt.Errorf("driver not found for database type: %s", dbType)
 	}
-	return driver, nil
 }
 
-// Connect connects to a database using the appropriate driver
+// Connect creates a new driver instance and connects to the database
 func (dm *DriverManager) Connect(config ConnectionConfig) (DatabaseDriver, error) {
-	driver, err := dm.GetDriver(config.Type)
+	driver, err := dm.newDriver(config.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	err = driver.Connect(config)
-	if err != nil {
+	if err := driver.Connect(config); err != nil {
 		return nil, err
 	}
 

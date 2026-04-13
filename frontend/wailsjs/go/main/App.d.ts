@@ -25,6 +25,8 @@ export function ConnectToDatabase(arg1:main.Connection):Promise<boolean|string>;
 
 export function DeleteConnection(arg1:string):Promise<void>;
 
+export function DeleteRedisKey(arg1:main.Connection,arg2:Array<string>):Promise<void>;
+
 export function DisconnectFromDatabase(arg1:main.Connection):Promise<void>;
 
 export function EditTableData(arg1:main.Connection,arg2:main.EditRequest):Promise<main.EditResult>;
@@ -40,6 +42,8 @@ export function ExecuteNonQuery(arg1:main.Connection,arg2:string,arg3:string):Pr
 export function ExecuteQuery(arg1:main.Connection,arg2:string,arg3:string):Promise<main.QueryResult>;
 
 export function ExecuteQueryWithTimeout(arg1:main.Connection,arg2:string,arg3:string,arg4:main.QueryOptions):Promise<main.QueryResult>;
+
+export function ExecuteRedisCommand(arg1:main.Connection,arg2:string,arg3:Array<any>):Promise<any>;
 
 export function ExecuteTransactionBatch(arg1:main.TransactionRequest):Promise<main.TransactionResult>;
 
@@ -70,6 +74,12 @@ export function GetFunctions(arg1:main.Connection,arg2:string):Promise<Array<mai
 export function GetLanguage():Promise<string>;
 
 export function GetQuickSuggestions(arg1:string):Promise<Array<main.AutoCompleteItem>>;
+
+export function GetRedisDBSize(arg1:main.Connection):Promise<number>;
+
+export function GetRedisInfo(arg1:main.Connection,arg2:string):Promise<string>;
+
+export function GetRedisKeyInfo(arg1:main.Connection,arg2:string):Promise<db.RedisKeyInfo>;
 
 export function GetSQLStructure(arg1:string):Promise<Record<string, any>>;
 
@@ -113,7 +123,11 @@ export function SaveConnection(arg1:main.Connection):Promise<void>;
 
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
 
+export function ScanRedisKeys(arg1:main.Connection,arg2:string,arg3:number,arg4:number):Promise<Array<string>>;
+
 export function SetLanguage(arg1:string):Promise<void>;
+
+export function SetRedisKeyValue(arg1:main.Connection,arg2:string,arg3:any,arg4:number):Promise<void>;
 
 export function TestConnection(arg1:main.Connection):Promise<boolean|string>;
 

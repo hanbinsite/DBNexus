@@ -58,12 +58,6 @@ func (a *App) getDriverForConfig(dbConfig db.ConnectionConfig) (db.DatabaseDrive
 	return driver, nil
 }
 
-// getDriverForConnection returns a driver for the given connection config
-func (a *App) getDriverForConnection(config Connection) (db.DatabaseDriver, error) {
-	dbConfig := a.connectionToDBConfig(config)
-	return a.driverManager.Connect(dbConfig)
-}
-
 func (a *App) loadConnections() error {
 	configDir := filepath.Dir(a.configPath)
 

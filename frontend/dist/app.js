@@ -102,15 +102,28 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initWails() {
-    // Wait for Wails to be ready
-    if (typeof window.runtime !== 'undefined') {
+    // In Wails v2, window.go is injected after the page loads.
+    // Use a polling approach to wait for it, with a timeout fallback to mock mode.
+    if (isWailsAvailable()) {
         state.wailsReady = true;
         loadSavedConnections();
-    } else {
-        // Wails not available, run in browser mode
-        console.log('Running in browser mode (Wails not available)');
-        loadMockConnections();
+        return;
     }
+
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds (50 * 100ms)
+    const poll = setInterval(() => {
+        attempts++;
+        if (isWailsAvailable()) {
+            clearInterval(poll);
+            state.wailsReady = true;
+            loadSavedConnections();
+        } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            console.log('Running in browser mode (Wails not available)');
+            loadMockConnections();
+        }
+    }, 100);
 }
 
 // ==========================================================================
@@ -2014,67 +2027,69 @@ function renderCurrentPage() {
 }
 
 function renderDataView(result) {
-    const header = document.getElementById('dataViewHeader');
-    const body = document.getElementById('dataViewBody');
-    
-    // Store column widths in state
-    state.columnWidths = state.columnWidths || {};
-    
-    // Render header with resize handles
-    let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
-    result.columns.forEach((col, index) => {
-        const width = state.columnWidths[col] || 150;
-        headerHtml += `
-            <th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
-                <span class="th-content">${col}</span>
-                <div class="resize-handle" data-col="${index}"></div>
-            </th>`;
-    });
-    headerHtml += '</tr>';
-    header.innerHTML = headerHtml;
-    
-    // Render body
-    let bodyHtml = '';
-    result.rows.forEach((row, rowIndex) => {
-        bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
-        row.forEach((cell, colIndex) => {
-            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
-            bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
-        });
-        bodyHtml += '</tr>';
-    });
-    body.innerHTML = bodyHtml;
-    
-    // Update record count
-    document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
-    document.getElementById('dvSelectedCount').textContent = '已选: 0';
-    
-    // Add event listeners
-    document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
-    document.querySelectorAll('.row-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateSelectedCount);
-    });
-    
-    // Initialize column resize
-    initColumnResize();
+	console.log('renderDataView called, columns:', result.columns?.length, 'rows:', result.rows?.length);
+	const header = document.getElementById('dataViewHeader');
+	const body = document.getElementById('dataViewBody');
+
+	// Store column widths in state
+	state.columnWidths = state.columnWidths || {};
+
+	// Render header with resize handles
+	let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+	result.columns.forEach((col, index) => {
+		const width = state.columnWidths[col] || 150;
+		headerHtml += `
+		<th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
+		<span class="th-content">${col}</span>
+		<div class="resize-handle" data-col="${index}"></div>
+	</th>`;
+	});
+	headerHtml += '</tr>';
+	header.innerHTML = headerHtml;
+
+	// Render body
+	let bodyHtml = '';
+	result.rows.forEach((row, rowIndex) => {
+		bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
+		row.forEach((cell, colIndex) => {
+			const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
+			bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
+		});
+		bodyHtml += '</tr>';
+	});
+	body.innerHTML = bodyHtml;
+
+	// Update record count
+	document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
+	document.getElementById('resultCount').textContent = `${result.row_count} 条记录`;
+	document.getElementById('dvSelectedCount').textContent = '已选: 0';
+
+	// Add event listeners
+	document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
+	document.querySelectorAll('.row-checkbox').forEach(cb => {
+		cb.addEventListener('change', updateSelectedCount);
+	});
+
+	// Initialize column resize
+	initColumnResize();
 }
 
 // ==========================================================================
 // Load Table Indexes
 // ==========================================================================
 async function loadTableIndexes() {
-    if (!state.currentTable || !state.activeConnection) return;
-    
-    const tbody = document.getElementById('indexesViewBody');
-    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">加载中...</td></tr>';
-    
-    try {
-        if (isWailsAvailable()) {
-            const indexes = await WailsAPI.getTableIndexes(
-                state.activeConnection, 
-                state.currentTable.database, 
-                state.currentTable.name
-            );
+	if (!state.currentTable || !state.activeConnection) return;
+
+	const tbody = document.getElementById('indexesViewBody');
+	tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">加载中...</td></tr>';
+
+	try {
+		if (isWailsAvailable()) {
+			const indexes = await WailsAPI.getTableIndexes(
+				state.activeConnection,
+				state.currentTable.database,
+				state.currentTable.name
+			);
             renderIndexes(indexes);
         } else {
             // Mock indexes
@@ -2321,139 +2336,137 @@ function deleteSelectedForeignKeys() {
 // Update loadTableData to store all data for pagination
 async function loadTableData(tableName, database) {
 	console.log('loadTableData called:', { tableName, database, activeConnection: state.activeConnection });
-	
+
 	if (!state.activeConnection) {
 		showNotification('warning', '请先选择一个数据库连接');
-		hideLoading();
 		return;
 	}
-    
-    // Ensure database is set - use selectedDatabase as fallback
-    const activeDb = database || state.selectedDatabase;
-    if (!activeDb) {
-        showNotification('warning', '请先选择数据库');
-        hideLoading();
-        return;
-    }
-    
-    state.currentTable = state.currentTable || {};
-    state.currentTable.name = tableName;
-    state.currentTable.database = activeDb;
-    
-    showLoading(`加载表数据: ${tableName}...`);
-    
-    try {
-        let columns = [];
-        // Determine connection type for proper SQL quoting
-        const connType = state.activeConnection.type || 'mysql';
-        
-        // Format table identifier based on database type
-        let quotedTableName;
-        if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
-            quotedTableName = `"${tableName}"`;
-        } else {
-            quotedTableName = `\`${tableName}\``;
-        }
-        
-        // Load columns for filter dropdowns
-        if (isWailsAvailable()) {
-            try {
-                columns = await WailsAPI.getTableColumns(state.activeConnection, activeDb, tableName);
-                if (columns && columns.length > 0) {
-                    populateFilterDropdowns(columns);
-                    populateStructureView(columns);
-                }
-            } catch (e) {
-                console.warn('Failed to load columns:', e);
-            }
-        }
-        
-        // Load table stats
-        if (isWailsAvailable()) {
-            try {
-                const stats = await WailsAPI.getTableStats(state.activeConnection, activeDb, tableName);
-                if (stats && stats.engine) {
-                    document.getElementById('dvTableEngine').textContent = stats.engine;
-                }
-            } catch (e) {
-                console.log('Stats not available:', e);
-            }
-        }
-        
-        // Execute query to get data - using proper quoting
-        const query = `SELECT * FROM ${quotedTableName} LIMIT 10000`;
-        
-	if (isWailsAvailable()) {
-		const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
-		console.log('Query result:', result);
-		console.log('Result type:', typeof result);
-		console.log('Result keys:', result ? Object.keys(result) : 'null');
-		console.log('Result error:', result?.error);
-		console.log('Result rows:', result?.rows);
-		console.log('Result columns:', result?.columns);
 
-		if (result && result.error) {
-			showNotification('error', result.error);
-		} else if (result && result.rows) {
-			pagination.allData = result.rows || [];
-			pagination.columns = result.columns || [];
-			pagination.totalRows = result.row_count || 0;
-			pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
+	// Ensure database is set - use selectedDatabase as fallback
+	const activeDb = database || state.selectedDatabase;
+	if (!activeDb) {
+		showNotification('warning', '请先选择数据库');
+		return;
+	}
+
+	state.currentTable = state.currentTable || {};
+	state.currentTable.name = tableName;
+	state.currentTable.database = activeDb;
+
+	showLoading(`加载表数据: ${tableName}...`);
+
+	try {
+		let columns = [];
+		// Determine connection type for proper SQL quoting
+		const connType = state.activeConnection.type || 'mysql';
+
+		// Format table identifier based on database type
+		let quotedTableName;
+		if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
+			quotedTableName = `"${tableName}"`;
+		} else {
+			quotedTableName = `\`${tableName}\``;
+		}
+
+		// Load columns for filter dropdowns
+		if (isWailsAvailable()) {
+			try {
+				columns = await WailsAPI.getTableColumns(state.activeConnection, activeDb, tableName);
+				if (columns && columns.length > 0) {
+					populateFilterDropdowns(columns);
+					populateStructureView(columns);
+				}
+			} catch (e) {
+				console.warn('Failed to load columns:', e);
+			}
+		}
+
+		// Load table stats
+		if (isWailsAvailable()) {
+			try {
+				const stats = await WailsAPI.getTableStats(state.activeConnection, activeDb, tableName);
+				if (stats && stats.engine) {
+					document.getElementById('dvTableEngine').textContent = stats.engine;
+				}
+			} catch (e) {
+				console.log('Stats not available:', e);
+			}
+		}
+
+		// Execute query to get data - using proper quoting
+		const query = `SELECT * FROM ${quotedTableName} LIMIT 10000`;
+
+		if (isWailsAvailable()) {
+			const result = await WailsAPI.executeQuery(state.activeConnection, activeDb, query);
+			console.log('Query result:', result);
+			console.log('Result type:', typeof result);
+			console.log('Result keys:', result ? Object.keys(result) : 'null');
+			console.log('Result error:', result?.error);
+			console.log('Result rows:', result?.rows);
+			console.log('Result columns:', result?.columns);
+
+			if (result && result.error) {
+				showNotification('error', result.error);
+			} else if (result && result.rows) {
+				pagination.allData = result.rows || [];
+				pagination.columns = result.columns || [];
+				pagination.totalRows = result.row_count || 0;
+				pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
+				pagination.currentPage = 1;
+
+				updatePaginationUI();
+				renderCurrentPage();
+			} else {
+				showNotification('warning', '未获取到数据');
+			}
+		} else {
+			// Mock data
+			await new Promise(resolve => setTimeout(resolve, 300));
+
+			const mockColumns = ['id', 'name', 'email', 'created_at', 'status', 'phone', 'address'];
+			const mockRows = [];
+			for (let i = 1; i <= 156; i++) {
+				mockRows.push([
+					i,
+					`用户${i}`,
+					`user${i}@example.com`,
+					`2024-01-${String(i % 28 + 1).padStart(2, '0')} ${String(i % 24).padStart(2, '0')}:00:00`,
+					i % 3 === 0 ? 'inactive' : 'active',
+					`1380000${String(i).padStart(4, '0')}`,
+					`北京市朝阳区某街道${i}号`
+				]);
+			}
+
+			// Store all data
+			pagination.allData = mockRows;
+			pagination.columns = mockColumns;
+			pagination.totalRows = mockRows.length;
+			pagination.totalPages = Math.ceil(mockRows.length / pagination.pageSize);
 			pagination.currentPage = 1;
 
 			updatePaginationUI();
 			renderCurrentPage();
-		} else {
-			showNotification('warning', '未获取到数据');
+
+			// Populate mock structure
+			const mockColumnsInfo = [
+				{ name: 'id', type: 'INT', nullable: false, primary_key: true, default_value: 'auto_increment' },
+				{ name: 'name', type: 'VARCHAR(100)', nullable: false, primary_key: false, default_value: '' },
+				{ name: 'email', type: 'VARCHAR(255)', nullable: true, primary_key: false, default_value: '' },
+				{ name: 'created_at', type: 'DATETIME', nullable: true, primary_key: false, default_value: 'CURRENT_TIMESTAMP' },
+				{ name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" },
+				{ name: 'phone', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: '' },
+				{ name: 'address', type: 'VARCHAR(500)', nullable: true, primary_key: false, default_value: '' }
+			];
+			populateFilterDropdowns(mockColumnsInfo);
+			populateStructureView(mockColumnsInfo);
 		}
-	} else {
-            // Mock data
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            const mockColumns = ['id', 'name', 'email', 'created_at', 'status', 'phone', 'address'];
-            const mockRows = [];
-            for (let i = 1; i <= 156; i++) {
-                mockRows.push([
-                    i,
-                    `用户${i}`,
-                    `user${i}@example.com`,
-                    `2024-01-${String(i % 28 + 1).padStart(2, '0')} ${String(i % 24).padStart(2, '0')}:00:00`,
-                    i % 3 === 0 ? 'inactive' : 'active',
-                    `1380000${String(i).padStart(4, '0')}`,
-                    `北京市朝阳区某街道${i}号`
-                ]);
-            }
-            
-            // Store all data
-            pagination.allData = mockRows;
-            pagination.columns = mockColumns;
-            pagination.totalRows = mockRows.length;
-            pagination.totalPages = Math.ceil(mockRows.length / pagination.pageSize);
-            pagination.currentPage = 1;
-            
-            updatePaginationUI();
-            renderCurrentPage();
-            
-            // Populate mock structure
-            const mockColumnsInfo = [
-                { name: 'id', type: 'INT', nullable: false, primary_key: true, default_value: 'auto_increment' },
-                { name: 'name', type: 'VARCHAR(100)', nullable: false, primary_key: false, default_value: '' },
-                { name: 'email', type: 'VARCHAR(255)', nullable: true, primary_key: false, default_value: '' },
-                { name: 'created_at', type: 'DATETIME', nullable: true, primary_key: false, default_value: 'CURRENT_TIMESTAMP' },
-                { name: 'status', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: "'active'" },
-                { name: 'phone', type: 'VARCHAR(20)', nullable: true, primary_key: false, default_value: '' },
-                { name: 'address', type: 'VARCHAR(500)', nullable: true, primary_key: false, default_value: '' }
-            ];
-            populateFilterDropdowns(mockColumnsInfo);
-            populateStructureView(mockColumnsInfo);
-        }
-    } catch (error) {
-        const msg = error?.message || error?.toString() || '未知错误';
-        console.error('Load table data error:', error);
-        showNotification('error', `加载数据失败: ${msg}`);
-    }
-    
-    hideLoading();
+	} catch (error) {
+		const msg = error?.message || error?.toString() || '未知错误';
+		console.error('Load table data error:', error);
+		showNotification('error', `加载数据失败: ${msg}`);
+	} finally {
+		hideLoading();
+	}
 }
 
 function openView(viewName, database) {

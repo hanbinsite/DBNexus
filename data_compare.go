@@ -228,13 +228,25 @@ func buildDataMap(result QueryResult, keyColumns []string) map[string]map[string
 
 	// 找到键列的索引
 	keyIndexes := make([]int, len(keyColumns))
+	foundAll := true
 	for i, keyCol := range keyColumns {
+		found := false
 		for colIdx, col := range result.Columns {
 			if col == keyCol {
 				keyIndexes[i] = colIdx
+				found = true
 				break
 			}
 		}
+		if !found {
+			foundAll = false
+			break
+		}
+	}
+
+	// 如果未找到所有键列，直接返回空映射
+	if !foundAll {
+		return dataMap
 	}
 
 	for _, row := range result.Rows {

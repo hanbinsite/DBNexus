@@ -93,6 +93,9 @@ func GetAuditLogger() *AuditLogger {
 
 // loadTodayLogs 加载今日的日志
 func (al *AuditLogger) loadTodayLogs() {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+
 	data, err := os.ReadFile(al.logFile)
 	if err != nil {
 		return

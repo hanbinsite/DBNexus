@@ -46,6 +46,10 @@ export function DeleteConnection(arg1) {
   return window['go']['main']['App']['DeleteConnection'](arg1);
 }
 
+export function DeleteRedisKey(arg1, arg2) {
+  return window['go']['main']['App']['DeleteRedisKey'](arg1, arg2);
+}
+
 export function DisconnectFromDatabase(arg1) {
   return window['go']['main']['App']['DisconnectFromDatabase'](arg1);
 }
@@ -76,6 +80,10 @@ export function ExecuteQuery(arg1, arg2, arg3) {
 
 export function ExecuteQueryWithTimeout(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExecuteQueryWithTimeout'](arg1, arg2, arg3, arg4);
+}
+
+export function ExecuteRedisCommand(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExecuteRedisCommand'](arg1, arg2, arg3);
 }
 
 export function ExecuteTransactionBatch(arg1) {
@@ -136,6 +144,18 @@ export function GetLanguage() {
 
 export function GetQuickSuggestions(arg1) {
   return window['go']['main']['App']['GetQuickSuggestions'](arg1);
+}
+
+export function GetRedisDBSize(arg1) {
+  return window['go']['main']['App']['GetRedisDBSize'](arg1);
+}
+
+export function GetRedisInfo(arg1, arg2) {
+  return window['go']['main']['App']['GetRedisInfo'](arg1, arg2);
+}
+
+export function GetRedisKeyInfo(arg1, arg2) {
+  return window['go']['main']['App']['GetRedisKeyInfo'](arg1, arg2);
 }
 
 export function GetSQLStructure(arg1) {
@@ -222,8 +242,16 @@ export function SaveFileDialog(arg1, arg2) {
   return window['go']['main']['App']['SaveFileDialog'](arg1, arg2);
 }
 
+export function ScanRedisKeys(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ScanRedisKeys'](arg1, arg2, arg3, arg4);
+}
+
 export function SetLanguage(arg1) {
   return window['go']['main']['App']['SetLanguage'](arg1);
+}
+
+export function SetRedisKeyValue(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SetRedisKeyValue'](arg1, arg2, arg3, arg4);
 }
 
 export function TestConnection(arg1) {

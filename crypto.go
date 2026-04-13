@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -114,9 +113,4 @@ func decryptPassword(encrypted string) (string, error) {
 	}
 
 	return string(plaintext), nil
-}
-
-func deriveKeyFromPassword(password string) []byte {
-	hash := sha256.Sum256([]byte(password))
-	return hash[:]
 }

@@ -72,22 +72,23 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 	var query string
 	switch config.Type {
 	case "mysql":
+		safeDB := escapeStringLiteral(dbConfig.Database)
 		query = `
-			SELECT TABLE_NAME 
-			FROM information_schema.VIEWS 
-			WHERE TABLE_SCHEMA = '` + dbConfig.Database + `'
+		SELECT TABLE_NAME
+		FROM information_schema.VIEWS
+		WHERE TABLE_SCHEMA = '` + safeDB + `'
 		`
 	case "postgresql", "polardb", "gaussdb":
 		query = `
-			SELECT viewname 
-			FROM pg_views 
-			WHERE schemaname = 'public'
+		SELECT viewname
+		FROM pg_views
+		WHERE schemaname = 'public'
 		`
 	case "sqlite":
 		query = `
-			SELECT name 
-			FROM sqlite_master 
-			WHERE type='view'
+		SELECT name
+		FROM sqlite_master
+		WHERE type='view'
 		`
 	default:
 		return []TableInfo{}, nil
@@ -95,7 +96,7 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 
 	rows, err := driver.Query(a.ctx, query)
 	if err != nil {
-		return []TableInfo{}, nil
+		return nil, fmt.Errorf("查询视图失败: %v", err)
 	}
 	defer rows.Close()
 
@@ -107,6 +108,9 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 		}
 	}
 
+	if views == nil {
+		views = []TableInfo{}
+	}
 	return views, nil
 }
 
@@ -123,11 +127,12 @@ func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, err
 	var query string
 	switch config.Type {
 	case "mysql":
+		safeDB := escapeStringLiteral(dbConfig.Database)
 		query = `
-			SELECT ROUTINE_NAME 
-			FROM information_schema.ROUTINES 
-			WHERE ROUTINE_TYPE = 'FUNCTION' 
-			AND ROUTINE_SCHEMA = '` + dbConfig.Database + `'
+		SELECT ROUTINE_NAME
+		FROM information_schema.ROUTINES
+		WHERE ROUTINE_TYPE = 'FUNCTION'
+		AND ROUTINE_SCHEMA = '` + safeDB + `'
 		`
 	case "postgresql", "polardb", "gaussdb":
 		query = `
@@ -226,6 +231,12 @@ func sanitizeIdentifier(identifier string) string {
 	}
 
 	return cleaned
+}
+
+// escapeStringLiteral escapes a string literal for SQL to prevent injection
+func escapeStringLiteral(s string) string {
+	// Replace single quotes with two single quotes (SQL standard)
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 // GetTableIndexes returns indexes for a table
@@ -362,25 +373,25 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 	var query string
 
 	safeTable := sanitizeIdentifier(table)
-	safeDatabase := sanitizeIdentifier(database)
+	safeDatabase := escapeStringLiteral(database)
 
 	switch config.Type {
 	case "mysql":
 		query = fmt.Sprintf(`
-			SELECT
-				CONSTRAINT_NAME,
-				COLUMN_NAME,
-				REFERENCED_TABLE_NAME,
-				REFERENCED_COLUMN_NAME,
-				UPDATE_RULE,
-				DELETE_RULE
-			FROM information_schema.KEY_COLUMN_USAGE kcu
-			JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
-				ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
-				AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
-			WHERE kcu.TABLE_NAME = '%s'
-			AND kcu.TABLE_SCHEMA = '%s'
-			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+		SELECT
+		CONSTRAINT_NAME,
+		COLUMN_NAME,
+		REFERENCED_TABLE_NAME,
+		REFERENCED_COLUMN_NAME,
+		UPDATE_RULE,
+		DELETE_RULE
+		FROM information_schema.KEY_COLUMN_USAGE kcu
+		JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+		ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+		AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+		WHERE kcu.TABLE_NAME = '%s'
+		AND kcu.TABLE_SCHEMA = '%s'
+		AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
 		`, safeTable, safeDatabase)
 	case "postgresql", "polardb", "gaussdb":
 		query = fmt.Sprintf(`

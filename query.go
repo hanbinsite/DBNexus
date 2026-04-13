@@ -290,16 +290,36 @@ func splitQueries(query string) []string {
 
 // ExecuteNonQuery executes a non-query SQL statement
 func (a *App) ExecuteNonQuery(config Connection, database string, query string) (int64, string, error) {
+	if config.SavePassword && config.Password != "" {
+		decrypted, err := decryptPassword(config.Password)
+		if err == nil {
+			config.Password = decrypted
+		}
+	}
+
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.driverManager.Connect(dbConfig)
-	if err != nil {
-		return 0, "", fmt.Errorf("connection failed: %v", err)
-	}
-	defer driver.Close()
+	key := buildKey(dbConfig)
+	a.poolMutex.RLock()
+	pooledDriver, exists := a.pool.get(key)
+	a.poolMutex.RUnlock()
 
-	result, err := driver.Exec(a.ctx, query)
+	if !exists {
+		a.poolMutex.Lock()
+		if pooledDriver, exists = a.pool.get(key); !exists {
+			newDriver, err := a.driverManager.Connect(dbConfig)
+			if err != nil {
+				a.poolMutex.Unlock()
+				return 0, "", fmt.Errorf("connection failed: %v", err)
+			}
+			a.pool.set(key, newDriver)
+			pooledDriver, _ = a.pool.get(key)
+		}
+		a.poolMutex.Unlock()
+	}
+
+	result, err := pooledDriver.driver.Exec(a.ctx, query)
 	if err != nil {
 		return 0, "", fmt.Errorf("execution failed: %v", err)
 	}

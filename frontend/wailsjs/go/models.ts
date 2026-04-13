@@ -20,6 +20,28 @@ export namespace db {
 	        this.primary_key = source["primary_key"];
 	    }
 	}
+	export class RedisKeyInfo {
+	    key: string;
+	    type: string;
+	    ttl: number;
+	    size: number;
+	    value: any;
+	    encoding: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RedisKeyInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.type = source["type"];
+	        this.ttl = source["ttl"];
+	        this.size = source["size"];
+	        this.value = source["value"];
+	        this.encoding = source["encoding"];
+	    }
+	}
 
 }
 

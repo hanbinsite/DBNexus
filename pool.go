@@ -90,11 +90,6 @@ func buildKey(config db.ConnectionConfig) string {
 	return fmt.Sprintf("%s:%s:%d:%s:%s", config.Type, config.Host, config.Port, config.Username, config.Database)
 }
 
-// buildConnectionKey creates a unique key for a physical server connection (excludes database name)
-func buildConnectionKey(config db.ConnectionConfig) string {
-	return fmt.Sprintf("%s:%s:%d:%s", config.Type, config.Host, config.Port, config.Username)
-}
-
 func (p *connectionPool) get(key string) (*pooledDriver, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -219,8 +214,10 @@ func (p *connectionPool) GetHealthy(ctx context.Context, key string) (db.Databas
 	p.mu.Lock()
 	if pooled, exists := p.connections[key]; exists {
 		pooled.lastPing = time.Now()
+		p.mu.Unlock()
+	} else {
+		p.mu.Unlock()
 	}
-	p.mu.Unlock()
 
 	return pooled.driver, true
 }

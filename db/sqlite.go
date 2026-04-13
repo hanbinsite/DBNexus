@@ -50,6 +50,9 @@ func (d *SQLiteDriver) Close() error {
 
 // Ping tests the SQLite connection
 func (d *SQLiteDriver) Ping(ctx context.Context) error {
+	if d.sqlDB == nil {
+		return fmt.Errorf("database connection is nil")
+	}
 	return d.sqlDB.PingContext(ctx)
 }
 

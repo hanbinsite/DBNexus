@@ -115,8 +115,11 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 		sqlOpts.ReadOnly = options.ReadOnly
 	}
 
-	ctx := context.Background()
-	tx, err := pooledDriver.driver.BeginTx(ctx, sqlOpts)
+	// 使用带超时的 context 测试连接，但事务本身使用无超时 context
+	connectCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	tx, err := pooledDriver.driver.BeginTx(connectCtx, sqlOpts)
+	cancel() // 立即取消连接 context
+
 	if err != nil {
 		return "", fmt.Errorf("开始事务失败: %v", err)
 	}
@@ -126,7 +129,7 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 	globalTransactions[txID] = &activeTransaction{
 		tx:      tx,
 		driver:  pooledDriver.driver,
-		ctx:     ctx,
+		ctx:     context.Background(), // 事务使用无超时 context
 		created: time.Now(),
 	}
 	globalTxMutex.Unlock()

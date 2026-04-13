@@ -206,29 +206,6 @@ func TestBuildKey(t *testing.T) {
 	}
 }
 
-func TestBuildConnectionKey(t *testing.T) {
-	config := db.ConnectionConfig{
-		Type:     db.DBType("postgresql"),
-		Host:     "localhost",
-		Port:     5432,
-		Username: "postgres",
-		Database: "mydb",
-	}
-	// buildConnectionKey excludes database name
-	key := buildConnectionKey(config)
-	expected := "postgresql:localhost:5432:postgres"
-	if key != expected {
-		t.Errorf("buildConnectionKey() = %q, want %q", key, expected)
-	}
-
-	// Test that buildKey includes database name
-	keyWithDB := buildKey(config)
-	expectedWithDB := "postgresql:localhost:5432:postgres:mydb"
-	if keyWithDB != expectedWithDB {
-		t.Errorf("buildKey() = %q, want %q", keyWithDB, expectedWithDB)
-	}
-}
-
 func TestSplitQueries(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -239,7 +216,7 @@ func TestSplitQueries(t *testing.T) {
 		{"SELECT 'a;b'; SELECT 2", []string{"SELECT 'a;b'", "SELECT 2"}},
 		{"SELECT 1;\nSELECT 2;\n", []string{"SELECT 1", "SELECT 2"}},
 		{"", []string{}},
-		{"   ", []string{}},
+		{" ", []string{}},
 	}
 
 	for _, tt := range tests {

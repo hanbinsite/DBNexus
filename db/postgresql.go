@@ -81,6 +81,9 @@ func (d *PostgreSQLDriver) Close() error {
 
 // Ping tests the PostgreSQL connection
 func (d *PostgreSQLDriver) Ping(ctx context.Context) error {
+	if d.sqlDB == nil {
+		return fmt.Errorf("database connection is nil")
+	}
 	return d.sqlDB.PingContext(ctx)
 }
 

@@ -48,7 +48,10 @@ func (a *App) SetRedisKeyValue(config Connection, key string, value interface{},
 
 	// 设置键值
 	ctx := context.Background()
-	return driver.SetRedisKeyValue(ctx, key, value, ttl)
+	err = driver.SetRedisKeyValue(ctx, key, value, ttl)
+	if err != nil {
+		return err
+	}
 
 	// 记录审计日志
 	auditLogger := GetAuditLogger()
