@@ -10,7 +10,7 @@
 
 **调用模式**: 所有方法返回 `Promise`，前端使用 `await` 或 `.then()` 处理。
 
-**方法总数**: 52 (App.d.ts + App.js)
+**方法总数**: 72 (App.d.ts 52个已实现 + §13 Audit 3个 + §10-12 新增扩展 17个)
 
 **参数传递**: JSON 序列化。前端传递 JS 对象，Wails runtime 自动反序列化为 Go struct。
 
@@ -1076,6 +1076,7 @@ try {
 | Server Info | GetServerInfo | 1 |
 | File Dialog | OpenFileDialog, SaveFileDialog | 2 |
 | Test | RunAllTests, RunConnectionTest | 2 |
-| **Total** | | **62** |
+| Audit | GetAuditLogs, ExportAuditLogs, ClearOldAuditLogs | 3 |
+| **Total** | | **72** |
 
-**⚠️ 注意**: App.d.ts 列出 52 个方法声明，但 `ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。
+**⚠️ 注意**: App.d.ts 列出 52 个方法声明（已实现的Go后端方法）。文档中额外标注了 20 个规划/扩展方法（Audit 3个 + Autocomplete扩展 + SQL Formatter扩展 + Query Analyzer扩展 + Data Compare扩展 + Transaction扩展），总计 72 个方法定义。`ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。

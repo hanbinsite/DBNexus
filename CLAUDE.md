@@ -145,7 +145,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 | `docs/02-architecture.md` | System architecture, IPC flow, module boundaries, data flow diagrams |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions with field documentation |
-| `docs/04-api-reference.md` | Full Wails bindings API (52+ methods) with signatures and error handling |
+| `docs/04-api-reference.md` | Full Wails bindings API (52 implemented + 20 planned = 72 total) with signatures and error handling |
 | `docs/05-ui-pages.md` | UI layout, panels, components, 9 modal + 2 panel, modular refactor plan |
 | `docs/06-security.md` | Encryption, injection defense, audit, vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, contributing, design traceability |

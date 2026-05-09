@@ -244,7 +244,7 @@ Three-step requirement: (1) implement `DatabaseDriver` interface in `db/`, (2) r
 | `docs/02-architecture.md` | System architecture diagrams, IPC flow, module boundaries, concurrency model |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions (Connection, QueryResult, EditRequest, etc.) with field docs |
-| `docs/04-api-reference.md` | Full Wails bindings API (52 methods + 3 audit methods) with signatures, params, error handling |
+| `docs/04-api-reference.md` | Full Wails bindings API (52 implemented + 20 planned = 72 total) with signatures, params, error handling |
 | `docs/05-ui-pages.md` | UI layout, panels, components, modal list (9 modal + 2 panel), modular refactor plan |
 | `docs/06-security.md` | AES-256-GCM encryption, SQL injection defense, audit logging, known vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, CGO, contributing, design→implementation traceability |
