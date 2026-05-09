@@ -1,92 +1,85 @@
-# CLAUDE.md This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# CLAUDE.md — AI Development Guide
+
+> AI agent quick reference. For full documentation see `docs/` directory. Start with `docs/AGENTS.md`.
+
+---
 
 ## Project Overview
 
-DB Client is a cross-platform desktop database client built with Go and Wails v2. It provides a modern UI for managing multiple database systems including PostgreSQL, MySQL, SQLite, Redis, PolarDB, and GaussDB.
+DB Client is a cross-platform desktop database client built with Go and Wails v2. It provides a modern UI for managing PostgreSQL, MySQL, SQLite, Redis, PolarDB, and GaussDB.
 
-## Build Commands
+---
+
+## Build & Run Commands
 
 ```bash
-# Development mode with hot reload
-wails dev
-
-# Build for production
-wails build
-# Or use platform-specific scripts:
-# Windows: build.bat
-# Linux/Mac: ./build.sh
-
-# Run tests
-go test ./...
-
-# Run specific test
-go test -run TestFunctionName ./...
+wails dev                  # Dev mode with hot reload
+wails build                # Production build
+build.bat                  # Windows build script
+go test ./...              # Run all tests
+go test -run TestName ./...  # Run specific test
+go vet ./...               # Static analysis
 ```
+
+---
 
 ## Architecture
 
-### Backend (Go)
+### Backend (Go, package main)
 
-The backend follows a modular architecture with clear separation of concerns:
+| File | Responsibility |
+|------|---------------|
+| `main.go` | Entry point, Wails v2 window config |
+| `app.go` | App struct: ctx, driverManager, connections, pool, poolMutex. Startup/shutdown lifecycle |
+| `types.go` | Connection, QueryResult, MultiQueryResult, TableInfo, DatabaseInfo, IndexInfo, ForeignKeyInfo, TableStats, EditRequest, EditResult |
+| `config.go` | connectionToDBConfig, getDriverForConfig (pool-aware), loadConnections, saveConnections |
+| `pool.go` | connectionPool with getOrCreate (double-check locking inside pool.mu), buildKey, evictOldest, GetHealthy, MaxPoolSize=50 |
+| `crypto.go` | AES-256-GCM encrypt/decrypt, initEncryptionKey (global `var encryptionKey []byte`) |
+| `connection.go` | GetSupportedDatabases, SaveConnection, DeleteConnection, TestConnection, ConnectToDatabase (uses pool.getOrCreate) |
+| `query.go` | ExecuteQuery (NO timeout), ExecuteMultiQuery, ExecuteNonQuery, splitQueries |
+| `query_timeout.go` | ExecuteQueryWithTimeout (Default=30s, Max=300s), ExecuteMultiQueryWithTimeout |
+| `schema.go` | GetDatabases/Tables/Views/Functions/Columns/Indexes/ForeignKeys/Stats, sanitizeIdentifier, escapeStringLiteral |
+| `data_editor.go` | EditTableData (INSERT/UPDATE/DELETE), EditRequest with WhereClause, BatchEdit |
+| `data_export.go` | ExportData to CSV/JSON/Excel/SQL, ImportData |
+| `data_compare.go` | CompareTableData, CompareQueryData |
+| `transaction.go` | BeginTransaction, ExecuteInTransaction, Commit/Rollback, globalTransactions map |
+| `audit.go` | AuditLogger singleton (sync.Once), Log, writeToFile, truncateQuery, GetLogs |
+| `redis_api.go` | Redis Wails bindings, getRedisDriver (type assertion to *db.RedisDriver) |
+| `i18n.go` | MessageKey enum, a.t(key, lang), zh/en message maps |
+| `autocomplete.go` | GetAutoCompleteSuggestions (table/column/keyword/function/database) |
+| `query_analyzer.go` | AnalyzeQuery, ExplainQuery, complexity scoring |
+| `sql_formatter.go` | FormatSQL (beautify), MinifySQL |
+| `window.go` | WindowMinimize/Maximize/Close/IsMaximized |
+| `filedialog.go` | OpenFileDialog, SaveFileDialog |
 
-**Core Components:**
-- `main.go` - Application entry point, Wails configuration
-- `app.go` - Main App struct with Wails bindings, startup/shutdown lifecycle
-- `types.go` - Shared data structures (Connection, QueryResult, TableInfo, etc.)
+### Database Driver Layer (`db/` package)
 
-**Database Layer (`db/` package):**
-- `db.go` - DatabaseDriver interface, DriverManager, ConnectionConfig, ColumnInfo types
-- `postgresql.go` - PostgreSQL/PolarDB/GaussDB driver implementation
-- `mysql.go` - MySQL driver implementation
-- `sqlite.go` - SQLite driver implementation
-- `redis.go` - Redis driver with specialized key/value operations
+| File | Responsibility |
+|------|---------------|
+| `db/db.go` | DatabaseDriver interface, DriverManager, newDriver() switch, ConnectionConfig, ColumnInfo |
+| `db/types.go` | TableInfo, ViewInfo, FunctionInfo |
+| `db/postgresql.go` | PostgreSQL/PolarDB/GaussDB driver |
+| `db/mysql.go` | MySQL driver (no SSLMode → plaintext credentials) |
+| `db/sqlite.go` | SQLite driver (CGO) |
+| `db/redis.go` | Redis driver + RedisKeyInfo, SetRedisKeyValue, ExecuteRedisCommand, type assertions on value |
 
-**Feature Modules (root package):**
-- `connection.go` - Connection management, testing, CRUD operations
-- `query.go` - Query execution, multi-query splitting, results handling
-- `transaction.go` - Transaction management with isolation level support
-- `schema.go` - Schema inspection (tables, views, functions, indexes, foreign keys)
-- `pool.go` - Connection pooling with max 50 connections and eviction
-- `data_editor.go` - Table data editing (INSERT/UPDATE/DELETE operations)
-- `data_compare.go` - Table and query comparison functionality
-- `audit.go` - Audit logging for security tracking
-- `crypto.go` - AES-256 encryption for stored passwords
-- `config.go` - Configuration file loading/saving
-- `redis_api.go` - Redis-specific API endpoints
-- `autocomplete.go` - SQL autocomplete suggestions
-- `query_analyzer.go` - Query analysis and complexity scoring
-- `data_export.go` - Data export to CSV/JSON/Excel formats
-- `sql_formatter.go` - SQL beautification and minification
-- `i18n.go` - Internationalization (Chinese/English)
-- `window.go` - Window state management
+### Frontend (Pure JavaScript)
 
-### Frontend (JavaScript)
+`frontend/dist/` — no React/Vue, global `state` object, `WailsAPI` bridge (app.js:24-73).
 
-Pure JavaScript frontend in `frontend/dist/`:
-- `app.js` - Main application logic, state management, Wails API integration
-- `index.html` - Main HTML structure
-- `i18n.js` - Translation handling
-- `lib/monaco-editor/` - Monaco Editor for SQL editing with syntax highlighting
+| File | Responsibility |
+|------|---------------|
+| `app.js` | Main logic, state management, WailsAPI calls, 71 innerHTML/insertAdjacentHTML usages |
+| `index.html` | Main HTML structure (870 lines) |
+| `i18n.js` | Frontend translation |
+| `lib/monaco-editor/` | SQL editor |
 
-The frontend uses a global `state` object and communicates with Go backend via `window.go.main.App.*` bindings.
-
-### Connection Pool
-
-- Maximum 50 pooled connections (`MaxPoolSize` in pool.go)
-- Key format: `{type}:{host}:{port}:{username}:{database}`
-- Automatic eviction of oldest connections when pool is full
-- Health checking via Ping before returning connections
-
-### Security
-
-- Passwords encrypted with AES-256-GCM before storage
-- Encryption key stored in `~/.db-client/.key`
-- Audit logging tracks all queries and sensitive data access
-- SQL injection prevention via identifier sanitization
+---
 
 ## Database Driver Interface
 
-All drivers implement `DatabaseDriver` interface (db/db.go):
+All drivers implement `DatabaseDriver` (db/db.go:42-53):
+
 ```go
 Connect(config ConnectionConfig) error
 Close() error
@@ -100,24 +93,95 @@ GetDatabases(ctx context.Context) ([]string, error)
 BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 ```
 
-Redis driver has additional specialized methods for key operations.
+Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `ExecuteRedisCommand`, `GetRedisInfo`, `GetRedisDBSize`, `ScanRedisKeys`.
 
-## Configuration Storage
+### Adding New Drivers
 
-User data stored in:
-- Windows: `%APPDATA%\db-client\` or `~/.db-client/`
-- Connections: `connections.json`
-- Encryption key: `.key`
-- Audit logs: `logs/audit_YYYY-MM-DD.log`
+1. Create driver file in `db/` implementing `DatabaseDriver` interface
+2. Register in `newDriver()` switch (db/db.go:65-78)
+3. Add entry to `GetSupportedDatabases()` (connection.go:11-20)
+4. Update frontend if special UI handling needed
+
+---
+
+## Connection Pool
+
+- Max 50 connections (`MaxPoolSize` in pool.go:14)
+- Key format: `{type}:{host}:{port}:{username}:{database}` (pool.go:89-91)
+- `getOrCreate()` uses internal double-check locking with `pool.mu`
+- Eviction: oldest by `createdAt` (FIFO)
+- Health check: 3s ping timeout via `pingWithTimeout`
+- `GetHealthy`: validates with ping, but has stale reference race (see pitfalls)
+
+---
+
+## Security
+
+- Passwords: AES-256-GCM encrypted before storage (crypto.go)
+- Key: `~/.db-client/.key` (0600 perms, Base64 encoded, 32 bytes)
+- SQL injection: `sanitizeIdentifier()` for table/column names
+- Audit: `AuditLogger` tracks all queries and sensitive data access
+- Config: `connections.json` stored at `~/.db-client/` (0700 dir, 0600 file)
+
+---
+
+## Known Security Issues (Top 5)
+
+1. **WhereClause SQL injection** — `EditRequest.WhereClause` used raw in SQL (data_editor.go:256). Not sanitized, not parameterized.
+2. **Frontend XSS** — 71 uses of `innerHTML`/`insertAdjacentHTML` with server data (app.js). No sanitization before DOM insertion.
+3. **encryptionKey race condition** — Global `var encryptionKey []byte` has no `sync.Once` protection (crypto.go:14). Concurrent init can overwrite key file.
+4. **MySQL plaintext credentials** — Driver ignores SSLMode (db/mysql.go:23). Credentials sent unencrypted over network.
+5. **No query timeout by default** — `ExecuteQuery` has no deadline (query.go). Can freeze UI indefinitely. Must use `ExecuteQueryWithTimeout`.
+
+---
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| `docs/AGENTS.md` | AI agent entry point: commands, conventions, pitfalls, dependencies |
+| `docs/01-overview.md` | Project vision, priorities, tech stack, metrics, risks, business model |
+| `docs/02-feature-design.md` | Feature design with module breakdown, API mapping, traceability matrix |
+| `docs/02-architecture.md` | System architecture, IPC flow, module boundaries, data flow diagrams |
+| `docs/03-architecture.md` | Directory tree with line-number references |
+| `docs/03-data-models.md` | All Go struct definitions with field documentation |
+| `docs/04-api-reference.md` | Full Wails bindings API (52+ methods) with signatures and error handling |
+| `docs/05-ui-pages.md` | UI layout, panels, components, dialogs, context menus |
+| `docs/06-security.md` | Encryption, injection defense, audit, vulnerabilities |
+| `docs/07-development-guide.md` | Build setup, testing, contributing, design traceability |
+| `docs/ui-01-design-system.md` | Design tokens, component specs, theme system, accessibility |
+
+### Key Cross-References
+
+- **Data models**: See `docs/03-data-models.md` for all struct definitions
+- **API reference**: See `docs/04-api-reference.md` for all Wails bindings
+- **Security details**: See `docs/06-security.md` for vulnerability analysis
+
+---
+
+## Code Conventions
+
+- Go backend: `package main` (except `db/` = `package db`)
+- Frontend: pure JS, global `state` object, `WailsAPI` bridge
+- i18n: use `a.t(MsgXxx, lang)`, never hardcode strings
+- SQL identifiers: always `sanitizeIdentifier()` before string interpolation
+- Passwords: always `decryptPassword()` before passing to driver
+- Pool access: use `pool.getOrCreate()`, not manual double-check with `poolMutex`
+- No comments in Go code unless explicitly asked
+
+---
 
 ## Wails Bindings
 
-All exported methods on `App` struct are available to frontend via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API.
+All exported methods on `App` struct are available via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API (52 methods).
 
-## Adding New Database Drivers
+---
 
-1. Create driver file in `db/` (e.g., `mongodb.go`)
-2. Implement `DatabaseDriver` interface
-3. Register in `db/db.go` `newDriver()` switch statement
-4. Add to `GetSupportedDatabases()` in `connection.go`
-5. Update frontend if special UI handling needed
+## Configuration Storage
+
+| Item | Path |
+|------|------|
+| Connections | `~/.db-client/connections.json` |
+| Encryption key | `~/.db-client/.key` (0600) |
+| Audit logs | `~/.db-client/logs/audit_YYYY-MM-DD.log` |
+| Language config | `~/.db-client/config.json` |
