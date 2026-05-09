@@ -377,35 +377,37 @@ func truncateQuery(query string, maxLen int) string {
 | 1 | **encryptionKey race condition** | crypto.go:14 | Key corruption → saved passwords irrecoverable | `sync.Once` |
 | 2 | **WhereClause SQL injection** | data_editor.go:255-256, 306-307 | Arbitrary SQL execution via crafted WHERE clause | Parameterized queries or validate WHERE format |
 | 3 | **Frontend XSS via innerHTML** | app.js (57 locations) | Script injection via database data | textContent / createElement / DOMPurify |
-| 4 | **Password exposed to frontend** | connection.go:24 | Encrypted passwords viewable in DevTools | Clear Password in GetConnections() response |
+| 4 | **MySQL plaintext credentials** | db/mysql.go:23 | Credentials sent unencrypted over network (SSLMode ignored) | Parse SSLMode config, add tls=true to DSN |
+| 5 | **No query timeout by default** | query.go:10-97 | Long-running queries block UI indefinitely | Always use ExecuteQueryWithTimeout (default 30s) |
+| 6 | **Password exposed to frontend** | connection.go:24 | Encrypted passwords viewable in DevTools | Clear Password in GetConnections() response |
 
 ### P1 — High
 
 | # | Issue | Location | Risk | Fix |
 |---|-------|----------|------|-----|
-| 5 | **ExecuteRedisCommand arbitrary commands** | redis_api.go:102-134 | FLUSHALL/CONFIG SET etc. | Command whitelist (allow only safe commands) |
-| 6 | **Connection password in IPC** | All API methods | Full Connection object transmitted per call | Use connection ID + backend lookup |
-| 7 | **Audit log not covering queries** | query.go, transaction.go | Core operations untracked | Add audit logging to all query/transaction methods |
-| 8 | **Audit log O(n) performance** | audit.go:196-214 | Performance degradation at scale | Append-only JSON lines |
+| 7 | **ExecuteRedisCommand arbitrary commands** | redis_api.go:102-134 | FLUSHALL/CONFIG SET etc. | Command whitelist (allow only safe commands) |
+| 8 | **Connection password in IPC** | All API methods | Full Connection object transmitted per call | Use connection ID + backend lookup |
+| 9 | **Audit log not covering queries** | query.go, transaction.go | Core operations untracked | Add audit logging to all query/transaction methods |
+| 10 | **Audit log O(n) performance** | audit.go:196-214 | Performance degradation at scale | Append-only JSON lines |
 
 ### P2 — Medium
 
 | # | Issue | Location | Risk | Fix |
 |---|-------|----------|------|-----|
-| 9 | **truncateQuery UTF-8 truncation** | audit.go:296-300 | Corrupted audit log entries | rune-level truncation |
-| 10 | **config.json 0644 permissions** | app.go:90 | Other users can read config | Change to 0600 |
-| 11 | **exports directory 0755** | data_export.go:97 | Other users can read exported data | Change to 0700 |
-| 12 | **SQLite identifier backticks for PG** | data_editor.go:196-204 | Syntax errors → potential error-based information leak | Dynamic quote selection |
-| 13 | **No rate limiting on Redis commands** | redis_api.go:102 | Repeated FLUSHALL via loop | Rate limit + command whitelist |
+| 11 | **truncateQuery UTF-8 truncation** | audit.go:296-300 | Corrupted audit log entries | rune-level truncation |
+| 12 | **config.json 0644 permissions** | app.go:90 | Other users can read config | Change to 0600 |
+| 13 | **exports directory 0755** | data_export.go:97 | Other users can read exported data | Change to 0700 |
+| 14 | **SQLite identifier backticks for PG** | data_editor.go:196-204 | Syntax errors → potential error-based information leak | Dynamic quote selection |
+| 15 | **No rate limiting on Redis commands** | redis_api.go:102 | Repeated FLUSHALL via loop | Rate limit + command whitelist |
 
 ### P3 — Low
 
 | # | Issue | Location | Risk | Fix |
 |---|-------|----------|------|-----|
-| 14 | **Windows file permissions different semantics** | config.go, crypto.go | Unix permissions (0600) don't fully restrict on Windows | Use Windows ACL APIs |
-| 15 | **No CSRF protection** | Wails IPC | Desktop app, low risk | Wails v2 IPC is internal, not HTTP-based |
-| 16 | **No input validation on language param** | app.go:71 | SetLanguage accepts any string | Validate "zh"/"en" only |
-| 17 | **AutoConnect not implemented** | types.go:16 | Flag exists but not used | Implement or remove field |
+| 16 | **Windows file permissions different semantics** | config.go, crypto.go | Unix permissions (0600) don't fully restrict on Windows | Use Windows ACL APIs |
+| 17 | **No CSRF protection** | Wails IPC | Desktop app, low risk | Wails v2 IPC is internal, not HTTP-based |
+| 18 | **No input validation on language param** | app.go:71 | SetLanguage accepts any string | Validate "zh"/"en" only |
+| 19 | **AutoConnect not implemented** | types.go:16 | Flag exists but not used | Implement or remove field |
 
 ---
 

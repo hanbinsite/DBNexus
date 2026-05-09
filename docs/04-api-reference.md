@@ -10,7 +10,7 @@
 
 **调用模式**: 所有方法返回 `Promise`，前端使用 `await` 或 `.then()` 处理。
 
-**方法总数**: 72 (App.d.ts 52个已实现 + §13 Audit 3个 + §10-12 新增扩展 17个)
+**方法总数**: 69 (App.d.ts 已实现的Wails方法) + 3 规划 (§13 Audit需包装为App方法) = 72 方法定义
 
 **参数传递**: JSON 序列化。前端传递 JS 对象，Wails runtime 自动反序列化为 Go struct。
 
@@ -870,6 +870,8 @@
 
 ## 13. Audit / 审计
 
+> **⚠️ 规划状态**: 以下3个方法尚未实现为App结构体的Wails绑定。当前实现为`AuditLogger`结构体方法（audit.go:217/244/260），需包装为App方法后才能通过Wails IPC调用。
+
 ### 13.1 GetAuditLogs
 
 **签名**: `GetAuditLogs(level: string, eventType: string, limit: int, offset: int): Promise<Array<AuditLog>>`
@@ -1076,7 +1078,7 @@ try {
 | Server Info | GetServerInfo | 1 |
 | File Dialog | OpenFileDialog, SaveFileDialog | 2 |
 | Test | RunAllTests, RunConnectionTest | 2 |
-| Audit | GetAuditLogs, ExportAuditLogs, ClearOldAuditLogs | 3 |
+| Audit *(规划)* | GetAuditLogs, ExportAuditLogs, ClearOldAuditLogs | 3* |
 | **Total** | | **72** |
 
 **⚠️ 注意**: App.d.ts 列出 52 个方法声明（已实现的Go后端方法）。文档中额外标注了 20 个规划/扩展方法（Audit 3个 + Autocomplete扩展 + SQL Formatter扩展 + Query Analyzer扩展 + Data Compare扩展 + Transaction扩展），总计 72 个方法定义。`ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。

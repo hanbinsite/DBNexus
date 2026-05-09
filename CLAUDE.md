@@ -69,7 +69,7 @@ go vet ./...               # Static analysis
 
 | File | Responsibility |
 |------|---------------|
-| `app.js` | Main logic, state management, WailsAPI calls, 71 innerHTML/insertAdjacentHTML usages |
+| `app.js` | Main logic, state management, WailsAPI calls, 57 innerHTML/insertAdjacentHTML usages |
 | `index.html` | Main HTML structure (870 lines) |
 | `i18n.js` | Frontend translation |
 | `lib/monaco-editor/` | SQL editor |
@@ -128,7 +128,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 ## Known Security Issues (Top 5)
 
 1. **WhereClause SQL injection** — `EditRequest.WhereClause` used raw in SQL (data_editor.go:256). Not sanitized, not parameterized.
-2. **Frontend XSS** — 71 uses of `innerHTML`/`insertAdjacentHTML` with server data (app.js). No sanitization before DOM insertion.
+2. **Frontend XSS** — 57 uses of `innerHTML`/`insertAdjacentHTML` with server data (app.js). No sanitization before DOM insertion.
 3. **encryptionKey race condition** — Global `var encryptionKey []byte` has no `sync.Once` protection (crypto.go:14). Concurrent init can overwrite key file.
 4. **MySQL plaintext credentials** — Driver ignores SSLMode (db/mysql.go:23). Credentials sent unencrypted over network.
 5. **No query timeout by default** — `ExecuteQuery` has no deadline (query.go). Can freeze UI indefinitely. Must use `ExecuteQueryWithTimeout`.
@@ -146,7 +146,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions with field documentation |
 | `docs/04-api-reference.md` | Full Wails bindings API (52 implemented + 20 planned = 72 total) with signatures and error handling |
-| `docs/05-ui-pages.md` | UI layout, panels, components, 9 modal + 2 panel, modular refactor plan |
+| `docs/05-ui-pages.md` | UI layout, panels, components, 8 modal + 2 panel, modular refactor plan |
 | `docs/06-security.md` | Encryption, injection defense, audit, vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, contributing, design traceability |
 | `docs/ui-01-design-system.md` | Terminal Noir design system: color tokens, typography, spacing, motion, DPI scaling |
@@ -176,7 +176,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 
 ## Wails Bindings
 
-All exported methods on `App` struct are available via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API (52 methods).
+All exported methods on `App` struct are available via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API (69 methods).
 
 ---
 

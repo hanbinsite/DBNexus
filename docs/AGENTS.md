@@ -59,7 +59,7 @@ db-server/
 │   ├── 02-architecture.md   # System architecture, component diagrams
 │   ├── 03-architecture.md   # Directory tree
 │   ├── 03-data-models.md    # All Go struct definitions
-│   ├── 04-api-reference.md  # Full Wails API (52 methods)
+│   ├── 04-api-reference.md  # Full Wails API (69 Wails + 3 planned Audit = 72 total)
 │   ├── 05-ui-pages.md       # UI layout, panels, components
 │   ├── 06-security.md       # Encryption, injection, audit details
 │   ├── 07-development-guide.md # Build setup, testing, contributing
@@ -110,7 +110,7 @@ query := fmt.Sprintf("UPDATE `%s` SET %s WHERE %s", ...) // data_editor.go:270
 
 ### 2. Frontend uses insertAdjacentHTML/innerHTML with unsanitized data (XSS)
 
-**File**: `frontend/dist/app.js` (71 matches)
+**File**: `frontend/dist/app.js` (57 matches: 46 innerHTML + 11 insertAdjacentHTML)
 
 Extensive use of `innerHTML` and `insertAdjacentHTML` with data from server responses (connection names, database names, query results, error messages). Any malicious data from a database could inject HTML/JS.
 
@@ -245,7 +245,7 @@ Three-step requirement: (1) implement `DatabaseDriver` interface in `db/`, (2) r
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions (Connection, QueryResult, EditRequest, etc.) with field docs |
 | `docs/04-api-reference.md` | Full Wails bindings API (52 implemented + 20 planned = 72 total) with signatures, params, error handling |
-| `docs/05-ui-pages.md` | UI layout, panels, components, modal list (9 modal + 2 panel), modular refactor plan |
+| `docs/05-ui-pages.md` | UI layout, panels, components, modal list (8 modal + 2 panel), modular refactor plan |
 | `docs/06-security.md` | AES-256-GCM encryption, SQL injection defense, audit logging, known vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, CGO, contributing, design→implementation traceability |
 | `docs/ui-01-design-system.md` | Terminal Noir design system: color tokens (2 themes), typography, spacing, motion, DPI scaling |

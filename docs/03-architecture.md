@@ -51,7 +51,7 @@ db-server/                                 # Go module: db-server
 │   │   └── lib/monaco-editor/              # Monaco Editor 预构建包
 │   └── wailsjs/                            # Wails 自动生成的 JS 绑定
 │       ├── go/main/App.js                  # JS 调用代理
-│       ├── go/main/App.d.ts                # 50+ API 类型声明（L1-142）
+│       ├── go/main/App.d.ts                # 69 API 类型声明（L1-142）
 │       ├── go/models.ts                    # 共享模型类型声明
 │       └── runtime/runtime.js              # Wails runtime API
 │
@@ -79,7 +79,7 @@ db-server/                                 # Go module: db-server
 │                         │                                           │
 │              ┌──────────▼──────────┐                                │
 │              │    WailsAPI Bridge   │  window.go.main.App.*         │
-│              │  (app.js:24-73)      │  ← App.d.ts 定义的 50+ API   │
+│              │  (app.js:24-73)      │  ← App.d.ts 定义的 69 API   │
 │              └──────────┬──────────┘                                │
 └─────────────────────────┼───────────────────────────────────────────┘
                           │ IPC (Wails Bindings)
@@ -107,7 +107,7 @@ db-server/                                 # Go module: db-server
 │  ┌──────▼───────────▼──────────▼──────────────────────────┐         │
 │  │               Connection Pool (pool.go)                  │         │
 │  │  sync.RWMutex | map[string]*pooledDriver | MaxPool=50  │         │
-│  │  buildKey: "{type}:{host}:{port}:{user}:{db}"          │         │
+│  │  buildKey: "{type}:{host}:{port}:{username}:{database}"          │         │
 │  │  getOrCreate: double-check locking (L24-74)             │         │
 │  │  eviction: 按 createdAt 排序淘汰最旧 (L122-151)          │         │
 │  └──────────────────────┬─────────────────────────────────┘         │
@@ -456,7 +456,7 @@ Wails v2 的 IPC 机制基于 **Go struct 方法自动绑定**：
 | `error` | JS Error | Go error → Promise rejection |
 | `void` | `Promise<void>` | `DeleteConnection() → Promise<void>` |
 
-### 5.3 API 方法分类 (App.d.ts 共 50+ 方法)
+### 5.3 API 方法分类 (App.d.ts 共 69 方法)
 
 | 类别 | 方法 | 数量 |
 |------|------|------|
@@ -481,7 +481,7 @@ Wails v2 的 IPC 机制基于 **Go struct 方法自动绑定**：
 const WailsAPI = {
     getConnections: () => window.go.main.App.GetConnections(),
     executeQuery: (conn, db, query) => window.go.main.App.ExecuteQuery(conn, db, query),
-    // ... 50+ 方法
+    // ... 69 方法
 };
 ```
 

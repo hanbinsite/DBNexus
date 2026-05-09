@@ -19,7 +19,7 @@
 │  │                    │                                           │   │
 │  │         ┌──────────▼──────────┐                                │   │
 │  │         │  WailsAPI Bridge    │  window.go.main.App.*          │   │
-│  │         │  (app.js:24-73)     │  50+ methods from App.d.ts    │   │
+│  │         │  (app.js:24-73)     │  69 methods from App.d.ts      │   │
 │  │         └──────────┬──────────┘                                │   │
 │  └─────────────────────┼──────────────────────────────────────────┘   │
 │                        │ IPC (Wails Bindings)                       │
@@ -38,7 +38,7 @@
 │  │  ┌─────────────────▼──────────────────────────────────────┐   │   │
 │  │  │            Connection Pool (pool.go)                     │   │   │
 │  │  │  sync.RWMutex + map[string]*pooledDriver                 │   │   │
-│  │  │  MaxPoolSize=50, key="{type}:{host}:{port}:{user}:{db}" │   │   │
+│  │  │  MaxPoolSize=50, key="{type}:{host}:{port}:{username}:{database}" │   │   │
 │  │  │  getOrCreate: double-check locking (L24-74)              │   │   │
 │  │  │  eviction: FIFO by createdAt (L122-151)                  │   │   │
 │  │  │  health: Ping 3s timeout (L197-223)                      │   │   │
@@ -390,7 +390,7 @@ type pooledDriver struct {
 
 ### 2.19 i18n: i18n.go (L1-89)
 
-**Go 侧**: `MessageKey` enum (12条), `messages map[string]map[MessageKey]string` (zh/en)
+**Go 侧**: `MessageKey` enum (18条), `messages map[string]map[MessageKey]string` (zh/en)
 **方法**: `t(key, lang)` (L69-81), `getCurrentLang()` (L83-89)
 
 **已知问题**: Go 侧大量硬编码中文未走 i18n
@@ -465,7 +465,7 @@ const state = {
 
 ### 3.3 WailsAPI Bridge (app.js:24-73)
 
-所有 50+ 后端方法通过 `window.go.main.App.*` 调用，封装在 `WailsAPI` 对象中。Mock 模式支持浏览器开发（L104-127 polling 5s）。
+所有 69 后端方法通过 `window.go.main.App.*` 调用，封装在 `WailsAPI` 对象中。Mock 模式支持浏览器开发（L104-127 polling 5s）。
 
 ### 3.4 Monaco Editor Integration
 

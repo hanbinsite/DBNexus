@@ -550,7 +550,7 @@
 ### 2.14 国际化
 
 **功能列表**:
-- ✅ MessageKey枚举 (17个消息键)
+- ✅ MessageKey枚举 (18个消息键)
 - ✅ 中文消息映射
 - ✅ 英文消息映射
 - ✅ 默认回退到中文
@@ -644,7 +644,7 @@
 | # | 功能 | 模块 | 当前状态 | 需要的工作 | 优先级 | 预估工时 |
 |---|------|------|----------|------------|--------|----------|
 | 1 | WhereClause参数化 | 数据编辑 | 原文拼入SQL | 解析WhereClause为参数化条件,或强制使用PrimaryKey | P0 | 4h |
-| 2 | 前端XSS防护 | 前端 | 71处innerHTML | 替换为textContent/createElement | P0 | 16h |
+| 2 | 前端XSS防护 | 前端 | 57处innerHTML | 替换为textContent/createElement | P0 | 16h |
 | 3 | encryptionKey sync.Once | 加密 | 全局变量无保护 | 改用sync.Once初始化 | P0 | 2h |
 | 4 | ExecuteQuery添加超时 | 查询 | 无超时 | 添加context.WithTimeout或废弃此方法 | P0 | 2h |
 | 5 | 事务自动清理 | 事务 | cleanup函数存在但未调用 | 添加定时器或启动时调用 | P1 | 2h |
