@@ -146,10 +146,13 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions with field documentation |
 | `docs/04-api-reference.md` | Full Wails bindings API (52+ methods) with signatures and error handling |
-| `docs/05-ui-pages.md` | UI layout, panels, components, dialogs, context menus |
+| `docs/05-ui-pages.md` | UI layout, panels, components, 9 modal + 2 panel, modular refactor plan |
 | `docs/06-security.md` | Encryption, injection defense, audit, vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, contributing, design traceability |
-| `docs/ui-01-design-system.md` | Design tokens, component specs, theme system, accessibility |
+| `docs/ui-01-design-system.md` | Terminal Noir design system: color tokens, typography, spacing, motion, DPI scaling |
+| `docs/ui-02-visual-spec.md` | 15 pixel-level visual specs with ASCII layouts and state matrices |
+| `docs/ui-03-interaction-flow.md` | 18 interaction flows: DDL confirm, import, Monaco fallback, copy-paste, edge cases |
+| `docs/10-interface-contract.md` | Frontend-backend contracts, type mapping, EditRequest V2 (PrimaryKey), Wails IPC perf |
 
 ### Key Cross-References
 

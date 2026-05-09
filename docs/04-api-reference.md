@@ -870,9 +870,33 @@
 
 ## 13. Audit / 审计
 
-**注意**: `GetAuditLogs`, `ExportAuditLogs`, `ClearOldAuditLogs` 未作为 App 的 exported method，仅作为 AuditLogger 的内部方法。这些 API 不通过 Wails Bindings 对前端可用。
+### 13.1 GetAuditLogs
 
-前端无法直接调用审计 API。如需前端访问审计日志，需要添加 exported wrapper 方法。
+**签名**: `GetAuditLogs(level: string, eventType: string, limit: int, offset: int): Promise<Array<AuditLog>>`
+
+**行为**: 获取审计日志列表。支持按级别(INFO/WARNING/ERROR/CRITICAL)和事件类型过滤。`limit` 默认100。
+
+**前端用法**: `WailsAPI.GetAuditLogs("ERROR", "", 50, 0)` — 获取前50条ERROR级别日志。
+
+---
+
+### 13.2 ExportAuditLogs
+
+**签名**: `ExportAuditLogs(format: string, startTime: string, endTime: string): Promise<Array<number>>`
+
+**行为**: 导出审计日志。`format` 可选 `"json"` 或 `"csv"`。返回文件字节数组，前端通过 Blob 触发下载。
+
+**前端用法**: `WailsAPI.ExportAuditLogs("json", "2024-01-01T00:00:00", "2024-01-31T23:59:59")`
+
+---
+
+### 13.3 ClearOldAuditLogs
+
+**签名**: `ClearOldAuditLogs(days: int): Promise<int>`
+
+**行为**: 清除超过指定天数的旧日志。返回清除的条数。
+
+**前端用法**: `WailsAPI.ClearOldAuditLogs(30)` — 清除30天前的日志，返回清除数。
 
 ---
 

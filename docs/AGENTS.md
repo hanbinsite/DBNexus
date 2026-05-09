@@ -240,10 +240,15 @@ Three-step requirement: (1) implement `DatabaseDriver` interface in `db/`, (2) r
 | File | Content |
 |------|---------|
 | `docs/01-overview.md` | Project vision, priorities matrix, tech stack, metrics, risks, business model |
+| `docs/02-feature-design.md` | 17 feature modules, 30 traceability matrix, 15 unfinished items |
 | `docs/02-architecture.md` | System architecture diagrams, IPC flow, module boundaries, concurrency model |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions (Connection, QueryResult, EditRequest, etc.) with field docs |
-| `docs/04-api-reference.md` | Full Wails bindings API (52 methods) with signatures, params, error handling |
-| `docs/05-ui-pages.md` | UI layout, panels, components, state management, event handlers |
+| `docs/04-api-reference.md` | Full Wails bindings API (52 methods + 3 audit methods) with signatures, params, error handling |
+| `docs/05-ui-pages.md` | UI layout, panels, components, modal list (9 modal + 2 panel), modular refactor plan |
 | `docs/06-security.md` | AES-256-GCM encryption, SQL injection defense, audit logging, known vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, CGO, contributing, design→implementation traceability |
+| `docs/ui-01-design-system.md` | Terminal Noir design system: color tokens (2 themes), typography, spacing, motion, DPI scaling |
+| `docs/ui-02-visual-spec.md` | 15 pixel-level visual specs (panels, dialogs, Redis browser, query history, about) |
+| `docs/ui-03-interaction-flow.md` | 18 interaction flows (DDL confirm, import, Monaco fallback, copy-paste, edge cases) |
+| `docs/10-interface-contract.md` | Frontend-backend interface contracts, type mapping, EditRequest V2 (PrimaryKey), Wails IPC perf |

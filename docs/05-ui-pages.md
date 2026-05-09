@@ -1,575 +1,684 @@
-# D05 - UI Pages & Components / UI 页面与组件文档
+# D05 — UI 页面与组件定义
 
-> 文档版本: v1.0 | 最后更新: 2026-05-08 | 基于 frontend/dist/index.html (870行) + app.js (3502行) 撰写
+> 文档版本: v2.0 | Terminal Noir设计方向 | 完全重新设计
+> 联动文档: U01设计系统, U02视觉规格, U03交互流程
 
 ---
 
-## 1. Main Layout / 主布局
+## 1. UI架构总览
 
-### 1.1 Application Container (index.html:28)
+### 1.1 页面层次结构
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ Toolbar (header.toolbar)               [1280×40px]        │
-│ ├─ Logo "DB Client" + New/Query/Run/Refresh buttons      │
-│ ├─ Language/Settings/Theme toggle                        │
-│ └─ Window controls: minimize/maximize/close              │
-├──────────────┬───────────────────────────────────────────┤
-│ Sidebar      │ Workspace                                 │
-│ (260px)      │                                           │
-│ ├─ Conn List │ ├─ Tab Bar                                │
-│ ├─ DB Tree   │ ├─ Welcome Panel (default)                │
-│              │ ├─ Editor Panel (SQL editor)               │
-│              │ ├─ Results Panel (below editor)            │
-│              │ ├─ Data View Panel (Navicat style)         │
-│              │                                           │
-├──────────────┴───────────────────────────────────────────┤
-│ Status Bar (footer.status-bar)                           │
-│ ├─ Connection status + name                             │
-│ └─ Language + Window size + Clock                        │
-└──────────────────────────────────────────────────────────┘
+DB Client Window (1280×800, frameless)
+├── Toolbar (44px)                     — 全局操作
+├── Main Content (flex:1)
+│   ├── Sidebar (260px, resizable)
+│   │   ├── ConnectionList             — 连接列表 + 操作
+│   │   └── DatabaseTree               — 数据库对象浏览
+│   ├── Resize Handle (4px)
+│   └── Workspace (flex:1)
+│       ├── TabBar (34px)              — 标签页管理
+│       ├── WelcomePanel               — 空状态首页
+│       ├── QueryWorkspace             — SQL编辑+查询执行+结果
+│       │   ├── EditorToolbar (32px)
+│       │   ├── MonacoEditor
+│       │   ├── Resize Handle
+│       │   └── ResultsPanel
+│       │       ├── ResultsViewTabs
+│       │       ├── ResultMessages
+│       │       ├── ResultSummary
+│       │       └── ResultTable
+│       ├── DataViewPanel              — Navicat风格数据浏览
+│       │   ├── DataViewToolbar
+│       │   ├── FilterBar
+│       │   ├── DataTable
+│       │   ├── StructureView
+│       │   ├── IndexesView
+│       │   └── ForeignKeysView
+│       ├── ComparePanel               — 数据对比
+│       ├── AuditPanel                 — 审计日志
+│       └── TransactionPanel           — 事务管理
+├── Resize Handles (8 handles, border)
+└── StatusBar (26px)                   — 持久信息
 ```
 
-**Frameless Window**: Custom title bar via `toolbar` (main.go:32 `Frameless: true`)
-**Resize Handles**: 8 resize handles for window borders (index.html:18-26)
-
----
-
-## 2. Toolbar / 工具栏 (index.html:30-116)
-
-### 2.1 Left Section (toolbar-left)
-
-| Button | Icon | Action | i18n Key |
-|--------|------|--------|----------|
-| New Connection | Circle+ | `openConnectionDialog()` | newConnection |
-| New Query | Document+ | `createNewTab()` | newQuery |
-| Run Query | Triangle (play) | `executeQuery()` | executeQuery |
-| Refresh | Arrows | `refreshConnection()` | refresh |
-
-### 2.2 Right Section (toolbar-right)
-
-| Button | Icon | Action |
-|--------|------|--------|
-| Language | Globe | `openLanguageSettings()` |
-| Settings | Gear | `openSettings()` |
-| Theme Toggle | Sun/Moon | `toggleTheme()` |
-| Minimize | — | `minimizeWindow()` |
-| Maximize | Square | `maximizeWindow()` |
-| Close | X | `closeWindow()` |
-
----
-
-## 3. Sidebar / 侧边栏 (index.html:122-152)
-
-### 3.1 Connection List (connectionList)
-
-**HTML**: `<div class="connection-list" id="connectionList">` (index.html:133)
-
-**渲染**: `loadSavedConnections()` (app.js:1131+) → 遍历 state.connections → 生成 HTML
-
-**每项显示**: Connection name, type icon, color indicator, expand button
-
-**交互**:
-- Click → `selectConnection(conn)` → 加载数据库树
-- Double-click → `connectAndExpand(conn)`
-- 右键 → 上下文菜单
-
-### 3.2 Database Tree (dbTree)
-
-**HTML**: `<div class="db-tree" id="dbTree">` (index.html:138)
-
-**结构**:
-```
-└─ Databases (tree-header + expand-btn)
-   ├─ db_name_1 (database node)
-   │  ├─ Tables (expand section)
-   │  │  ├─ table_1
-   │  │  ├─ table_2
-   │  │  └─ ...
-   │  ├─ Views (expand section)
-   │  ├─ Functions (expand section)
-   │  ├─ Indexes (expand section)
-   │  └─ ...
-   ├─ db_name_2
-   └─ ...
-```
-
-**渲染**: `loadDatabaseTree()` (app.js:1407+)
-- `WailsAPI.getDatabases()` → 遍历每个数据库
-- `WailsAPI.getTables()` / `getViews()` / `getFunctions()` → 子节点
-
-**交互**:
-- Click database → `selectDatabase(name)` → 刷新 editor database selector
-- Click table → `openDataView(table)` → 显示 Data View Panel
-- 右键 → 上下文菜单 (新查询/刷新/删除)
-
----
-
-## 4. Workspace / 工作区 (index.html:157)
-
-### 4.1 Tab Bar (tabBar)
-
-**HTML**: `<div class="tab-bar" id="tabBar">` (index.html:159)
-
-**Tab 结构**: `<div class="tab" data-id="{id}">` → label + close button
-
-**交互**:
-- Click tab → `switchTab(id)` → 显示对应面板
-- Click close → `closeTab(id)`
-- Click "+" → `createNewTab()`
-
-**State**: `state.tabs[]` — 每个 tab 保存 {id, name, connection, database, editorContent, results}
-
----
-
-### 4.2 Welcome Panel (welcomePanel)
-
-**HTML**: `<div class="welcome-panel" id="welcomePanel">` (index.html:173-197)
-
-**默认显示**: 初始状态，无活动 tab 时显示
-
-**内容**: Logo + "DB Client" 标题 + "数据库管理工具" 描述 + 两个按钮:
-- "新建连接" → `openConnectionDialog()`
-- "新建查询" → `createNewTab()`
-
----
-
-## 5. SQL Editor Panel / SQL 编辑器面板 (index.html:200-243)
-
-### 5.1 Editor Toolbar (editor-toolbar)
-
-**HTML**: `<div class="editor-toolbar">` (index.html:201)
-
-| Button | Icon | Action |
-|--------|------|--------|
-| Format | Lines | `formatSQL()` |
-| Execute | Play triangle | `executeQuery()` |
-| Explain | Circle+info | `explainQuery()` |
-| — divider — | | |
-| Save | Document | `saveQuery()` |
-| Load | Folder | `loadQuery()` |
-
-**Database Selector**: `<select id="queryDatabase">` (index.html:234-236) — 选择当前数据库
-
-### 5.2 Editor Container (editorContainer)
-
-**HTML**: `<div class="editor-container" id="editorContainer">` (index.html:239)
-
-**主编辑器**: `<div id="monacoEditor">` — Monaco Editor 渲染目标
-
-**降级编辑器**: `<textarea id="fallbackEditor">` (index.html:241) — Monaco 加载失败时使用
-
-**初始化**: `initEditor()` (app.js)
-- 加载 Monaco: `require(['vs/editor/editor.main'], callback)`
-- 创建实例: `monaco.editor.create(document.getElementById('monacoEditor'), options)`
-- 主题: `vs-dark` (dark) / `vs` (light)
-
-**功能**: 语法高亮, IntelliSense, 多光标, 代码折叠, 搜索替换
-
----
-
-## 6. Results Panel / 结果面板 (index.html:249-268)
-
-### 6.1 Results View Tabs
-
-**HTML**: `<div class="results-view-tabs" id="resultViewTabs">` (index.html:251)
-
-| Tab | ID | Default | Content |
-|-----|----|---------|---------|
-| Messages | rv-messages | 显示 | 查询执行消息 (成功/失败/时间) |
-| Summary | rv-summary | 隐藏 | 查询统计摘要 |
-| Results | rv-results | 隐藏 | 数据表格 (有结果时显示) |
-
-### 6.2 Messages View (rv-messages)
-
-**渲染**: `displayQueryResults()` (app.js:2915)
-
-**内容**:
-- 成功消息: "查询成功, 返回 N 行, 耗时 Xms"
-- 错误消息: 红色显示错误详情
-- 多查询: 每条查询结果逐一显示
-
-### 6.3 Summary View (rv-summary)
-
-**内容**: 查询统计 (行数/耗时/查询类型/数据库)
-
-### 6.4 Results View (rv-results)
-
-**内容**: HTML 表格渲染查询结果数据
-
-### 6.5 Results Info Bar (results-info)
-
-**HTML**: `<div class="results-info">` (index.html:263)
-
-**显示**: `result-count` (行数) + `result-time` (耗时)
-
----
-
-## 7. Data View Panel / 数据查看面板 (index.html:273-525)
-
-Navicat 风格的表格数据查看器，点击数据库树中的表时显示。
-
-### 7.1 Data View Toolbar (data-view-toolbar)
-
-**HTML**: `<div class="data-view-toolbar">` (index.html:275)
-
-**Tabs** (data-view-tabs):
-| Tab | data-view | Content |
-|-----|-----------|---------|
-| 内容 (Content) | content | 数据网格 |
-| 表结构 (Structure) | structure | 列信息 |
-| 索引 (Indexes) | indexes | 索引信息 |
-| 外键 (Foreign Keys) | foreign-keys | 外键信息 |
-
-**Actions** (data-view-actions):
-| Button | Action |
-|--------|--------|
-| + 添加记录 | `addNewRow()` |
-| 🗑 删除选中 | `deleteSelectedRows()` |
-| — divider — | |
-| 💾 保存更改 | `saveDataChanges()` |
-| ↩ 撤销更改 | `discardChanges()` |
-| — divider — | |
-| 🔄 刷新 | `refreshDataView()` |
-
-### 7.2 Filter Bar (data-view-filter)
-
-**HTML**: `<div class="data-view-filter">` (index.html:316)
-
-**Left (筛选)**:
-- Column selector (`filterColumn`) — 列名下拉
-- Operator selector (`filterOperator`) — =, !=, >, <, >=, <=, LIKE, IN, IS NULL, IS NOT NULL
-- Value input (`filterValue`)
-- Apply/Clear buttons
-
-**Right (排序)**:
-- Column selector (`sortColumn`)
-- Order toggle (`sortOrder`) — ASC/DESC
-
-### 7.3 Data Grid (data-view-grid)
-
-**HTML**: `<div class="data-view-grid" id="dataViewGrid">` (index.html:352)
-
-**表格结构**: `<table class="dv-table" id="dvTable">`
-
-**渲染**: `loadDataView(connection, database, table)` (app.js:1640+)
-- `WailsAPI.getTableColumns()` → 构建列头
-- `WailsAPI.executeQuery()` → `SELECT * FROM table LIMIT N OFFSET M` → 渲染行
-
-**特性**:
-- 列宽可拖拽调整
-- 行选中 (checkbox)
-- 双击行 → 行内编辑模式
-- NULL 值灰色显示
-
-### 7.4 Status Bar (data-view-status)
-
-**HTML**: `<div class="data-view-status">` (index.html:364)
-
-**Left**: Record count + Selected count + Table engine
-
-**Right**: Pagination controls:
-| Button | Action |
-|--------|--------|
-| << First | `dataViewFirstPage()` |
-| < Prev | `dataViewPrevPage()` |
-| > Next | `dataViewNextPage()` |
-| >> Last | `dataViewLastPage()` |
-| Page size selector | 50/100/200/500/1000 条/页 |
-| Go to page input | `dvGoToPage` |
-
-**默认页大小**: 100 条/页 (index.html:398)
-
-### 7.5 Structure View (structureView)
-
-**HTML**: `<div class="structure-view" id="structureView">` (index.html:412)
-
-**列定义** (index.html:414-427):
-| 列 | 宽度 | 内容 |
-|----|------|------|
-| # | 40px | 序号 |
-| 列名 | 180px | Column Name |
-| 数据类型 | 150px | Data Type |
-| 长度 | 80px | Length |
-| 小数点 | 80px | Decimal |
-| 不是 null | 80px | Nullable |
-| 主键 | 80px | Primary Key |
-| 自增 | 80px | Auto Increment |
-| 默认值 | - | Default Value |
-| 注释 | 150px | Comment |
-| 字符集 | 80px | Charset |
-| 排序规则 | 120px | Collation |
-
-### 7.6 Indexes View (indexesView)
-
-**HTML**: `<div class="indexes-view" id="indexesView">` (index.html:437)
-
-**工具栏**: "新建索引" / "删除索引"
-
-**列定义**:
-| 列 | 宽度 | 内容 |
-|----|------|------|
-| Checkbox | 40px | 多选 |
-| 索引名 | 180px | Index Name |
-| 类型 | 100px | Type (PRIMARY/UNIQUE/INDEX/FULLTEXT) |
-| 唯一 | 80px | Unique |
-| 列 | - | Columns (comma separated) |
-| 基数 | 120px | Cardinality |
-| 注释 | 150px | Comment |
-| 操作 | 100px | Actions |
-
-**底部信息**: 索引数量 + 索引大小
-
-### 7.7 Foreign Keys View (foreignKeysView)
-
-**HTML**: `<div class="foreign-keys-view" id="foreignKeysView">` (index.html:482)
-
-**工具栏**: "新建外键" / "删除外键"
-
-**列定义**:
-| 列 | 宽度 | 内容 |
-|----|------|------|
-| Checkbox | 40px | 多选 |
-| 外键名 | 180px | FK Name |
-| 列名 | 150px | Column |
-| → | 50px | Arrow icon |
-| 引用表 | 150px | Referenced Table |
-| 引用列 | 150px | Referenced Column |
-| 更新规则 | 100px | On Update |
-| 删除规则 | 100px | On Delete |
-| 操作 | 100px | Actions |
-
-**底部**: 外键数量 + 关系图 (`fkVisual`)
-
----
-
-## 8. Connection Dialog / 连接对话框 (index.html:567-708)
-
-### 8.1 Modal Structure
-
-**HTML**: `<div class="modal-overlay" id="connectionModal">`
-
-**触发**: `openConnectionDialog()` → 显示 modal
-
-**关闭**: `closeConnectionDialog()` / 点击关闭按钮
-
-### 8.2 Database Type Selector
-
-**HTML**: `<div class="connection-type-selector">` (index.html:578)
-
-**6 种类型按钮**: PostgreSQL, MySQL, PolarDB, GaussDB, SQLite, Redis
-
-**交互**: `selectDbType(type)` → 更新默认端口, 显示/隐藏 SQLite 文件路径行
-
-### 8.3 Connection Form
-
-| Field | ID | Placeholder | Default |
-|-------|----|------------|---------|
-| 连接名称 | connName | "我的数据库" | — |
-| 主机 | connHost | "localhost" | "localhost" |
-| 端口 | connPort | "5432" | 根据类型变化 |
-| 用户名 | connUser | "postgres" | 根据类型变化 |
-| 密码 | connPassword | "••••••••" | — |
-| 数据库 | connDatabase | — | "连接后选择数据库" |
-
-**SQLite 特殊字段**: `<div id="sqlitePathRow">` (index.html:668) — 文件路径 + "浏览" 按钮
-
-**Checkbox 字段** (index.html:677-686):
-- 保存密码 (`connSavePassword`)
-- 启动时自动连接 (`connAutoConnect`, 默认选中)
-
-### 8.4 Footer Actions
-
-| Button | Action | Side |
-|--------|--------|------|
-| 测试连接 | `testConnection()` | Left |
-| 取消 | `closeConnectionDialog()` | Right |
-| 保存 | `saveConnection()` | Right (primary) |
-
----
-
-## 9. Transaction Dialog / 事务对话框
-
-**当前状态**: 事务功能在后端已实现，但前端 UI 对话框尚未在 index.html 中定义。事务操作通过 `ExecuteTransactionBatch()` API 调用执行，前端需要新建 Transaction Dialog。
-
----
-
-## 10. Export/Import Dialog / 导出导入对话框
-
-**当前状态**: 导出/导入后端 API 已实现，但前端 UI 对话框尚未在 index.html 中定义。需要新建 Export/Import Dialog。
-
----
-
-## 11. Data Compare Dialog / 数据对比对话框
-
-**当前状态**: 数据对比后端 API 已实现，但前端 UI 对话框尚未在 index.html 中定义。需要新建 Compare Dialog。
-
----
-
-## 12. Context Menus / 上下文菜单 (index.html:836-865)
-
-### 12.1 Context Menu Structure
-
-**HTML**: `<div class="context-menu" id="contextMenu">` (index.html:836)
-
-**菜单项**:
-
-| Item | Icon | Action | Context |
-|------|------|--------|---------|
-| 打开 (Open) | External link | `contextAction('open')` | Connection/Table |
-| 新查询 (New Query) | Document | `contextAction('new_query')` | Connection/Table/DB |
-| — divider — | | | |
-| 刷新 (Refresh) | Arrows | `contextAction('refresh')` | Connection/Table/DB |
-| — divider — | | | |
-| 删除 (Delete) | Trash | `contextAction('delete')` | Connection |
-
-**动态生成**: `showConnectionContextMenu(conn)` / `showTableContextMenu(table, conn, db)` (app.js:593+)
-
-### 12.2 Connection Context Menu
-
-**菜单项**: 打开, 新查询, 刷新, 删除
-
-### 12.3 Table Context Menu
-
-**菜单项**: 打开数据视图, 新查询, 刷新
-
-### 12.4 Database Context Menu
-
-**菜单项**: 新查询, 刷新
-
----
-
-## 13. Modal Dialogs / 模态对话框
-
-### 13.1 Language Dialog (languageModal)
-
-**HTML**: `<div class="modal-overlay" id="languageModal">` (index.html:711)
-
-**内容**: 两个语言按钮:
-- 🇨🇳 简体中文 (`data-lang="zh"` → `setLanguage('zh')`)
-- 🇺🇸 English (`data-lang="en"` → `setLanguage('en')`)
-
-### 13.2 Settings Dialog (settingsModal)
-
-**HTML**: `<div class="modal-overlay" id="settingsModal">` (index.html:737)
-
-**左侧导航** (settings-sidebar):
-| Button | Section | Icon |
-|--------|---------|------|
-| 常规 (General) | general | Gear |
-| 编辑器 (Editor) | editor | Document |
-| 外观 (Appearance) | appearance | Sun |
-
-**常规设置** (index.html:772-790):
-- Language selector (zh/en)
-- 连接超时 (秒): number input
-- 查询超时 (秒): number input
-
-**编辑器设置** (index.html:792-815):
-- 字体大小: 12/14/16/18px
-- Tab 大小: 2/4 空格
-- 行号: checkbox
-
-**外观设置** (index.html:817-829):
-- 主题: 深色/浅色/跟随系统
-
-### 13.3 Error Details Dialog
-
-**渲染**: `showErrorDetails(message, details)` (app.js)
-
-**触发**: 点击错误消息展开按钮
-
----
-
-## 14. Settings Panel / 设置面板
-
-见 Section 13.2 — Settings Dialog 即为 Settings Panel
-
----
-
-## 15. Welcome/Home Panel / 首页
-
-见 Section 4.2 — Welcome Panel
-
----
-
-## 16. Notification System / 通知系统
-
-**实现**: `showNotification(message, type)` (app.js)
-
-**类型**: success / error / warning / info
-
-**渲染**: 临时 DOM 元素，自动消失 (3s timeout)
-
----
-
-## 17. Frontend State Management / 前端状态管理
-
-### 17.1 Global State Object (app.js:9-19)
-
-```javascript
-const state = {
-    currentTheme: 'dark',
-    connections: [],
-    tabs: [],
-    activeTab: null,
-    activeConnection: null,
-    sidebarWidth: 260,
-    editorHeight: 300,
-    isResizing: false,
-    wailsReady: false
+### 1.2 标签页管理
+
+工作区通过标签页组织。标签页类型：
+
+| 类型 | 标识 | 关闭行为 |
+|------|------|---------|
+| Query Tab | 📝 "Query N" | 如有未保存结果→确认 |
+| Data Tab | 📊 "Table: name" | 如有未保存修改→确认 |
+| Compare Tab | ⇔ "Compare" | 无需确认 |
+| Audit Tab | 📋 "Audit" | 无需确认 |
+| Transaction Tab | 🔴 "TX: id..." | 如有未提交事务→确认 |
+
+### 1.3 前端路由
+
+不使用传统路由。通过 `state.activeTab` 和 DOM显示/隐藏控制。
+
+```js
+// 简化的状态机
+const viewStates = {
+  WELCOME:   { welcomePanel: 'flex', editorPanel: 'none', dataViewPanel: 'none', comparePanel: 'none' },
+  QUERY:     { welcomePanel: 'none', editorPanel: 'flex', dataViewPanel: 'none', comparePanel: 'none' },
+  DATA_VIEW: { welcomePanel: 'none', editorPanel: 'none', dataViewPanel: 'flex', comparePanel: 'none' },
+  COMPARE:   { welcomePanel: 'none', editorPanel: 'none', dataViewPanel: 'none', comparePanel: 'flex' },
 };
 ```
 
-### 17.2 Mock Mode (app.js:104-127)
+---
 
-Wails 未就绪时使用 mock 数据:
+## 2. 各页/面板详细规格
 
-```javascript
-function loadMockConnections() {
-    state.connections = [
-        {id: "1", name: "Local PostgreSQL", type: "postgresql", host: "localhost", ...},
-        {id: "2", name: "Local MySQL", type: "mysql", ...},
-        ...
-    ];
-    renderConnectionList();
+### 2.1 WelcomePanel
+
+**何时渲染**: `state.activeTab == null` 且无可用连接时
+
+**内容**: 垂直居中排列
+```
+(80px)  [DB Logo SVG]       — var(--fg-muted), opacity 0.6
+(16px gap)
+(20px)  DB Client            — Semibold 600, var(--fg-primary)
+(8px gap)  
+(14px)  数据库管理工具         — var(--fg-muted)
+(24px gap)
+[Primary]  新建连接            — 蓝色按钮
+(12px gap)
+[Secondary] 新建查询            — 灰色按钮
+```
+
+**动画入场**: 
+- Logo: fade-in + translateY(-8px) 200ms
+- 标题: 同上, +100ms delay
+- 按钮: 同上, +200ms delay
+
+---
+
+### 2.2 QueryWorkspace (编辑+执行+结果)
+
+**何时渲染**: 创建查询标签页
+
+**核心状态机**:
+
+```
+┌── QueryWorkSpace State Machine ───────────────────────┐
+│                                                        │
+│ IDLE ──[Run]──→ RUNNING ──[complete]──→ RESULT       │
+│  │                │                      │             │
+│  │                │ [error]              │ [Run again]│
+│  │                ↓                      ↓             │
+│  │              ERROR ──[Run]──→ RUNNING              │
+│  │                │                                    │
+│  │                │ [Run again]                        │
+│  └────────────────┘                                    │
+│                                                        │
+│ IDLE状态:                                              │
+│  - Editor: editable, cursor visible                    │
+│  - Run按钮: enabled [▶]                                │
+│  - 进度条: hidden                                      │
+│  - 状态栏: 绿色/灰色连接态 (无查询脉冲)                 │
+│                                                        │
+│ RUNNING状态:                                            │
+│  - Editor: readonly (非必要，保留可编辑)                 │
+│  - Run按钮: [◼ 停止] danger color                      │
+│  - 进度条: indeterminate animation 显示                │
+│  - 状态栏: 蓝色脉冲 ●◉●◉                               │
+│                                                        │
+│ RESULT状态:                                             │
+│  - Run按钮: [▶] enabled                                │
+│  - 结果面板: 显示数据/摘要                              │
+│  - 信息栏: "总计: N行 | 耗时: Xms"                     │
+│                                                        │
+│ ERROR状态:                                              │
+│  - Run按钮: [▶] enabled                                │
+│  - 结果面板: 红色错误信息 + SQL回显                     │
+└────────────────────────────────────────────────────────┘
+```
+
+**Result Panel详细规格** (见 U02 第4节), 核心信息：
+
+| 元素 | 位置 | 内容 |
+|------|------|------|
+| ResultsViewTabs | Sticky top | 消息/摘要/结果 切换 |
+| MessagesView | 结果视图 | SQL回显 + success/error标记 + 受影响行数 |
+| SummaryView | 结果视图 | 多查询卡片网格(3列) |
+| ResultTableView | 结果视图 | 数据表格 (共享 DataViewPanel 的表格组件) |
+| ResultInfo | Bottom | "总计: N 行 | 耗时: Xms" |
+
+---
+
+### 2.3 DataViewPanel (数据浏览与编辑)
+
+**何时渲染**: 双击数据库树中的表名
+
+**子视图切换** (data-view-tabs，高度32px):
+```
+[内容]  [表结构]  [索引]  [外键]
+```
+
+**Content View详细规格**:
+- 数据表格 (共用 DataTable 组件) — 参见 U02 第5.4节
+- 过滤栏 — 参见 U02 第5.3节
+- 分页器 — 参见 U02 第5.5节
+- 底栏: 记录数 + 已选数 + 表引擎
+
+**Structure View** (见 U02 5.6节):
+- 列名/类型/非空/主键/默认值/注释
+- 可编辑: 双击修改列属性(未来)
+
+**Indexes View** (见 U02 5.7节):
+- 索引列表 + 新建/删除按钮
+- 底栏: 索引数量 + 总大小
+
+**Foreign Keys View** (见 U02 5.8节):
+- FK列表 + 新建/删除按钮
+
+---
+
+### 2.4 ConnectionList (侧边栏)
+
+**组件树**:
+```
+<div id="connectionList">
+  ├── <div class="sidebar-header">
+  │     ├── "连接" (11px uppercase fg-muted, font-weight:600)
+  │     └── [+] 按钮 (24×24, icon-only)
+  ├── {connections.map(conn =>
+  │     <div class="connection-item" id="{conn.id}">
+  │       ├── status-dot (8×8, success/danger/neutral)
+  │       ├── connection-icon (28×28, 渐变色圆形+类型图标)
+  │       ├── <div class="connection-info">
+  │       │     ├── name (12px semibold)
+  │       │     └── type@host (11px fg-muted)
+  │       ├── expand-btn (→箭头)
+  │     </div>
+  │   )}
+</div>
+```
+
+**交互**: 见 U03 第2.4节
+
+---
+
+### 2.5 DatabaseTree
+
+**组件树**:
+```
+<div id="dbTree">
+  ├── <div class="tree-header">
+  │     ├── expand-btn (chevron, 旋转90deg)
+  │     └── "数据库" (10px uppercase)
+  ├── <div class="tree-content">
+  │     {dbs.map(db =>
+  │       <div class="tree-node db-item">
+  │         ├── chevron + db-icon (16×16)
+  │         ├── db_name (12px medium)
+  │         └── <div class="tree-children">
+  │               <div class="tree-node branch-item">
+  │                 ├── "Tables ({count})"
+  │                 └── <div class="tree-children">
+  │                       {tables.map(table =>
+  │                         <div class="tree-node leaf-item">
+  │                           table-icon + table_name
+  │                         )}
+  │               </div>
+  │               <div class="tree-node branch-item">"Views ({count})" ...</div>
+  │               <div class="tree-node branch-item">"Functions ({count})" ...</div>
+  │             </div>
+  │     )}
+  ├── <div class="tree-empty-hint">(空状态)</div>
+</div>
+```
+
+**递归渲染**: 每层缩进16px, 节点高度26px
+
+**加载状态**: `<div class="tree-loading">加载中...</div>` (spinner + italic text)
+
+---
+
+### 2.6 模态框组件
+
+所有模态框共享基础结构：
+
+```html
+<!-- 模态框基础模板 -->
+<div class="modal-overlay {active}" onclick="closeModal(event)">
+  <div class="modal-container" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{title}</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      {content}
+    </div>
+    <div class="modal-footer">
+      {footer_buttons}
+    </div>
+  </div>
+</div>
+```
+
+**所有模态框清单**:
+
+| ID | 触发 | 尺寸 |
+|----|------|------|
+| connectionModal | 新建/编辑连接 | max-width: 560px |
+| languageModal | 工具栏语言按钮 | max-width: 400px |
+| settingsModal | 工具栏设置按钮 | max-width: 720px |
+| sqlPreviewModal | 编辑保存确认 | max-width: 560px |
+| exportModal | 导出操作 | max-width: 560px |
+| importModal | 导入操作 | max-width: 480px |
+| confirmDialog | 各种确认操作 | max-width: 400px |
+| aboutDialog | 关于菜单 | max-width: 360px |
+| queryHistoryPanel | 工具栏"历史"按钮 | 工作区面板 (非模态) |
+| redisBrowser | Redis连接展开 | 工作区右侧面板 (非模态) |
+
+**ConfirmDialog (确认框)**:
+```
+┌────────────────────────────┐
+│ 确认操作               [✕] │
+├────────────────────────────┤
+│                            │
+│   {message}                 │
+│   操作不可撤销。            │
+│                            │
+├────────────────────────────┤
+│               [取消] [确认] │
+└────────────────────────────┘
+```
+仅破坏性操作弹出 (DELETE表行, DROP表, 关闭未保存标签)。
+
+---
+
+### 2.7 ContextMenu (上下文菜单)
+
+**动态上下文菜单**:
+
+```js
+const contextMenuItems = {
+  'connection': [
+    { label: '连接', icon: 'link', action: connect },
+    { label: '断开', icon: 'unlink', action: disconnect },
+    { divider: true },
+    { label: '编辑', icon: 'edit', action: editConnection },
+    { label: '删除', icon: 'trash', action: deleteConnection, danger: true },
+  ],
+  'database': [
+    { label: '新建查询', icon: 'file-plus', action: newTab },
+    { divider: true },
+    { label: '刷新', icon: 'refresh', action: refreshDb },
+    { divider: true },
+    { label: '复制名称', icon: 'copy', action: copyDbName },
+  ],
+  'table': [
+    { label: '打开', icon: 'open', action: openTable },
+    { label: '在新标签中打开', icon: 'open-tab', action: openTableNewTab },
+    { divider: true },
+    { label: '导出数据...', icon: 'download', action: exportTable },
+    { label: '复制表名', icon: 'copy', action: copyName },
+    { divider: true },
+    { label: '刷新', icon: 'refresh', action: refreshTable },
+    { label: '清空表', icon: 'trash-empty', action: truncateTable, danger: true },
+    { label: '删除表', icon: 'trash', action: dropTable, danger: true },
+  ],
+};
+```
+
+**规格**: 见 U01 第8.7节
+
+---
+
+### 2.8 Toast通知 (右上角)
+
+**ToastStack**: position=fixed, top-right, z-index=10000
+
+```
+┌───────────────────────────────────────┐
+│  ┌── Toast 1 (entering) ──────────┐  │
+│  │ ✓ 操作成功                    ✕│  │ ← auto-dismiss 3s
+│  └────────────────────────────────┘  │
+│  ┌── Toast 2 ────────────────────┐  │
+│  │ ✗ 连接失败                     │  │
+│  │   [重连] [关闭]                │  │ ← 手动关闭
+│  └────────────────────────────────┘  │
+└───────────────────────────────────────┘
+```
+
+**Toast规格**: 见 U03 第9节
+
+---
+
+### 2.9 Monaco Editor
+
+**初始化**: `require(['vs/editor/editor.main'], initEditor)`
+
+**配置**:
+```js
+const editorConfig = {
+  value: '',
+  language: 'sql',
+  theme: getCurrentTheme() === 'dark' ? 'vs-dark' : 'vs',
+  fontSize: 14,
+  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  lineNumbers: 'on',
+  minimap: { enabled: false },          // Terminal Noir: 关闭小地图
+  scrollBeyondLastLine: false,
+  automaticLayout: true,                // 自动响应容器resize
+  wordWrap: 'off',
+  tabSize: 2,
+  renderWhitespace: 'none',
+  bracketPairColorization: { enabled: true },
+  suggest: {                             // 自动补全设置
+    snippetsPreventQuickSuggestions: false,
+    showWords: false,                   // 不显示文档词汇补全
+    showFunctions: true,
+    showKeywords: true,
+  },
+  quickSuggestions: {
+    other: true,
+    comments: false,
+    strings: false,
+  },
+  overviewRulerBorder: false,
+  hideCursorInOverviewRuler: true,
+  renderLineHighlight: 'line',
+  contextmenu: false,                    // 使用自定义右键菜单
+};
+```
+
+**resize监听**: 
+```js
+// 拖拽分割线后必须调用
+new ResizeObserver(() => editor.layout()).observe(editorContainer);
+```
+
+---
+
+## 3. 组件状态规范
+
+### 3.1 Empty States (空状态)
+
+| 场景 | 视觉 | 操作引导 |
+|------|------|---------|
+| 无连接 | 连接列表区域居中显示 "暂无连接" + database icon (48px, opacity 0.3) | "点击 [+] 新建连接" |
+| 未展开数据库 | Tree区居中显示 "选择连接以浏览数据库" | — |
+| SQL编辑器空白 | WelcomePanel (仅无标签页时) | 新建连接/查询按钮 |
+| 查询结果为空 | "查询返回0行" (fg-muted, italic) | — |
+| 表为空 | "表为空" + 添加行按钮 | "点击 [+] 添加第一行" |
+| 审计日志空 | "暂无日志记录" + clock icon | — |
+| 对比结果空 | "选择两个数据源进行对比" | 表单配置 |
+
+### 3.2 Loading States (加载)
+
+| 场景 | Spinner | 骨架屏 | 其他 |
+|------|---------|--------|------|
+| 连接测试 | ✓ (14×14px, 2px accent border) | | 按钮disabled |
+| 加载数据库列表 | ✓ (16×16px, tree-loading item) | | |
+| 查询执行 | ✓ 状态栏脉冲 | | 进度条 |
+| 分页加载数据 | | ✓ (3行灰色骨架行) |  |
+| 导出 | | | 进度条+行数 |
+
+**骨架屏规格**:
+```css
+.skeleton-row {
+  height: var(--row-height);
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 ```
 
-**触发条件**: 5秒内 Wails API 未就绪 (L114-126)
+### 3.3 Error States
+
+| 场景 | 视觉 | 恢复 |
+|------|------|------|
+| 连接超时 | 红色错误文字 + 建议："检查防火墙/网络" | [重试]按钮 |
+| 连接被拒绝 | "访问被拒绝: 检查用户名/密码" | [重试]按钮 |
+| 查询语法错误 | 红色左边框卡片 + SQL回显 + 建议 | 修正后重新执行 |
+| 查询超时 | "查询超时(30s)，建议添加LIMIT或索引" + 已返回行 | 调整超时设置 |
+| 网络断开 | 状态栏变红 + Toast通知 | [重连]按钮 |
 
 ---
 
-## 18. Panel Resizing / 面板调整大小
+## 4. 前端State管理
 
-### 18.1 Sidebar Resize (sidebarResize)
+### 4.1 全局State
 
-**HTML**: `<div class="resize-handle" id="sidebarResize">` (index.html:154)
+```js
+const state = {
+  // Theme
+  currentTheme: 'dark',         // 'dark' | 'light'
+  currentDensity: 'compact',    // 'relaxed' | 'compact' | 'dense'
+  currentLanguage: 'zh',        // 'zh' | 'en'
 
-**实现**: `initResizablePanels()` (app.js) → 拖拽调整 sidebarWidth
+  // Connections
+  connections: [],              // Array<Connection>
+  activeConnectionId: null,     // string | null
+  connectionStatuses: {},       // { [id]: 'connected'|'disconnected'|'connecting'|'error' }
 
-### 18.2 Editor/Results Split (splitHandle / editorResultsSplit)
+  // Tabs
+  tabs: [],                     // Array<Tab>
+  activeTabId: null,            // string | null
 
-**HTML**: `<div class="split-handle" id="splitHandle">` (index.html:246)
+  // UI
+  sidebarWidth: 260,
+  sidebarVisible: true,
 
-**实现**: 拖拽调整 editorHeight / resultsHeight
+  // Wails
+  wailsReady: false,
+};
+```
+
+### 4.2 Tab State
+
+```js
+const TabState = {
+  query: {
+    content: '',                // SQL text
+    results: null,              // MultiQueryResult | null
+    executionState: 'idle',     // 'idle' | 'running' | 'complete' | 'error'
+    currentDatabase: '',        // selected database
+    isModified: false,          // unsaved changes flag
+    isSaved: false,             // saved to file flag
+  },
+
+  dataView: {
+    table: '',                  // table name
+    database: '',
+    // edit state
+    rows: [],
+    columns: [],
+    totalRows: 0,
+    currentPage: 1,
+    pageSize: 100,
+    // pending changes
+    insertedRows: [],           // Array<{row, index}>
+    modifiedRows: [],           // Array<{row, index, originalRow}>
+    deletedRows: [],            // Array<{row, index}>
+    isModified: false,
+    // filter/sort
+    filterQuery: '',            // Raw WHERE
+    sortColumn: '',
+    sortOrder: '',              // 'ASC' | 'DESC' | ''
+  },
+};
+```
+
+### 4.3 持久化的State (localStorage)
+
+| Key | Value |
+|-----|-------|
+| `db-client-theme` | 'dark' / 'light' |
+| `db-client-density` | 'relaxed' / 'compact' / 'dense' |
+| `db-client-sidebar-width` | number (px) |
+| `db-client-editor-font-size` | 12/13/14/16/18 |
 
 ---
 
-## 19. Missing UI Components / 缺失的 UI 组件
+## 5. 面板切换
 
-以下后端 API 已实现但前端 UI 尚未创建:
+### 5.1 标签页创建
 
-| 功能 | 后端 API | 缺失 UI |
-|------|----------|---------|
-| 事务管理 | BeginTransaction, ExecuteInTransaction, Commit/Rollback, ExecuteTransactionBatch | Transaction Dialog |
-| 数据导出 | ExportData | Export Dialog |
-| 数据导入 | ImportData | Import Dialog |
-| 数据对比 | CompareTables, CompareQueries | Compare Dialog |
-| 查询分析 | GetExplainPlan, AnalyzeQuery | Explain/Analysis Panel |
-| SQL 格式化 | FormatSQL, BeautifySQL | 已集成到 editor toolbar |
-| SQL 验证 | ValidateSQL | 验证结果展示 |
-| 自动补全 | GetAutoCompleteSuggestions | Monaco Editor 内置集成 |
-| 审计日志 | AuditLogger.GetLogs (内部) | Audit Log Viewer Dialog |
-| Redis 专用 | GetRedisKeyInfo, SetRedisKeyValue, etc. | Redis Key Viewer Panel |
-| 查询超时 | ExecuteQueryWithTimeout | Timeout setting in query toolbar |
+```
+CreateQueryTab() -> new tab { type:'query', content:'' }
+  → state.tabs.push(tab)
+  → state.activeTabId = tab.id
+  → 隐藏WelcomePanel
+  → 显示EditorPanel
+  → Monaco Editor获得焦点
+
+CreateDataTab(table, db) -> new tab { type:'dataView', table, db }
+  → WailsAPI.ExecuteQuery("SELECT * FROM {table} LIMIT 100")
+  → dataViewPanel显示
+```
+
+### 5.2 切换表的数据视图
+
+点击侧边栏另一个表:
+- 如果已有标签页(同类型dataView) -> 切换
+- 如果没有 -> 新建DataView tab
+
+### 5.3 面板冲突
+
+DataView 和 QueryEditor 不能同时占用WorkSpace。DataView替换当前的QueryTab（或合并为一个混合tab）：
+
+```
+用户双击表名:
+  → 找到第一个QueryTab → 转为DataView tab
+  → 保留原SQLeditor内容在后台
+
+用户点击QueryTab返回:
+  → 恢复原SQL编辑器内容
+```
+
+---
+
+## 6. 前端代码组织 (推荐重构)
+
+**当前**: 单文件 `app.js` (3502行)
+**推荐**: 模块化前端
+
+```
+frontend/src/
+├── main.js              # 入口: 初始化, Wails polling, 注册全局事件
+├── state.js             # 全局state对象, mutations
+├── theme.js             # 主题切换, 密度切换
+├── api.js               # WailsAPI 封装层 (统一错误处理/超时)
+├── components/
+│   ├── toolbar.js       # 工具栏初始化
+│   ├── statusbar.js     # 状态栏(连接指示/时钟/窗口尺寸)
+│   ├── sidebar.js       # 侧边栏: 连接列表渲染
+│   ├── db-tree.js       # 数据库树: 展开/折叠/加载/右键
+│   ├── tab-bar.js       # 标签栏: 创建/切换/关闭/拖拽
+│   ├── modal.js         # 模态框基类: open/close/focus-trap
+│   ├── toast.js         # Toast通知系统
+│   ├── context-menu.js  # 上下文菜单
+│   └── confirm.js       # 确认对话框
+├── panels/
+│   ├── welcome.js       # 欢迎面板
+│   ├── editor.js        # Monaco编辑器 + toolbar
+│   ├── results.js       # 结果面板(消息/摘要/表格)
+│   ├── data-grid.js     # 数据表格(含过滤/排序/分页/编辑)
+│   └── data-view.js     # 数据浏览面板(内容/表结构/索引/FK)
+├── dialogs/
+│   ├── connection.js    # 连接对话框(含表单验证)
+│   ├── settings.js      # 设置对话框
+│   ├── export.js        # 导出对话框
+│   └── language.js      # 语言选择对话框
+└── utils/
+    ├── dom.js           # 安全的DOM操作 (createElement, no innerHTML)
+    ├── format.js        # 数字/大小/时间格式化
+    ├── escape.js        # HTML/SQL 转义
+    └── keyboard.js      # 键盘快捷键注册
+```
+
+**DOM安全规则**: 
+- 禁止 `innerHTML` / `insertAdjacentHTML` 与用户/数据库数据
+- 使用 `createElement('div')` + `textContent` 或 `setAttribute`
+- 仅静态HTML模板可使用innerHTML (在初始化时使用)
+
+---
+
+## 7. 前端与后端API 数据流
+
+```
+Frontend Component → state mutation → WailsAPI method → Go backend
+                       ↑                                   │
+                       └────── Promise resolve ────────────┘
+```
+
+**示例**: 执行查询的完整数据流:
+```
+1. EditorToolbar "Run" click → handleRunQuery()
+2. handleRunQuery:
+   a. tab.executionState = 'running' → UI更新
+   b. WailsAPI.executeQueryWithTimeout(conn, db, sql, {timeout:30})
+   c. .then(result => {
+        tab.results = result
+        tab.executionState = 'complete'
+        renderResults(result)
+      })
+   d. .catch(err => {
+        tab.executionState = 'error'
+        showError(err)
+      })
+3. Go backend (query_timeout.go):
+   a. decrypt password
+   b. pool.getOrCreate → driver.Query(ctx, sql)
+   c. rows.Scan → populate QueryResult
+   d. audit.Log
+   e. return QueryResult
+```
+
+---
+
+## 8. 主题与密度切换实现
+
+```js
+// Theme
+function setTheme(theme) {
+  state.currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('db-client-theme', theme);
+  // Monaco editor theme
+  if (editor) {
+    monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+  }
+}
+
+// Density (信息密度)
+function setDensity(density) {
+  state.currentDensity = density;
+  document.documentElement.setAttribute('data-density', density);
+  localStorage.setItem('db-client-density', density);
+  // CSS variables handle everything (no JS DOM manipulation required)
+}
+```
+
+**密度CSS变量**:
+```css
+[data-density="relaxed"] {
+  --row-height: 36px;
+  --cell-padding: 10px 12px;
+  --tree-node-height: 32px;
+}
+[data-density="compact"] {
+  --row-height: 28px;
+  --cell-padding: 6px 8px;
+  --tree-node-height: 26px;
+}
+[data-density="dense"] {
+  --row-height: 22px;
+  --cell-padding: 3px 6px;
+  --tree-node-height: 22px;
+  /* Dense模式下显示网格线 */
+  --grid-line: 1px solid var(--table-grid);
+}
+```
