@@ -326,7 +326,7 @@ function initWails() {
 }
 ```
 
-**Mock 数据** (app.js:128+): 预定义的连接配置，用于浏览器内开发调试
+**Mock 数据** (app.js:1094+): 预定义的连接配置，用于浏览器内开发调试
 
 ### 6.4 Theme Pattern
 
@@ -432,7 +432,7 @@ func TestMyNewFunction(t *testing.T) {
 | Method names: Go exported → PascalCase | `ExecuteQuery`, `GetTables` | All API methods |
 | Variable names: camelCase | `poolMutex`, `dbConfig` | Throughout |
 | JSON tags: snake_case | `json:"row_count"` | types.go |
-| Global singletons | `auditLogger` (sync.Once), `encryptionKey` (⚠️ no sync) | audit.go, crypto.go |
+| Global singletons | `auditLogger` (sync.Once), `encryptionKey` (sync.Once ✅ 已修复) | audit.go, crypto.go |
 | SQL identifiers: backticks for all | `` `table_name` `` | data_editor.go ⚠️ |
 
 ### 8.2 Frontend Style
@@ -462,13 +462,16 @@ if config.SavePassword && config.Password != "" {
 }
 ```
 
-**出现位置**: connection.go:103, connection.go:202, query.go:13, query.go:102, query.go:293, query_timeout.go:47, query_timeout.go:171, data_editor.go:54, transaction.go:71, redis_api.go:15, schema.go:176, test.go:15, test.go:94
+**出现位置**: connection.go:94, connection.go:180, config.go:15 (通过 connectionToDBConfig 统一解密), test.go:15, test.go:80
 
-**建议**: 统一到 `connectionToDBConfig()` (config.go:12-30)，此方法已包含解密逻辑
+**建议**: 统一到 `connectionToDBConfig()` (config.go:12-30)，此方法已包含解密逻辑 ✅ 已实施
 
-### 9.2 Pool Double-Check Pattern (6 处重复)
+### 9.2 Pool Double-Check Pattern (6 处重复) — ✅ 已修复
+
+> **状态更新**: poolMutex 双重锁定模式已从所有调用点移除。现在所有连接池访问统一使用 `getDriverForConfig(config.go:32)` 和 `pool.getOrCreate(pool.go:32-77)`。以下为历史记录:
 
 ```go
+// 旧模式 (已删除):
 a.poolMutex.RLock()
 pooledDriver, exists := a.pool.get(key)
 a.poolMutex.RUnlock()
@@ -485,9 +488,7 @@ if !exists {
 }
 ```
 
-**出现位置**: query.go:24-43, query.go:113-129, query_timeout.go:58-77, data_editor.go:66-99, transaction.go:82-97, query_analyzer.go:110-130
-
-**建议**: 统一使用 `pool.getOrCreate(key, createFunc)` (pool.go:24-74)，已实现原子性获取+创建
+**当前实现**: `pool.getOrCreate(key, createFunc)` (pool.go:32-77)，内部包含 double-check locking，调用方只需一行 `a.getDriverForConfig(dbConfig)`
 
 ### 9.3 Audit Logging Pattern
 
@@ -505,17 +506,17 @@ auditLogger.Log(AuditLevelInfo, AuditEventQuery,
 
 ## 10. Anti-Patterns / 反模式
 
-### 10.1 Dual Locking
+### 10.1 Dual Locking ✅ 已修复
 
 **问题**: `App.poolMutex` + `pool.mu` 构成双层锁 (详见 02-architecture.md Section 7)
 
-**修复**: 移除 `App.poolMutex`，统一使用 `pool.getOrCreate()`
+**修复**: 已移除 `App.poolMutex`，统一使用 `pool.getOrCreate()` — ✅ 已实施
 
 ### 10.2 Global Mutable State
 
-**问题**: `encryptionKey` (crypto.go:14), `globalTransactions` (transaction.go:52) 是全局可变状态
+**问题**: `encryptionKey` (crypto.go:16), `globalTransactions` (transaction.go:52) 是全局可变状态
 
-**修复**: `encryptionKey` → `sync.Once`; `globalTransactions` → App struct field
+**修复**: `encryptionKey` → `sync.Once` ✅ 已实施; `globalTransactions` → App struct field
 
 ### 10.3 No Dependency Injection
 

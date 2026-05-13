@@ -4,10 +4,10 @@
 
 | 模块名 | 功能描述 | 完成度 | 关键文件 | 安全风险 |
 |--------|----------|--------|----------|----------|
-| 连接管理 | 多数据库连接创建、保存、测试与池化管理 | 90% | connection.go, pool.go, config.go, crypto.go | 加密密码暴露前端 (GetConnections) |
-| SQL编辑器 | SQL查询执行、多语句执行、超时控制 | 80% | query.go, query_timeout.go, app.js Monaco | ExecuteQuery无超时 |
+| 连接管理 | 多数据库连接创建、保存、测试与池化管理 | 90% | connection.go, pool.go, config.go, crypto.go | ✅已修复(密码清除, connection.go:26) |
+| SQL编辑器 | SQL查询执行、多语句执行、超时控制 | 80% | query.go, query_timeout.go, app.js Monaco | ✅已修复(委托WithTimeout, query.go:10) |
 | 数据查询与展示 | 数据库/表/视图/列/索引/外键元数据查询 | 85% | schema.go, app.js dataViewPanel | 查询结果无行数限制 |
-| 数据编辑 | 表数据INSERT/UPDATE/DELETE操作 | 70% | data_editor.go | WhereClause SQL注入 |
+| 数据编辑 | 表数据INSERT/UPDATE/DELETE操作 | 70% | data_editor.go | ✅已修复(PrimaryKey参数化, types.go:91) |
 | 数据导出导入 | CSV/JSON/Excel/SQL导出、CSV/JSON导入 | 75% | data_export.go | SQL导出逐行INSERT性能差 |
 | 数据对比 | 表数据对比、查询结果对比、报告生成 | 70% | data_compare.go | 全量内存加载 |
 | Schema检查 | 索引/外键/统计信息/视图/函数查询 | 85% | schema.go | MySQL DESCRIBE未sanitize |
@@ -15,7 +15,7 @@
 | 查询分析 | EXPLAIN解析、复杂度评估、优化建议 | 50% | query_analyzer.go | GetSlowQueries空实现 |
 | SQL格式化 | SQL美化/压缩/验证/结构分析 | 80% | sql_formatter.go | 基础验证不够严格 |
 | 自动补全 | 表名/列名/关键字/函数/数据库名补全 | 60% | autocomplete.go | 列名补全空实现 |
-| 审计日志 | 操作日志记录/查询/导出/清理 | 70% | audit.go | 每次Log全量重写文件 |
+| 审计日志 | 操作日志记录/查询/导出/清理 | 70% | audit.go | ✅已修复(appendToFile, audit.go:189) |
 | Redis API | Redis键值CRUD、命令执行、信息查询 | 85% | redis_api.go, db/redis.go | 类型断言可panic |
 | 国际化 | 中英文消息翻译 | 75% | i18n.go | 部分硬编码中文 |
 | 窗口管理 | 窗口最小化/最大化/关闭/状态查询 | 90% | window.go | 无安全风险 |
@@ -55,18 +55,18 @@
 **数据模型**: `Connection` (见 03-data-models.md), `ConnectionConfig` (db包), `pooledDriver` (pool包)
 
 **已知缺陷**:
-- `ConnectToDatabase` 解密失败时静默忽略 (connection.go:202-207, 仅 `if err == nil` 而不报错)
-- `GetConnections` 返回含加密密码的数组暴露给前端JS上下文 (connection.go:23-25)
+- `ConnectToDatabase` 解密失败时静默忽略 (connection.go:178范围, 仅 `if err == nil` 而不报错)
+- ✅已修复: `GetConnections` 清除Password字段, 不再暴露加密密码 (connection.go:22-26)
 - MySQL驱动忽略SSLMode (db/mysql.go:23, 连接字符串未包含tls参数)
-- `encryptionKey` 全局变量无 `sync.Once` 保护, 并发init可覆盖key文件 (crypto.go:14)
-- `poolMutex` 在 `query.go` 等文件中仍使用手动双重检查而非 `pool.getOrCreate` (query.go:24-43)
+- ✅已修复: `encryptionKey` 有 `sync.Once` 保护 (crypto.go:16-17)
+- ✅已修复: 所有池访问统一使用 `getDriverForConfig` (config.go:32), 移除手动双重检查
 
 **安全注意事项**:
 - 密码必须在保存前加密, 传输前解密
 - 连接池key包含数据库名 (`buildKey`, pool.go:89-91), 避免缓存错乱
 - 审计日志记录所有连接操作
-- `connections.json` 应设置0600权限 (config.go:114)
-- 配置目录应设置0700权限 (config.go:65)
+- `connections.json` 应设置0600权限 (config.go)
+- 配置目录应设置0700权限 (config.go)
 
 ---
 
@@ -89,7 +89,7 @@
 
 | API方法 | 功能 | 状态 |
 |---------|------|------|
-| `ExecuteQuery` | 执行单条SQL查询(无超时) | ✅ |
+| `ExecuteQuery` | 执行单条SQL查询(委托WithTimeout) | ✅ |
 | `ExecuteMultiQuery` | 执行多条SQL(分号分隔) | ✅ |
 | `ExecuteNonQuery` | 执行非查询语句 | ✅ |
 | `ExecuteQueryWithTimeout` | 执行带超时控制的查询 | ✅ |
@@ -98,11 +98,11 @@
 **数据模型**: `QueryResult`, `SingleQueryResult`, `MultiQueryResult`, `QueryOptions`
 
 **已知缺陷**:
-- `ExecuteQuery` 无超时限制, 可无限阻塞UI (query.go:10-97)
-- `ExecuteQuery` 仍使用手动 `poolMutex` 双重检查而非 `pool.getOrCreate` (query.go:24-43)
-- 查询结果无行数限制, 大结果集可导致OOM (query.go:62-89)
-- `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式 (query.go:252-256)
-- NULL值被转换为字符串 `"NULL"` 而非null (query.go:82)
+- ✅已修复: `ExecuteQuery` 现委托 `ExecuteQueryWithTimeout` (默认30s超时, query.go:10)
+- ✅已修复: 所有池访问统一使用 `getDriverForConfig` (config.go:32)
+- 查询结果无行数限制, 大结果集可导致OOM (query_timeout.go范围)
+- `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式 (query.go:18)
+- NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103)
 
 **安全注意事项**:
 - 优先使用 `ExecuteQueryWithTimeout` 而非 `ExecuteQuery`
@@ -149,13 +149,13 @@
 - `GetTableStats` 的 `COUNT(*)` 在大表上性能极差 (schema.go:461)
 - `GetTableStats` 的 `SHOW TABLE STATUS` 在MySQL上扫描列数固定, 不同版本可能不兼容 (schema.go:492-494)
 - `GetFunctions` 对SQLite使用了错误的查询条件 (`type='view' AND name LIKE 'func_%'`, schema.go:149-151)
-- PostgreSQL数组解析 `parsePostgresArray` 不处理NULL元素 (schema.go:518-567)
+- PostgreSQL数组解析 `parsePostgresArray` 不处理NULL元素 (schema.go:518-555)
 
 **安全注意事项**:
 - `sanitizeIdentifier` 阻止路径遍历 (`..`) 和危险字符 (schema.go:194-234)
 - `escapeStringLiteral` 使用SQL标准双单号转义 (schema.go:237-240)
 - 标识符长度限制64字符防止DOS (schema.go:224-226)
-- `GetViews` 和 `GetFunctions` 使用 `escapeStringLiteral` 处理数据库名 (schema.go:75, 131)
+- `GetViews` 和 `GetFunctions` 使用 `escapeStringLiteral` 处理数据库名 (schema.go:59, 113)
 
 ---
 
@@ -163,8 +163,8 @@
 
 **功能列表**:
 - ✅ 插入数据 (`performInsert`, 参数化值)
-- ✅ 更新数据 (`performUpdate`, 主键条件/WhereClause)
-- ✅ 删除数据 (`performDelete`, 主键条件/WhereClause)
+- ✅ 更新数据 (`performUpdate`, 主键条件)
+- ✅ 删除数据 (`performDelete`, 主键条件)
 - ✅ 批量编辑 (`BatchEdit`, 逐条执行)
 - ✅ 可编辑列查询 (`GetEditableColumns`, 排除自增列)
 - ✅ INSERT语句预览 (`GenerateInsertStatement`)
@@ -187,17 +187,17 @@
 **数据模型**: `EditRequest`, `EditResult`, `EditOperation`
 
 **已知缺陷**:
-- **`WhereClause` SQL注入**: `req.WhereClause` 直接拼接到SQL中, 未参数化 (data_editor.go:255-256, 306-307)
-- `performInsert` 使用反引号包裹列名但PostgreSQL应使用双引号 (data_editor.go:196-201)
-- `formatValueForSQL` 对字符串值仅做单引号转义, 不够安全 (data_editor.go:411-425)
-- `BatchEdit` 逐条执行无事务保护, 部分失败无法回滚 (data_editor.go:359-368)
-- `GenerateUpdateStatement` 中 `whereClause` 参数未sanitize (data_editor.go:392-408)
+- ✅已修复: `EditRequest` 使用 `PrimaryKey` 字段构建参数化WHERE条件 (types.go:91, data_editor.go:151, 216)
+- `performInsert` 使用反引号包裹列名但PostgreSQL应使用双引号 (data_editor.go:108)
+- `formatValueForSQL` 对字符串值仅做单引号转义, 不够安全 (data_editor.go范围, 行号未精确验证)
+- `BatchEdit` 逐条执行无事务保护, 部分失败无法回滚 (data_editor.go:278)
+- ✅已修复: `GenerateUpdateStatement` 使用 `PrimaryKey` 参数化条件 (data_editor.go:309)
 
 **安全注意事项**:
-- **P0**: `WhereClause` 必须改为参数化查询或至少添加白名单验证
-- 表名和列名通过 `sanitizeIdentifier` 净化 (data_editor.go:168, 186, 192, 241, 246, 260, 302, 311)
-- 所有编辑操作记录审计日志 (data_editor.go:132-153)
-- 更新/删除操作要求必须有WHERE条件或主键 (data_editor.go:233-239, 294-300)
+- ✅已修复: `EditRequest.PrimaryKey` 实现参数化WHERE条件 (types.go:91)
+- 表名和列名通过 `sanitizeIdentifier` 净化 (data_editor.go:89, 108, 151, 216, 261)
+- 所有编辑操作记录审计日志 (data_editor.go范围)
+- 更新/删除操作使用 `PrimaryKey` 构建参数化WHERE条件 (data_editor.go:151, 216)
 
 ---
 
@@ -302,7 +302,7 @@
 | `GetTableIndexes` | 获取索引信息(MySQL/PostgreSQL) | ✅ |
 | `GetTableForeignKeys` | 获取外键信息(MySQL/PostgreSQL) | ✅ |
 | `GetTableStats` | 获取表统计信息 | ✅ |
-| `GetTableStatistics` | 获取表统计信息(map格式, query_analyzer.go:714) | ✅ |
+| `GetTableStatistics` | 获取表统计信息(map格式, query_analyzer.go:304) | ✅ |
 | `AnalyzeTableUsage` | 分析所有表的使用情况 | ✅ |
 
 **数据模型**: `IndexInfo`, `ForeignKeyInfo`, `TableStats`

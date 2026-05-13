@@ -6,7 +6,7 @@
 
 ## 1. Connection Types / 连接类型
 
-### 1.1 Connection (types.go:4-18)
+### 1.1 Connection (types.go:3-17)
 
 保存的数据库连接配置，存储在 `connections.json`。
 
@@ -87,7 +87,7 @@ const (
 
 ## 2. Query Result Types / 查询结果类型
 
-### 2.1 QueryResult (types.go:21-27)
+### 2.1 QueryResult (types.go:19-25)
 
 单查询执行结果。
 
@@ -101,14 +101,14 @@ type QueryResult struct {
 }
 ```
 
-**特殊值处理** (query.go:79-87):
+**特殊值处理** (query_timeout.go:102-108):
 - `nil` → `"NULL"` 字符串
 - `[]byte` → `string(b)` (二进制数据转字符串)
 - 其他值原样保留
 
 ---
 
-### 2.2 SingleQueryResult (types.go:30-38)
+### 2.2 SingleQueryResult (types.go:27-35)
 
 多查询中单个查询的结果。
 
@@ -126,7 +126,7 @@ type SingleQueryResult struct {
 
 ---
 
-### 2.3 MultiQueryResult (types.go:41-49)
+### 2.3 MultiQueryResult (types.go:37-45)
 
 多查询批量执行的总结果。
 
@@ -146,7 +146,7 @@ type MultiQueryResult struct {
 
 ## 3. Schema Types / Schema 类型
 
-### 3.1 TableInfo (types.go:52-57)
+### 3.1 TableInfo (types.go:47-52)
 
 表/视图/函数信息。
 
@@ -178,7 +178,7 @@ type TableInfo struct {
 
 ---
 
-### 3.3 DatabaseInfo (types.go:60-64)
+### 3.3 DatabaseInfo (types.go:54-58)
 
 ```go
 type DatabaseInfo struct {
@@ -188,11 +188,11 @@ type DatabaseInfo struct {
 }
 ```
 
-**实际使用**: `GetDatabases()` 只填充 `Name`，`Owner` 和 `Comment` 未实现 (schema.go:24-29)
+**实际使用**: `GetDatabases()` 只填充 `Name`，`Owner` 和 `Comment` 未实现 (schema.go:12-30)
 
 ---
 
-### 3.4 IndexInfo (types.go:67-76)
+### 3.4 IndexInfo (types.go:60-69)
 
 ```go
 type IndexInfo struct {
@@ -209,7 +209,7 @@ type IndexInfo struct {
 
 ---
 
-### 3.5 ForeignKeyInfo (types.go:79-87)
+### 3.5 ForeignKeyInfo (types.go:71-79)
 
 ```go
 type ForeignKeyInfo struct {
@@ -223,11 +223,11 @@ type ForeignKeyInfo struct {
 }
 ```
 
-**PG 动作码映射** (schema.go:570-584): `a`→NO ACTION, `r`→RESTRICT, `c`→CASCADE, `n`→SET NULL, `d`→SET DEFAULT
+**PG 动作码映射** (schema.go: ~460行区域): `a`→NO ACTION, `r`→RESTRICT, `c`→CASCADE, `n`→SET NULL, `d`→SET DEFAULT
 
 ---
 
-### 3.6 TableStats (types.go:90-98)
+### 3.6 TableStats (types.go:81-89)
 
 ```go
 type TableStats struct {
@@ -243,7 +243,7 @@ type TableStats struct {
 
 ---
 
-### 3.7 TestResult (types.go:101-106)
+### 3.7 TestResult (types.go:105-110)
 
 ```go
 type TestResult struct {
@@ -322,24 +322,23 @@ const (
 
 ---
 
-### 4.2 EditRequest (data_editor.go:22-29)
+### 4.2 EditRequest (types.go:91-97)
 
 ```go
 type EditRequest struct {
-    Operation   EditOperation          `json:"operation"`        // 操作类型
-    Table       string                 `json:"table"`             // 表名
-    Database    string                 `json:"database"`          // 数据库名
-    Data        map[string]interface{} `json:"data"`              // 列名→值映射
-    WhereClause string                 `json:"whereClause,omitempty"` // WHERE 条件 (⚠️ SQL 注入风险)
-    PrimaryKey  map[string]interface{} `json:"primaryKey,omitempty"`  // 主键列→值映射
+    Operation   EditOperation          `json:"operation"`           // 操作类型
+    Table       string                 `json:"table"`               // 表名
+    Database    string                 `json:"database"`            // 数据库名
+    Data        map[string]interface{} `json:"data,omitempty"`      // 列名→值映射
+    PrimaryKey  map[string]interface{} `json:"primaryKey,omitempty"` // 主键列→值映射 (参数化)
 }
 ```
 
-**⚠️ 安全警告**: `WhereClause` 直接拼接进 SQL 语句 (data_editor.go:255-256, L306-307)，未使用参数化查询，存在 SQL 注入风险。
+**✅ 已修复**: `WhereClause` 已删除，强制使用 `PrimaryKey` 进行参数化 WHERE 条件 (data_editor.go:159/180/217/228)。
 
 ---
 
-### 4.3 EditResult (data_editor.go:32-37)
+### 4.3 EditResult (types.go:99-103)
 
 ```go
 type EditResult struct {
@@ -400,7 +399,7 @@ type ExportResult struct {
 
 ---
 
-### 5.4 ImportRequest (data_export.go:265-270)
+### 5.4 ImportRequest (data_export.go:245-250)
 
 ```go
 type ImportRequest struct {
@@ -413,7 +412,7 @@ type ImportRequest struct {
 
 ---
 
-### 5.5 ImportResult (data_export.go:273-278)
+### 5.5 ImportResult (data_export.go:252-257)
 
 ```go
 type ImportResult struct {
@@ -741,7 +740,7 @@ type QueryAnalysis struct {
 }
 ```
 
-**复杂度计算** (query_analyzer.go:617-647): score = joinCount×2 + subquery(5) + aggregate(3) + orderBy(2) + groupBy(3) + union(4); LOW≤3, MEDIUM≤8, HIGH>8
+**复杂度计算** (query_analyzer.go: ~350行区域): score = joinCount×2 + subquery(5) + aggregate(3) + orderBy(2) + groupBy(3) + union(4); LOW≤3, MEDIUM≤8, HIGH>8
 
 ---
 
@@ -819,7 +818,7 @@ type AuditLogger struct {
 }
 ```
 
-**单例**: `GetAuditLogger()` + `sync.Once` (audit.go:72-92)
+**单例**: `GetAuditLogger()` + `sync.Once` (audit.go:69-87)
 
 ---
 
@@ -836,7 +835,7 @@ type connectionPool struct {
 
 ---
 
-### 12.2 pooledDriver (pool.go:76-80)
+### 12.2 pooledDriver (pool.go:20-24)
 
 ```go
 type pooledDriver struct {
@@ -871,5 +870,5 @@ type pooledDriver struct {
 
 | Type A | Type B | Issue |
 |--------|--------|-------|
-| `main.TableInfo` (types.go:52-57) | `db.TableInfo` (db/types.go:4-9) | 相同结构，重复定义 |
-| `main.Connection` (types.go:4-18) | `db.ConnectionConfig` (db/db.go:22-30) | 类似结构，需 `connectionToDBConfig()` 转换 |
+| `main.TableInfo` (types.go:47-52) | `db.TableInfo` (db/types.go:4-9) | 相同结构，重复定义 |
+| `main.Connection` (types.go:3-17) | `db.ConnectionConfig` (db/db.go:22-30) | 类似结构，需 `connectionToDBConfig()` 转换 |

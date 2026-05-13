@@ -44,7 +44,7 @@
 
 **签名**: `GetConnections(): Promise<Array<main.Connection>>`
 
-**源码**: connection.go:23-25
+**源码**: connection.go:22
 
 **返回值**: `App.connections` 数组（直接返回内部状态）
 
@@ -56,17 +56,17 @@
 
 **签名**: `SaveConnection(arg1:main.Connection): Promise<void>`
 
-**源码**: connection.go:28-74
+**源码**: connection.go:31
 
 **参数**: Connection 对象（见 D03-data-models.md）
 
 **处理逻辑**:
-1. ID 为空时自动生成 (L31)
-2. `save_password=true && password!=""` → `encryptPassword()` (L36-39)
-3. `save_password=false` → 清空密码 (L42)
-4. 查找已有连接，更新或新增 (L47-61)
-5. 记录审计日志 (L64-71)
-6. 写入 connections.json (L73)
+1. ID 为空时自动生成
+2. `save_password=true && password!=""` → `encryptPassword()`
+3. `save_password=false` → 清空密码
+4. 查找已有连接，更新或新增
+5. 记录审计日志
+6. 写入 connections.json
 
 **错误**: 加密失败 → "failed to encrypt password"; 写入失败 → 文件权限错误
 
@@ -76,14 +76,14 @@
 
 **签名**: `DeleteConnection(arg1:string): Promise<void>`
 
-**源码**: connection.go:77-96
+**源码**: connection.go:73
 
 **参数**: `id` — 连接 ID 字符串
 
 **处理逻辑**:
-1. 从 connections 数组中查找并删除 (L79-85)
-2. 记录审计日志 (WARNING 级别) (L88-93)
-3. 保存 connections.json (L95)
+1. 从 connections 数组中查找并删除
+2. 记录审计日志 (WARNING 级别)
+3. 保存 connections.json
 
 **错误**: ID 不存在时仍成功（静默无操作）
 
@@ -93,7 +93,7 @@
 
 **签名**: `TestConnection(arg1:main.Connection): Promise<boolean|string>`
 
-**源码**: connection.go:99-150
+**源码**: connection.go:90
 
 **参数**: Connection 对象（Password 可能需解密）
 
@@ -102,11 +102,11 @@
 - 失败: `[false, "连接失败: ..."]` + 错误提示建议
 
 **处理逻辑**:
-1. 解密密码 (L103-109)
-2. 验证必填字段 (L112-120)
-3. 使用默认数据库 (L122-125)
-4. DriverManager.Connect() → driver.Ping() → driver.Close() (L137-148)
-5. 错误消息附带提示 (formatError) (L153-176)
+1. 解密密码
+2. 验证必填字段
+3. 使用默认数据库
+4. DriverManager.Connect() → driver.Ping() → driver.Close()
+5. 错误消息附带提示 (formatError)
 
 **错误提示映射** (i18n.go):
 | 错误关键词 | 提示 |
@@ -125,7 +125,7 @@
 
 **签名**: `ConnectToDatabase(arg1:main.Connection): Promise<boolean|string>`
 
-**源码**: connection.go:200-259
+**源码**: connection.go:178
 
 **参数**: Connection 对象
 
@@ -134,9 +134,9 @@
 - 失败: `[false, "连接失败: ..."]`
 
 **处理逻辑**:
-1. 解密密码 (L202-207)
-2. 构建连接配置 (L210-223)
-3. `pool.getOrCreate(key, createFunc)` (L229-252)
+1. 解密密码
+2. 构建连接配置
+3. `pool.getOrCreate(key, createFunc)`
    - createFunc: DriverManager.Connect → Ping retry 3x 200ms
 4. pool 超 50 时自动 evictOldest
 
@@ -146,7 +146,7 @@
 
 **签名**: `DisconnectFromDatabase(arg1:main.Connection): Promise<void>`
 
-**源码**: connection.go:262-265
+**源码**: connection.go:233
 
 **参数**: Connection 对象
 
@@ -158,7 +158,7 @@
 
 **签名**: `GetSupportedFeatures(): Promise<Record<string, Array<string>>>`
 
-**源码**: test.go:74-83
+**源码**: connection.go:239
 
 **返回值**:
 ```json
@@ -182,17 +182,13 @@
 
 **签名**: `ExecuteQuery(arg1:main.Connection, arg2:string, arg3:string): Promise<main.QueryResult>`
 
-**源码**: query.go:10-97
+**源码**: query.go:10 (委托给 ExecuteQueryWithTimeout)
 
 **参数**: `(Connection, database, query)`
 
 **返回值**: QueryResult (见 D03-data-models.md)
 
-**处理逻辑**:
-1. 解密密码 (L13-17)
-2. poolMutex double-check 获取连接 (L24-43)
-3. `driver.Query(ctx, query)` (L45)
-4. 扫描结果行，NULL→"NULL", []byte→string (L69-89)
+**处理逻辑**: 解密密码后委托给 `ExecuteQueryWithTimeout` 执行。
 
 **错误**: "Connection failed" / "Query failed" / "Failed to get columns" / "Failed to scan row"
 
@@ -202,14 +198,14 @@
 
 **签名**: `ExecuteMultiQuery(arg1:main.Connection, arg2:string, arg3:string): Promise<main.MultiQueryResult>`
 
-**源码**: query.go:99-236
+**源码**: query.go:14 (委托给 ExecuteMultiQueryWithTimeout)
 
 **参数**: `(Connection, database, query)` — query 可包含多条分号分割的 SQL
 
 **返回值**: MultiQueryResult
 
 **处理逻辑**:
-1. `splitQueries()` 智能分割 (L132, query.go:238-289)
+1. `splitQueries()` 智能分割 (query.go:18)
 2. 每条查询判断类型 (SELECT/SHOW/DESCRIBE/EXPLAIN/WITH → Query, 其余 → Exec)
 3. SELECT 查询: 扫描列名 + 行数据
 4. 非 SELECT: RowsAffected
@@ -220,7 +216,7 @@
 
 **签名**: `ExecuteNonQuery(arg1:main.Connection, arg2:string, arg3:string): Promise<number>`
 
-**源码**: query.go:292-329
+**源码**: query.go:70
 
 **参数**: `(Connection, database, query)`
 
@@ -234,7 +230,7 @@
 
 **签名**: `ExecuteQueryWithTimeout(arg1:main.Connection, arg2:string, arg3:string, arg4:main.QueryOptions): Promise<main.QueryResult>`
 
-**源码**: query_timeout.go:27-152
+**源码**: query_timeout.go:21
 
 **参数**: `(Connection, database, query, QueryOptions{Timeout: int})`
 
@@ -245,7 +241,7 @@
 
 **超时错误**: "查询超时（{N}秒），请优化查询或增加超时时间。💡提示：..."
 
-**特点**: 每行扫描时检查 `ctx.Done()` (L111-122)，防止大数据集读取阻塞
+**特点**: 每行扫描时检查 `ctx.Done()`，防止大数据集读取阻塞
 
 ---
 
@@ -253,11 +249,11 @@
 
 **签名**: `ExecuteMultiQueryWithTimeout(arg1:main.Connection, arg2:string, arg3:string, arg4:main.QueryOptions): Promise<main.MultiQueryResult>`
 
-**源码**: query_timeout.go:155-322
+**源码**: query_timeout.go:121
 
 **参数**: `(Connection, database, query, QueryOptions{Timeout: int})`
 
-**特点**: 总超时控制 — 每条子查询前检查 `ctx.Done()` (L210-223)
+**特点**: 总超时控制 — 每条子查询前检查 `ctx.Done()`
 
 ---
 
@@ -267,7 +263,7 @@
 
 **签名**: `GetDatabases(arg1:main.Connection): Promise<Array<main.DatabaseInfo>>`
 
-**源码**: schema.go:11-30
+**源码**: schema.go:12
 
 **返回值**: DatabaseInfo 数组（仅 Name 字段填充）
 
@@ -277,7 +273,7 @@
 
 **签名**: `GetTables(arg1:main.Connection, arg2:string): Promise<Array<main.TableInfo>>`
 
-**源码**: schema.go:33-60
+**源码**: schema.go:33
 
 **参数**: `(Connection, database)`
 
@@ -289,7 +285,7 @@
 
 **签名**: `GetViews(arg1:main.Connection, arg2:string): Promise<Array<main.TableInfo>>`
 
-**源码**: schema.go:63-115
+**源码**: schema.go:59
 
 **返回值**: TableInfo 数组，Type="view"
 
@@ -301,7 +297,7 @@
 
 **签名**: `GetFunctions(arg1:main.Connection, arg2:string): Promise<Array<main.TableInfo>>`
 
-**源码**: schema.go:118-171
+**源码**: schema.go:113
 
 **返回值**: TableInfo 数组，Type="function"
 
@@ -315,7 +311,7 @@
 
 **签名**: `GetTableColumns(arg1:main.Connection, arg2:string, arg3:string): Promise<Array<db.ColumnInfo>>`
 
-**源码**: schema.go:174-192
+**源码**: schema.go:168
 
 **参数**: `(Connection, database, tableName)`
 
@@ -327,7 +323,7 @@
 
 **签名**: `GetTableIndexes(arg1:main.Connection, arg2:string, arg3:string): Promise<Array<main.IndexInfo>>`
 
-**源码**: schema.go:243-361
+**源码**: schema.go:220
 
 **参数**: `(Connection, database, tableName)`
 
@@ -341,7 +337,7 @@
 
 **签名**: `GetTableForeignKeys(arg1:main.Connection, arg2:string, arg3:string): Promise<Array<main.ForeignKeyInfo>>`
 
-**源码**: schema.go:364-445
+**源码**: schema.go:337
 
 **参数**: `(Connection, database, tableName)`
 
@@ -355,7 +351,7 @@
 
 **签名**: `GetTableStats(arg1:main.Connection, arg2:string, arg3:string): Promise<main.TableStats>`
 
-**源码**: schema.go:448-515
+**源码**: schema.go:420
 
 **返回值**: TableStats (RowCount, DataLength, IndexLength, Engine, Charset, Collation)
 
@@ -367,7 +363,7 @@
 
 **签名**: `GetTableStatistics(arg1:main.Connection, arg2:string, arg3:string): Promise<Record<string, any>>`
 
-**源码**: query_analyzer.go:714-736
+**源码**: query_analyzer.go:304
 
 **返回值**: map 包含 row_count, data_length, index_length, engine, charset, collation, comment, index_ratio
 
@@ -379,7 +375,7 @@
 
 **签名**: `EditTableData(arg1:main.Connection, arg2:main.EditRequest): Promise<main.EditResult>`
 
-**源码**: data_editor.go:40-154
+**源码**: data_editor.go:18
 
 **参数**: `(Connection, EditRequest{operation, table, database, data, whereClause, primaryKey})`
 
@@ -395,7 +391,7 @@
 
 **签名**: `BatchEdit(arg1:main.Connection, arg2:Array<main.EditRequest>): Promise<Array<main.EditResult>>`
 
-**源码**: data_editor.go:359-368
+**源码**: data_editor.go:278
 
 **处理**: 遍历每个 EditRequest，逐个调用 EditTableData()
 
@@ -419,7 +415,7 @@
 
 **签名**: `GenerateInsertStatement(arg1:string, arg2:Record<string, any>): Promise<string>`
 
-**源码**: data_editor.go:371-389
+**源码**: data_editor.go:289
 
 **参数**: `(tableName, data)` — 列名→值映射
 
@@ -431,7 +427,7 @@
 
 **签名**: `GenerateUpdateStatement(arg1:string, arg2:Record<string, any>, arg3:string): Promise<string>`
 
-**源码**: data_editor.go:392-408
+**源码**: data_editor.go:309
 
 **参数**: `(tableName, data, whereClause)`
 
@@ -445,7 +441,7 @@
 
 **签名**: `ExportData(arg1:main.Connection, arg2:main.ExportRequest): Promise<main.ExportResult>`
 
-**源码**: data_export.go:47-154
+**源码**: data_export.go:43
 
 **参数**: `(Connection, ExportRequest{format, fileName, query, table, database, limit, offset})`
 
@@ -459,7 +455,7 @@
 
 **签名**: `ImportData(arg1:main.Connection, arg2:main.ImportRequest): Promise<main.ImportResult>`
 
-**源码**: data_export.go:281-373
+**源码**: data_export.go:259
 
 **参数**: `(Connection, ImportRequest{format, fileName, table, database})`
 
@@ -477,7 +473,7 @@
 
 **签名**: `CompareTables(arg1:main.Connection, arg2:main.CompareRequest): Promise<main.CompareResult>`
 
-**源码**: data_compare.go:73-129
+**源码**: data_compare.go:66
 
 **参数**: `(Connection, CompareRequest{type, mode, sourceDB, targetDB, sourceTable, targetTable, keyColumns, compareColumns})`
 
@@ -852,7 +848,7 @@
 
 **签名**: `GetTableStatistics(arg1:main.Connection, arg2:string, arg3:string): Promise<Record<string, any>>`
 
-**源码**: query_analyzer.go:714-736
+**源码**: query_analyzer.go:304
 
 **返回值**: row_count, data_length, index_length, engine, charset, collation, comment, index_ratio
 
@@ -1081,4 +1077,4 @@ try {
 | Audit *(规划)* | GetAuditLogs, ExportAuditLogs, ClearOldAuditLogs | 3* |
 | **Total** | | **72** |
 
-**⚠️ 注意**: App.d.ts 列出 52 个方法声明（已实现的Go后端方法）。文档中额外标注了 20 个规划/扩展方法（Audit 3个 + Autocomplete扩展 + SQL Formatter扩展 + Query Analyzer扩展 + Data Compare扩展 + Transaction扩展），总计 72 个方法定义。`ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。
+**⚠️ 注意**: App.d.ts 列出 69 个方法声明（已实现的Go后端方法）。文档中额外标注了 3 个规划/扩展方法（Audit 3个 — GetAuditLogs/ExportAuditLogs/ClearOldAuditLogs），总计 72 个方法定义。`ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。

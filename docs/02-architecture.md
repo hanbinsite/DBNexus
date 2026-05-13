@@ -28,8 +28,8 @@
 │  │              Backend Layer (Go, package main)                   │   │
 │  │                    │                                           │   │
 │  │  ┌─────────────────▼────────────────────┐                      │   │
-│  │  │            App struct                 │                      │   │
-│  │  │  (app.go:14-21)                       │                      │   │
+│  │  │  App struct                 │                      │   │
+│  │  │  (app.go:13)                          │                      │   │
 │  │  │  Fields: ctx, driverManager,          │                      │   │
 │  │  │          connections, configPath,     │                      │   │
 │  │  │          pool, poolMutex              │                      │   │
@@ -39,9 +39,9 @@
 │  │  │            Connection Pool (pool.go)                     │   │   │
 │  │  │  sync.RWMutex + map[string]*pooledDriver                 │   │   │
 │  │  │  MaxPoolSize=50, key="{type}:{host}:{port}:{username}:{database}" │   │   │
-│  │  │  getOrCreate: double-check locking (L24-74)              │   │   │
-│  │  │  eviction: FIFO by createdAt (L122-151)                  │   │   │
-│  │  │  health: Ping 3s timeout (L197-223)                      │   │   │
+│  │  │  getOrCreate: double-check locking (L32)               │   │   │
+│  │  │  eviction: FIFO by createdAt (L83)                     │   │   │
+│  │  │  health: Ping 3s timeout (L135)                        │   │   │
 │  │  └─────────────────┬──────────────────────────────────────┘   │   │
 │  │                    │                                           │   │
 │  │  ┌─────────────────▼──────────────────────────────────────┐   │   │
@@ -98,9 +98,9 @@
 
 ---
 
-### 2.2 App Core: app.go (L1-91)
+### 2.2 App Core: app.go (L1-107)
 
-**App struct** (L14-21):
+**App struct** (L13):
 ```go
 type App struct {
     ctx           context.Context
@@ -113,20 +113,20 @@ type App struct {
 ```
 
 **生命周期方法**:
-- `startup(ctx)` (L37-45): 初始化加密密钥、加载连接配置、记录启动审计日志
-- `shutdown(ctx)` (L48-55): 关闭连接池(`pool.closeAll()`)、保存连接配置、记录关闭日志
+- `startup(ctx)` (L33): 初始化加密密钥、加载连接配置、记录启动审计日志
+- `shutdown(ctx)` (L41): 关闭连接池(`pool.closeAll()`)、保存连接配置、记录关闭日志
 
 **语言管理**:
-- `GetLanguage()` (L62-68): 读取 `DB_CLIENT_LANG` env var，默认 "zh"
-- `SetLanguage(lang)` (L71-91): 写入 `~/.db-client/config.json`
+- `GetLanguage()` (L48): 读取 `DB_CLIENT_LANG` env var，默认 "zh"
+- `SetLanguage(lang)` (L69): 写入 `~/.db-client/config.json`
 
-**已知问题**: `poolMutex` (L20) 与 `pool.mu` (pool.go:18) 构成双重锁体系（详见 Section 7）
+**已知问题**: `poolMutex` (app.go:19) 与 `pool.mu` (pool.go:16) 构成双重锁体系（详见 Section 7）
 
 ---
 
-### 2.3 Connection Pool: pool.go (L1-234)
+### 2.3 Connection Pool: pool.go (L1-166)
 
-**核心常量**: `MaxPoolSize = 50` (L14)
+**核心常量**: `MaxPoolSize = 50` (L13)
 
 **连接池结构**:
 ```go
@@ -142,195 +142,192 @@ type pooledDriver struct {
 }
 ```
 
-**Key 格式**: `buildKey()` → `"{type}:{host}:{port}:{username}:{database}"` (L89-91)
+**Key 格式**: `buildKey()` → `"{type}:{host}:{port}:{username}:{database}"` (L79)
 - 例: `"postgresql:localhost:5432:postgres:mydb"`
 
 **核心方法**:
 
 | 方法 | 行号 | 职责 |
 |------|------|------|
-| `getOrCreate(key, createFunc)` | L24-74 | 原子性获取或创建连接，double-check locking，Ping 验证 |
-| `get(key)` | L93-98 | 读锁查找 |
-| `set(key, driver)` | L100-119 | 写锁设置，超 50 时淘汰最旧 |
-| `evictOldest()` | L122-151 | 按 createdAt 排序 FIFO 淘汰 |
-| `remove(key)` | L153-163 | 关闭并删除指定连接 |
-| `closeAll()` | L165-175 | shutdown 时关闭全部连接 |
-| `GetHealthy(ctx, key)` | L197-223 | Ping 3s 超时验证后返回 |
-| `SetWithHealth(ctx, key, driver)` | L226-234 | Ping 后才 set |
-| `pingWithTimeout(ctx, driver)` | L178-193 | 3s 超时 ping |
+| `getOrCreate(key, createFunc)` | L32 | 原子性获取或创建连接，double-check locking，Ping 验证 |
+| `buildKey(config)` | L79 | 构建 pool key |
+| `evictOldest()` | L83 | 按 createdAt 排序 FIFO 淘汰 |
+| `remove(key)` | L111 | 关闭并删除指定连接 |
+| `closeAll()` | L123 | shutdown 时关闭全部连接 |
+| `GetHealthy(ctx, key)` | L135 | Ping 3s 超时验证后返回 |
 
 **淘汰策略**: FIFO (按 `createdAt` 排序，删除最早创建的连接)
 
 ---
 
-### 2.4 Connection Management: connection.go (L1-266)
+### 2.4 Connection Management: connection.go (L1-265)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `GetSupportedDatabases` | L11-20 | `() []map[string]string` | 返回 6 种数据库类型及默认端口 |
-| `GetConnections` | L23-25 | `() []Connection` | 返回已保存连接列表 |
-| `SaveConnection` | L28-74 | `(conn Connection) error` | 加密密码、保存、审计记录 |
-| `DeleteConnection` | L77-96 | `(id string) error` | 删除、审计记录 |
-| `TestConnection` | L99-150 | `(config Connection) (bool, string)` | 解密密码→验证→连接→Ping→关闭 |
-| `ConnectToDatabase` | L200-259 | `(config Connection) (bool, string)` | 解密→pool.getOrCreate→Ping retry 3x |
-| `DisconnectFromDatabase` | L262-265 | `(config Connection) error` | pool.remove(key) |
+| `GetSupportedDatabases` | L11 | `() []map[string]string` | 返回 6 种数据库类型及默认端口 |
+| `GetConnections` | L22 | `() []Connection` | 返回已保存连接列表 |
+| `SaveConnection` | L31 | `(conn Connection) error` | 加密密码、保存、审计记录 |
+| `DeleteConnection` | L73 | `(id string) error` | 删除、审计记录 |
+| `TestConnection` | L90 | `(config Connection) (bool, string)` | 解密密码→验证→连接→Ping→关闭 |
+| `ConnectToDatabase` | L178 | `(config Connection) (bool, string)` | 解密→pool.getOrCreate→Ping retry 3x |
+| `DisconnectFromDatabase` | L233 | `(config Connection) error` | pool.remove(key) |
 
 **辅助方法**:
-- `formatError(prefix, err, dbType, lang)` (L153-176): 错误消息+提示建议
-- `getDefaultDatabase(dbType)` (L184-197): 默认数据库映射
+- `formatError(prefix, err, dbType, lang)` (L141): 错误消息+提示建议
+- `getDefaultDatabase(dbType)` (L163): 默认数据库映射
 
 ---
 
-### 2.5 Query Engine: query.go (L1-329)
+### 2.5 Query Engine: query.go (L1-86)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `ExecuteQuery` | L10-97 | `(config, database, query) QueryResult` | 单查询执行，pool double-check |
-| `ExecuteMultiQuery` | L99-236 | `(config, database, query) MultiQueryResult` | 多查询分号分割执行 |
-| `ExecuteNonQuery` | L292-329 | `(config, database, query) (int64, string, error)` | 非查询语句执行 |
-| `splitQueries` | L238-289 | `(query string) []string` | 分号分割，处理引号/转义 |
+| `ExecuteQuery` | L10 | `(config, database, query) QueryResult` | 委托 ExecuteQueryWithTimeout |
+| `ExecuteMultiQuery` | L14 | `(config, database, query) MultiQueryResult` | 委托 ExecuteMultiQueryWithTimeout |
+| `ExecuteNonQuery` | L70 | `(config, database, query) (int64, string, error)` | 非查询语句执行 |
+| `splitQueries` | L18 | `(query string) []string` | 分号分割，处理引号/转义 |
 
-**查询类型判断** (L150-155): SELECT / SHOW / DESCRIBE / EXPLAIN / WITH → `driver.Query()`，其余 → `driver.Exec()`
+**查询类型判断** (query_timeout.go L177): SELECT / SHOW / DESCRIBE / EXPLAIN / WITH → `driver.Query()`，其余 → `driver.Exec()`
 
-**NULL 处理**: `nil → "NULL"`, `[]byte → string(b)` (L79-87)
+**NULL 处理**: `nil → "NULL"`, `[]byte → string(b)` (query_timeout.go L102-103, L104)
 
 ---
 
-### 2.6 Query Timeout: query_timeout.go (L1-343)
+### 2.6 Query Timeout: query_timeout.go (L1-280)
 
 **常量**: `DefaultQueryTimeout=30`, `MaxQueryTimeout=300`, `MinQueryTimeout=1`
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `ExecuteQueryWithTimeout` | L27-152 | `(config, db, query, QueryOptions) QueryResult` | 带超时 context 的查询 |
-| `ExecuteMultiQueryWithTimeout` | L155-322 | `(config, db, query, QueryOptions) MultiQueryResult` | 带超时的多查询 |
+| `ExecuteQueryWithTimeout` | L21 | `(config, db, query, QueryOptions) QueryResult` | 带超时 context 的查询 |
+| `ExecuteMultiQueryWithTimeout` | L121 | `(config, db, query, QueryOptions) MultiQueryResult` | 带超时的多查询 |
 
 **超时机制**: `context.WithTimeout(a.ctx, timeoutSeconds*time.Second)`，每行扫描时检查 `ctx.Done()`
 
 ---
 
-### 2.7 Schema Inspection: schema.go (L1-585)
+### 2.7 Schema Inspection: schema.go (L1-555)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `GetDatabases` | L11-30 | `(config) ([]DatabaseInfo, error)` | 获取数据库列表 |
-| `GetTables` | L33-60 | `(config, database) ([]TableInfo, error)` | UseDatabase + GetTables |
-| `GetViews` | L63-115 | `(config, database) ([]TableInfo, error)` | 查询视图列表 |
-| `GetFunctions` | L118-171 | `(config, database) ([]TableInfo, error)` | 查询存储函数 |
-| `GetTableColumns` | L174-192 | `(config, database, table) ([]db.ColumnInfo, error)` | 表结构信息 |
-| `GetTableIndexes` | L243-361 | `(config, database, table) ([]IndexInfo, error)` | MySQL/PG 索引查询 |
-| `GetTableForeignKeys` | L364-445 | `(config, database, table) ([]ForeignKeyInfo, error)` | 外键查询 |
-| `GetTableStats` | L448-515 | `(config, database, table) (TableStats, error)` | 表统计信息 |
+| `GetDatabases` | L12 | `(config) ([]DatabaseInfo, error)` | 获取数据库列表 |
+| `GetTables` | L33 | `(config, database) ([]TableInfo, error)` | UseDatabase + GetTables |
+| `GetViews` | L59 | `(config, database) ([]TableInfo, error)` | 查询视图列表 |
+| `GetFunctions` | L113 | `(config, database) ([]TableInfo, error)` | 查询存储函数 |
+| `GetTableColumns` | L168 | `(config, database, table) ([]db.ColumnInfo, error)` | 表结构信息 |
+| `GetTableIndexes` | L220 | `(config, database, table) ([]IndexInfo, error)` | MySQL/PG 索引查询 |
+| `GetTableForeignKeys` | L337 | `(config, database, table) ([]ForeignKeyInfo, error)` | 外键查询 |
+| `GetTableStats` | L420 | `(config, database, table) (TableStats, error)` | 表统计信息 |
 
 **SQL 注入防护**:
-- `sanitizeIdentifier(identifier)` (L195-234): 过滤非法字符、路径遍历、长度限制 64
-- `escapeStringLiteral(s)` (L237-240): SQL 字符串引号替换
+- `sanitizeIdentifier(identifier)` (L180): 过滤非法字符、路径遍历、长度限制 64
+- `escapeStringLiteral(s)` (L216): SQL 字符串引号替换
 
 ---
 
-### 2.8 Data Editor: data_editor.go (L1-425)
+### 2.8 Data Editor: data_editor.go (L1-350)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `EditTableData` | L40-154 | `(config, EditRequest) EditResult` | INSERT/UPDATE/DELETE 操作 |
-| `GetEditableColumns` | L341-356 | `(config, db, table) ([]db.ColumnInfo, error)` | 排除 AUTO_INCREMENT 列 |
-| `BatchEdit` | L359-368 | `(config, []EditRequest) []EditResult` | 批量编辑 |
-| `GenerateInsertStatement` | L371-389 | `(table, data) string` | SQL 预览 |
-| `GenerateUpdateStatement` | L392-408 | `(table, data, whereClause) string` | SQL 预览 |
+| `EditTableData` | L18 | `(config, EditRequest) EditResult` | INSERT/UPDATE/DELETE 操作 |
+| `GetEditableColumns` | L261 | `(config, db, table) ([]db.ColumnInfo, error)` | 排除 AUTO_INCREMENT 列 |
+| `BatchEdit` | L278 | `(config, []EditRequest) []EditResult` | 批量编辑 |
+| `GenerateInsertStatement` | L289 | `(table, data) string` | SQL 预览 |
+| `GenerateUpdateStatement` | L309 | `(table, data, primaryKey) string` | SQL 预览 |
 
-**内部方法**: `performInsert` (L177-221), `performUpdate` (L224-290), `performDelete` (L293-338)
+**内部方法**: `validateEditRequest` (L89), `performInsert` (L108), `performUpdate` (L151), `performDelete` (L216)
 
-**已知问题**: UPDATE/DELETE 的 `req.WhereClause` 直接拼接进 SQL (L255-256, L306-307)，存在 SQL 注入风险
+**已知问题**: 无 — WhereClause SQL 注入已修复，EditRequest 现使用 PrimaryKey 字段 (types.go:91) 参数化 WHERE 条件
 
 ---
 
-### 2.9 Data Export/Import: data_export.go (L1-423)
+### 2.9 Data Export/Import: data_export.go (L1-394)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `ExportData` | L47-154 | `(config, ExportRequest) ExportResult` | 导出 CSV/JSON/Excel/SQL |
-| `ImportData` | L281-373 | `(config, ImportRequest) ImportResult` | 导入 CSV/JSON |
+| `ExportData` | L43 | `(config, ExportRequest) ExportResult` | 导出 CSV/JSON/Excel/SQL |
+| `ImportData` | L259 | `(config, ImportRequest) ImportResult` | 导入 CSV/JSON |
 
 **导出路径**: `~/.db-client/exports/{fileName}.{format}`
 **导入路径**: `~/.db-client/imports/{fileName}`
 
-**依赖**: `excelize/v2` 用于 Excel 导出 (L207-234)
+**依赖**: `excelize/v2` 用于 Excel 导出 (L192)
 
 ---
 
-### 2.10 Data Compare: data_compare.go (L1-401)
+### 2.10 Data Compare: data_compare.go (L1-360)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `CompareTables` | L73-129 | `(config, CompareRequest) CompareResult` | 表数据对比 |
-| `CompareQueries` | L306-341 | `(config, CompareRequest) CompareResult` | 查询结果对比 |
-| `GetCompareReport` | L344-368 | `(result) string` | 生成文本对比报告 |
-| `ExportCompareResult` | L371-382 | `(result, format) ([]byte, error)` | JSON/CSV/TXT 导出 |
+| `CompareTables` | L66 | `(config, CompareRequest) CompareResult` | 表数据对比 |
+| `CompareQueries` | L273 | `(config, CompareRequest) CompareResult` | 查询结果对比 |
+| `GetCompareReport` | L307 | `(result) string` | 生成文本对比报告 |
+| `ExportCompareResult` | L333 | `(result, format) ([]byte, error)` | JSON/CSV/TXT 导出 |
 
 **对比逻辑**: `buildDataMap` → 按键列构建映射 → 遍历比对 → 生成 DifferenceItem 列表
 
 ---
 
-### 2.11 Transaction Management: transaction.go (L1-257)
+### 2.11 Transaction Management: transaction.go (L1-249)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `BeginTransaction` | L70-138 | `(config, database, options) (string, error)` | 开始事务，返回 txID |
-| `ExecuteInTransaction` | L140-155 | `(txID, query) (int64, error)` | 事务内执行 SQL |
-| `CommitTransaction` | L157-174 | `(txID) error` | 提交事务 |
-| `RollbackTransaction` | L176-193 | `(txID) error` | 回滚事务 |
-| `ExecuteTransactionBatch` | L195-257 | `(TransactionRequest) TransactionResult` | 批量事务执行 |
+| `BeginTransaction` | L82 | `(config, database, options) (string, error)` | 开始事务，返回 txID |
+| `ExecuteInTransaction` | L132 | `(txID, query) (int64, error)` | 事务内执行 SQL |
+| `CommitTransaction` | L149 | `(txID) error` | 提交事务 |
+| `RollbackTransaction` | L168 | `(txID) error` | 回滚事务 |
+| `ExecuteTransactionBatch` | L187 | `(TransactionRequest) TransactionResult` | 批量事务执行 |
 
-**事务存储**: `globalTransactions map[string]*activeTransaction` + `globalTxMutex sync.RWMutex` (L52-54)
+**事务存储**: `globalTransactions map[string]*activeTransaction` + `globalTxMutex sync.RWMutex` (L51)
 **超时**: `TransactionTimeout = 30 * time.Minute` (L41)
 
-**已知问题**: `cleanupStaleTransactions()` (L57-68) 已定义但未自动调用
+**已知问题**: `cleanupStaleTransactions()` (L69) 已定义但未自动调用
 
 ---
 
-### 2.12 Redis API: redis_api.go (L1-224)
+### 2.12 Redis API: redis_api.go (L1-136)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `GetRedisKeyInfo` | L13-31 | `(config, key) (*db.RedisKeyInfo, error)` | 键详情（类型/TTL/值/编码） |
-| `SetRedisKeyValue` | L34-66 | `(config, key, value, ttl) error` | 设置键值+TTL |
-| `DeleteRedisKey` | L69-99 | `(config, keys...) error` | 删除键（支持多键） |
-| `ExecuteRedisCommand` | L102-134 | `(config, cmd, args...) (interface{}, error)` | 执行任意 Redis 命令 |
-| `GetRedisInfo` | L137-155 | `(config, section) (string, error)` | Redis INFO 命令 |
-| `GetRedisDBSize` | L158-176 | `(config) (int64, error)` | DBSIZE 命令 |
-| `ScanRedisKeys` | L179-197 | `(config, pattern, cursor, count) ([]string, uint64, error)` | SCAN 分页 |
+| `GetRedisKeyInfo` | L10 | `(config, key) (*db.RedisKeyInfo, error)` | 键详情（类型/TTL/值/编码） |
+| `SetRedisKeyValue` | L20 | `(config, key, value, ttl) error` | 设置键值+TTL |
+| `DeleteRedisKey` | L43 | `(config, keys...) error` | 删除键（支持多键） |
+| `ExecuteRedisCommand` | L64 | `(config, cmd, args...) (interface{}, error)` | 执行任意 Redis 命令 |
+| `GetRedisInfo` | L87 | `(config, section) (string, error)` | Redis INFO 命令 |
+| `GetRedisDBSize` | L97 | `(config) (int64, error)` | DBSIZE 命令 |
+| `ScanRedisKeys` | L107 | `(config, pattern, cursor, count) ([]string, uint64, error)` | SCAN 分页 |
 
-**内部方法**: `getRedisDriver(config)` (L200-224) — pool.getOrCreate + 类型断言为 `*db.RedisDriver`
+**内部方法**: `getRedisDriver(config)` (L117) — getDriverForConfig + 类型断言为 `*db.RedisDriver`
 
 ---
 
-### 2.13 Autocomplete: autocomplete.go (L1-514)
+### 2.13 Autocomplete: autocomplete.go (L1-459)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `GetAutoCompleteSuggestions` | L226-267 | `(config, db, query, position) AutoCompleteResult` | 上下文感知补全 |
-| `GetQuickSuggestions` | L504-514 | `(prefix) []AutoCompleteItem` | 关键字+函数补全（无连接） |
-| `GetTableColumnsForAutoComplete` | L472-501 | `(config, db, tableName) ([]AutoCompleteItem, error)` | 表列补全 |
+| `GetAutoCompleteSuggestions` | L210 | `(config, db, query, position) AutoCompleteResult` | 上下文感知补全 |
+| `GetQuickSuggestions` | L398 | `(prefix) []AutoCompleteItem` | 关键字+函数补全（无连接） |
+| `GetTableColumnsForAutoComplete` | L422 | `(config, db, tableName) ([]AutoCompleteItem, error)` | 表列补全 |
 
 **上下文分析**: `analyzeQueryContext(query, position)` → FROM/JOIN→表名补全, SELECT/WHERE→列名+函数补全, USE→数据库补全
 
-**数据源**: `sqlKeywords` (L46-117, 65条), `sqlFunctions` (L120-195, 55条), `mysqlFunctions` (L198-207), `postgresFunctions` (L210-222)
+**数据源**: `sqlKeywords` (L41, 65条), `sqlFunctions` (L114, 55条), `mysqlFunctions` (L184), `postgresFunctions` (L195)
 
-**已知问题**: `getColumnSuggestions()` (L352-359) 返回空数组，列名补全未实现
+**已知问题**: `getColumnSuggestions()` (L317) 返回空数组，列名补全未实现
 
 ---
 
-### 2.14 Query Analyzer: query_analyzer.go (L1-766)
+### 2.14 Query Analyzer: query_analyzer.go (L1-565)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `GetExplainPlan` | L84-172 | `(config, database, query) ExplainResult` | EXPLAIN ANALYZE 执行 |
-| `AnalyzeQuery` | L549-587 | `(query) QueryAnalysis` | 静态查询分析（复杂度/类型/推荐） |
-| `GetSlowQueries` | L707-711 | `(config, database, threshold) ([]map[string]interface{}, error)` | 未实现，返回空 |
-| `GetTableStatistics` | L714-736 | `(config, database, table) (map[string]interface{}, error)` | 表统计+索引使用率 |
-| `AnalyzeTableUsage` | L739-766 | `(config, database) ([]map[string]interface{}, error)` | 全表使用情况汇总 |
+| `GetExplainPlan` | L79 | `(config, database, query) ExplainResult` | EXPLAIN ANALYZE 执行 |
+| `AnalyzeQuery` | L158 | `(query) QueryAnalysis` | 静态查询分析（复杂度/类型/推荐） |
+| `GetSlowQueries` | L300 | `(config, database, threshold) ([]map[string]interface{}, error)` | 未实现，返回空 |
+| `GetTableStatistics` | L304 | `(config, database, table) (map[string]interface{}, error)` | 表统计+索引使用率 |
+| `AnalyzeTableUsage` | L327 | `(config, database) ([]map[string]interface{}, error)` | 全表使用情况汇总 |
 
-**EXPLAIN 解析**: MySQL (L227-336) 和 PostgreSQL (L339-491) 分别解析，使用预编译正则 (L25-31)
+**EXPLAIN 解析**: MySQL (L358) 和 PostgreSQL (L462) 分别解析，使用预编译正则 (L23)
 
 ---
 
@@ -338,60 +335,60 @@ type pooledDriver struct {
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
-| `FormatSQL` | L58-61 | `(sql, FormatOptions) string` | 自定义选项格式化 |
-| `MinifySQL` | L293-306 | `(sql) string` | 移除注释+空白压缩 |
+| `FormatSQL` | L58-60 | `(sql, FormatOptions) string` | 自定义选项格式化 |
+| `MinifySQL` | L293-305 | `(sql) string` | 移除注释+空白压缩 |
 | `ValidateSQL` | L322-347 | `(sql) (bool, []string)` | 基础语法验证 |
 | `BeautifySQL` | L426-428 | `(sql) string` | 默认选项美化 |
 | `CompactSQL` | L431-438 | `(sql) string` | 紧凑格式 |
-| `GetSQLStructure` | L442-473 | `(sql) map[string]interface{}` | SQL 结构分析 |
+| `GetSQLStructure` | L442-398 | `(sql) map[string]interface{}` | SQL 结构分析 |
 
 **FormatOptions** (L9-16): indentWidth, keywordCase, lineBreakStyle, alignClauses, formatFunctions, maxLineLength
 
 ---
 
-### 2.16 Audit Logging: audit.go (L1-322)
+### 2.16 Audit Logging: audit.go (L1-304)
 
-**单例模式**: `GetAuditLogger()` + `sync.Once` (L72-92)
+**单例模式**: `GetAuditLogger()` + `sync.Once` (L69-87)
 
-**日志级别**: INFO / WARNING / ERROR / CRITICAL (L15-20)
-**事件类型**: CONNECT / DISCONNECT / QUERY / QUERY_ERROR / QUERY_TIMEOUT / CONNECTION_SAVE / CONNECTION_DELETE / LOGIN / LOGOUT / SENSITIVE_DATA (L26-37)
+**日志级别**: INFO / WARNING / ERROR / CRITICAL (L14-21)
+**事件类型**: CONNECT / DISCONNECT / QUERY / QUERY_ERROR / QUERY_TIMEOUT / CONNECTION_SAVE / CONNECTION_DELETE / LOGIN / LOGOUT / SENSITIVE_DATA (L25-37)
 
-**AuditLog struct** (L40-55): ID, Timestamp, Level, EventType, User, Connection, Database, Query, Duration, Success, Message, Details, ClientIP, UserAgent
+**AuditLog struct** (L39-54): ID, Timestamp, Level, EventType, User, Connection, Database, Query, Duration, Success, Message, Details, ClientIP, UserAgent
 
 **内存缓存**: `logs []AuditLog`, `maxLogs = 10000`
-**持久化**: 每次 `Log()` → `writeToFile()` → 全量 JSON 序列化 → 临时文件 → rename (L196-214)
+**持久化**: 每次 `Log()` → `appendToFile()` → 单条 JSON 序列化 → append 写入 (L189-206)
 
-**已知问题**: 全量序列化 O(n) 性能问题；`truncateQuery` byte 截断对中文有风险
+**已知问题**: 全量序列化 O(n) 性能问题；`truncateQuery` byte 截断对中文有风险（已修复为 rune 级截断 L280-286）
 
 ---
 
-### 2.17 Crypto: crypto.go (L1-116)
+### 2.17 Crypto: crypto.go (L1-119)
 
 **算法**: AES-256-GCM (32字节密钥)
 **密钥存储**: `~/.db-client/.key` (0600权限, Base64编码)
-**密钥初始化**: `initEncryptionKey()` (L16-51) — 读已有 key 或生成新 key
-**加密**: `encryptPassword()` (L53-79) — nonce 随机生成 + Seal + Base64
-**解密**: `decryptPassword()` (L81-116) — Base64 decode → nonce 分离 → Open
+**密钥初始化**: `initEncryptionKey()` (L21-54) — 读已有 key 或生成新 key
+**加密**: `encryptPassword()` (L56-82) — nonce 随机生成 + Seal + Base64
+**解密**: `decryptPassword()` (L84-119) — Base64 decode → nonce 分离 → Open
 
-**已知问题**: `encryptionKey` (L14) 是全局 var，无 sync 保护，存在 race condition
+**已知问题**: `encryptionKey` (L16) 是全局 var，有 `sync.Once` 保护 (L17)，但初始化错误通过 `encryptionErr` (L18) 传播
 
 ---
 
-### 2.18 Config: config.go (L1-119)
+### 2.18 Config: config.go (L1-87)
 
 | 方法 | 行号 | 说明 |
 |------|------|------|
 | `connectionToDBConfig(conn)` | L12-30 | Connection → db.ConnectionConfig 转换（含解密） |
-| `getDriverForConfig(dbConfig)` | L34-59 | pool 获取或创建驱动（double-check locking） |
-| `loadConnections()` | L61-99 | 读取 connections.json |
-| `saveConnections()` | L101-119 | 写入 connections.json (0600权限) |
+| `getDriverForConfig(dbConfig)` | L32-42 | pool 获取或创建驱动（使用 pool.getOrCreate） |
+| `loadConnections()` | L44-69 | 读取 connections.json |
+| `saveConnections()` | L71-87 | 写入 connections.json (0600权限) |
 
 ---
 
-### 2.19 i18n: i18n.go (L1-89)
+### 2.19 i18n: i18n.go (L1-81)
 
-**Go 侧**: `MessageKey` enum (18条), `messages map[string]map[MessageKey]string` (zh/en)
-**方法**: `t(key, lang)` (L69-81), `getCurrentLang()` (L83-89)
+**Go 侧**: `MessageKey` enum (19条), `messages map[string]map[MessageKey]string` (zh/en)
+**方法**: `t(key, lang)` (L69-81), `getCurrentLang()` ~ `GetLanguage()` (app.go:48)
 
 **已知问题**: Go 侧大量硬编码中文未走 i18n
 
@@ -417,18 +414,18 @@ type pooledDriver struct {
 
 ---
 
-### 2.22 Test: test.go (L1-136)
+### 2.22 Test: test.go (L1-121)
 
 | 方法 | 行号 | 签名 | 说明 |
 |------|------|------|------|
 | `RunConnectionTest` | L11-59 | `(config) TestResult` | 单连接测试 |
 | `RunAllTests` | L62-71 | `() []TestResult` | 所有已保存连接测试 |
 | `GetSupportedFeatures` | L74-83 | `() map[string][]string` | 各数据库支持功能列表 |
-| `GetServerInfo` | L86-136 | `(config) map[string]string` | 服务器版本+表数量 |
+| `GetServerInfo` | L86-103 | `(config) map[string]string` | 服务器版本+表数量 |
 
 ---
 
-### 2.23 Types: types.go (L1-106)
+### 2.23 Types: types.go (L1-114)
 
 核心数据结构定义，详见 D03-data-models.md
 
@@ -514,7 +511,7 @@ type DatabaseDriver interface {
 - `UseDatabase()`: 关闭旧连接 → 新建连接到目标库（PG 无 USE 命令）
 - PolarDB/GaussDB 共享此驱动 (`newDriver()` switch L67-68)
 
-### 4.3 MySQL Driver: db/mysql.go (L1-140)
+### 4.3 MySQL Driver: db/mysql.go (L1-141)
 
 - 连接字符串: `%s:%s@tcp(%s:%d)/%s`
 - `UseDatabase()`: `USE {database}` 命令
@@ -565,21 +562,21 @@ type DatabaseDriver interface {
 
 存在两套锁机制:
 
-1. **pool.mu** (pool.go:18): pool 内部 RWMutex，`getOrCreate()` 使用
-2. **App.poolMutex** (app.go:20): App 层级 RWMutex，`query.go`/`data_editor.go`/`transaction.go` 使用
+1. **pool.mu** (pool.go:16): pool 内部 RWMutex，`getOrCreate()` 使用
+2. **App.poolMutex** (app.go:19): App 层级 RWMutex，`query.go`/`data_editor.go`/`transaction.go` 使用
 
 不同代码路径使用不同锁策略:
 
 | 路径 | 使用锁 | 代码位置 |
 |------|--------|----------|
-| `ConnectToDatabase()` | 仅 pool.mu (通过 `getOrCreate`) | connection.go:229 |
-| `redis_api.go` | 仅 pool.mu (通过 `getOrCreate`) | redis_api.go:210 |
-| `ExecuteQuery()` | App.poolMutex + pool.get/set | query.go:24-43 |
-| `ExecuteMultiQuery()` | App.poolMutex + pool.get/set | query.go:113-129 |
-| `EditTableData()` | App.poolMutex + pool.get/set | data_editor.go:66-99 |
-| `BeginTransaction()` | App.poolMutex + pool.get/set | transaction.go:82-97 |
-| `GetExplainPlan()` | App.poolMutex + pool.get/set | query_analyzer.go:110-130 |
-| `getDriverForConfig()` | App.poolMutex + pool.get/set | config.go:34-59 |
+| `ConnectToDatabase()` | 仅 pool.mu (通过 `getOrCreate`) | connection.go:203 |
+| `redis_api.go` | 仅 pool.mu (通过 `getDriverForConfig`) | redis_api.go:125 |
+| `ExecuteQuery()` | App.poolMutex + pool.get/set | query.go:10-12 |
+| `ExecuteMultiQuery()` | App.poolMutex + pool.get/set | query.go:14-16 |
+| `EditTableData()` | App.poolMutex + pool.get/set | data_editor.go:32 |
+| `BeginTransaction()` | App.poolMutex + pool.get/set | transaction.go:88 |
+| `GetExplainPlan()` | App.poolMutex + pool.get/set | query_analyzer.go:95 |
+| `getDriverForConfig()` | App.poolMutex + pool.get/set | config.go:32-42 |
 
 **风险**: 两条路径同时操作可能产生死锁或数据不一致
 
@@ -632,9 +629,9 @@ test.go ← {db, crypto, i18n}
 
 | # | Issue | Location | Impact | Fix |
 |---|-------|----------|--------|-----|
-| 1 | **encryptionKey race condition** | `crypto.go:14` | Multi-goroutine init may corrupt key | Use `sync.Once` |
+| 1 | **encryptionKey race condition** | `crypto.go:16` | Multi-goroutine init may corrupt key | Use `sync.Once`（已修复，L17 `encryptionOnce`） |
 | 2 | **Dual locking inconsistency** | `App.poolMutex` vs `pool.mu` | Deadlock risk, inconsistent locking | Unify to `pool.getOrCreate()` |
-| 3 | **WhereClause SQL injection** | `data_editor.go:255-256,306-307` | Raw `req.WhereClause` concatenated into SQL | Use parameterized queries or sanitize |
+| 3 | **WhereClause SQL injection (已修复)** | `data_editor.go:159,180,217,228` | Raw WhereClause 已被 PrimaryKey 字段替代 | EditRequest 现使用 PrimaryKey (types.go:91) 参数化 WHERE 条件 |
 
 ### P1 — High (Performance/Maintainability)
 
@@ -652,7 +649,7 @@ test.go ← {db, crypto, i18n}
 |---|-------|----------|--------|-----|
 | 9 | **getColumnSuggestions returns empty** | `autocomplete.go:352-359` | Column completion never works | Implement FROM clause parsing |
 | 10 | **i18n incomplete** | Go side hardcoded Chinese | SetLanguage(en) won't change messages | Add all Go messages to i18n map |
-| 11 | **GetSlowQueries stub** | `query_analyzer.go:707-711` | Always returns empty | Implement pg_stat_statements/slow_query_log |
+| 11 | **GetSlowQueries stub** | `query_analyzer.go:300-302` | Always returns empty | Implement pg_stat_statements/slow_query_log |
 | 12 | **Frontend XSS risk** | 57 `innerHTML`/`insertAdjacentHTML` calls | Unsanitized data injection | Use textContent or sanitize |
 
 ### P3 — Low (Improvement)

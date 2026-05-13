@@ -185,3 +185,39 @@ function executeQuery(conn, db, query) {
 - [ ] 审计日志: Go方法内部有 `auditLogger.Log(...)` 调用 (安全相关操作)
 - [ ] 密码解密: 任何使用 `config.SavePassword` 的操作 — Go自动调用 `decryptPassword`
 - [ ] 连接池: 使用 `pool.getOrCreate()` 而非手动锁模式
+
+---
+
+## 9. 契约实施状态追踪
+
+> 本节追踪D10契约中定义的修订项在代码中的实施状态。每项关联D08-migration-plan中的迁移步骤。
+
+### 9.1 核心契约实施状态
+
+| # | 契约项 | 修正设计(2.2/3.2/4.2) | 当前代码状态 | 迁移步骤 | 目标版本 | 状态 |
+|---|--------|----------------------|------------|---------|---------|------|
+| C1 | EditRequestV2 (删除WhereClause) | 强制primaryKey, 参数化SQL | types.go:91-97已使用PrimaryKey, data_editor.go:159使用参数化 | — | v1.0 | 已实施 |
+| C2 | NULL→null | 后端返回null, 前端统一渲染 | query_timeout.go:102-103 返回字符串"NULL" | M1-19/M1-20 | v1.5 | 未实施 |
+| C3 | 行数据Record化 | Array\<Record\<string,any\>\> | [][]interface{} 按列索引访问 | M3-2 | v3.0 | 延后 |
+| C4 | 统一错误模式 | {success, data?, error?, code?} | 各API错误格式不一致(QueryResult.Error/EditResult.Error等) | M3-2 | v3.0 | 延后 |
+| C5 | ExecuteQuery废弃 | 前端强制WithTimeout | app.js:42仍调用无超时版 | M1-11 | v1.5 | 未实施 |
+| C6 | byte[]→string | 所有二进制转UTF-8字符串 | query_timeout.go:104 `string(b)`已实施 | — | v1.0 | 已实施 |
+| C7 | GetConnections()清空密码 | 返回时Password="" | connection.go:26 `safe[i].Password = ""`已实施 | — | v1.0 | 已实施 |
+
+### 9.2 契约实施流程
+
+```
+1. 识别差距: 对照C1-C7状态表
+2. 查找迁移步骤: 在D08-migration-plan中找到对应M#编号
+3. 执行迁移: 按D08中的步骤和验收标准实施
+4. 更新状态: 完成后更新本表"状态"列为"已实施"
+5. 同步文档: 更新D02-feature-design/D06-security/ROADMAP
+```
+
+### 9.3 新增契约项的注册流程
+
+任何新增的接口修订必须:
+1. 在本节9.1表中新增一行, 分配C#编号
+2. 在D08-migration-plan中新增对应迁移步骤M#
+3. 在ROADMAP安全/技术债章节登记
+4. 标注目标版本和验收标准

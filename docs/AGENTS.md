@@ -94,19 +94,20 @@ db-server/
 
 ## Critical Pitfalls
 
-### 1. WhereClause in EditRequest is NOT sanitized (SQL injection)
+### 1. WhereClause in EditRequest — RESOLVED (was SQL injection)
 
-**File**: `data_editor.go:255-256`
-
-`req.WhereClause` is used raw in SQL string: `whereClause = req.WhereClause`. This is a direct SQL injection vector. Must parameterize or reject raw whereClause.
+**Status**: **已修复**. EditRequest (types.go:91) now uses `PrimaryKey` field instead of `WhereClause`. data_editor.go:159/180/217/228 build parameterized WHERE conditions from PrimaryKey.
 
 ```go
-// VULNERABLE: whereClause is raw user input injected into SQL
-whereClause = req.WhereClause  // data_editor.go:256
-query := fmt.Sprintf("UPDATE `%s` SET %s WHERE %s", ...) // data_editor.go:270
+// FIXED: EditRequest now uses PrimaryKey for parameterized WHERE
+type EditRequest struct {
+    Operation  string                 `json:"operation"`
+    Table      string                 `json:"table"`
+    Database   string                 `json:"database"`
+    Data       map[string]interface{} `json:"data,omitempty"`
+    PrimaryKey map[string]interface{} `json:"primaryKey,omitempty"` // replaces WhereClause
+}
 ```
-
-**Fix**: Parse WhereClause into parameterized conditions, or force frontend to always send PrimaryKey instead.
 
 ### 2. Frontend uses insertAdjacentHTML/innerHTML with unsanitized data (XSS)
 
@@ -116,37 +117,25 @@ Extensive use of `innerHTML` and `insertAdjacentHTML` with data from server resp
 
 **Fix**: Replace with `textContent` or `createElement` + `setAttribute`.
 
-### 3. encryptionKey global has no sync.Once protection (race condition)
+### 3. encryptionKey now has sync.Once protection — RESOLVED
 
-**File**: `crypto.go:14,16-19`
-
-`var encryptionKey []byte` is a global with nil-check in `initEncryptionKey()`. Two concurrent calls can both see `nil`, generate different keys, and one overwrites the other's key file. `AuditLogger` correctly uses `sync.Once` (audit.go:67-68) but `encryptionKey` does not.
+**Status**: **已修复**. `crypto.go:15-17` now uses `var encryptionOnce sync.Once` alongside `var encryptionKey []byte`. The race condition has been resolved.
 
 **Fix**: Use `sync.Once` for `initEncryptionKey`, like `auditLoggerOnce`.
 
-### 4. ExecuteQuery has no timeout (blocks UI indefinitely)
+### 4. ExecuteQuery now delegates to WithTimeout — RESOLVED
 
-**File**: `query.go:10-97`
+**Status**: **已修复**. `query.go:10-11` now delegates `ExecuteQuery` to `ExecuteQueryWithTimeout` with default `QueryOptions{}` (30s timeout). `ExecuteMultiQuery` similarly delegates at query.go:14-15. The old direct implementation with no timeout has been removed.
 
-`ExecuteQuery` uses `a.ctx` with no deadline. A long-running query will block the Wails IPC call, freezing the WebView UI. `ExecuteQueryWithTimeout` exists in `query_timeout.go` with configurable timeout (default 30s).
+### 5. globalTransactions cleanup implemented
 
-**Fix**: Always call `ExecuteQueryWithTimeout` from frontend; deprecate or remove `ExecuteQuery`.
+**File**: `transaction.go:57-69`
 
-### 5. globalTransactions never auto-cleaned (memory leak)
+`cleanupStaleTransactions()` exists at transaction.go:69 and `startStaleTransactionCleanup()` at transaction.go:57. However, `startStaleTransactionCleanup` is not called automatically in `startup()`. Abandoned transactions still accumulate until manual cleanup.
 
-**File**: `transaction.go:51-53`
+### 6. Dual pool locking pattern — RESOLVED
 
-`globalTransactions` map accumulates transactions. `cleanupStaleTransactions()` exists (transaction.go:57-68) but is never called automatically. Abandoned transactions (e.g., user closes tab) stay forever.
-
-**Fix**: Call `cleanupStaleTransactions()` periodically (e.g., in App startup or on a timer).
-
-### 6. Dual pool locking pattern (poolMutex + pool.mu)
-
-**Files**: `data_editor.go:66-99`, `query.go:24-43`, `transaction.go:82-98`
-
-Some code manually does double-check locking with `a.poolMutex` + `a.pool.get/set`, while `pool.go` already has `getOrCreate()` with its own `pool.mu`. This creates two lock layers and risk of inconsistency. `redis_api.go:210-213` and `connection.go:229` correctly use `pool.getOrCreate`.
-
-**Fix**: Replace all manual double-check patterns with `a.pool.getOrCreate(key, createFunc)`.
+**Status**: **已修复**. All pool access now uses `getDriverForConfig` (config.go:32) which internally uses `pool.getOrCreate`. The manual double-check patterns with `poolMutex` have been removed from query.go, data_editor.go, and transaction.go.
 
 ### 7. Redis type assertions can panic
 
@@ -156,21 +145,13 @@ Some code manually does double-check locking with `a.poolMutex` + `a.pool.get/se
 
 **Fix**: Use safe type switch with default case: `switch v := value.(type) { case []string: ... default: ... }`.
 
-### 8. Audit writeToFile serializes entire log array on every event
+### 8. Audit writeToFile now uses append-only — RESOLVED
 
-**File**: `audit.go:196-213`
+**Status**: **已修复**. `audit.go:189` `appendToFile()` uses incremental append instead of full-file serialization. The old O(n) per event approach has been replaced.
 
-Every `Log()` call triggers `json.MarshalIndent(al.logs, "", "  ")` + write entire file. With 10000 max logs, this becomes O(n) per event, causing disk I/O bottleneck under load.
+### 9. truncateQuery now uses rune-based truncation — RESOLVED
 
-**Fix**: Change to append-only write: serialize only the new entry, append to file with newline separator.
-
-### 9. truncateQuery truncates by bytes not chars (breaks Chinese text)
-
-**File**: `audit.go:296-301`
-
-`len(query)` counts bytes, `query[:maxLen]` slices bytes. Multi-byte Chinese characters get cut mid-character, producing invalid UTF-8. Same bug exists for identifier length in `sanitizeIdentifier` (schema.go:224).
-
-**Fix**: Use `utf8.RuneCountInString()` for length and slice by rune index, not byte index.
+**Status**: **已修复**. `audit.go:280-285` now uses `utf8.RuneCountInString()` for length and `[]rune` slicing, correctly handling Chinese and other multi-byte characters.
 
 ### 10. MySQL driver ignores SSLMode (plaintext credentials over network)
 
@@ -244,11 +225,40 @@ Three-step requirement: (1) implement `DatabaseDriver` interface in `db/`, (2) r
 | `docs/02-architecture.md` | System architecture diagrams, IPC flow, module boundaries, concurrency model |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions (Connection, QueryResult, EditRequest, etc.) with field docs |
-| `docs/04-api-reference.md` | Full Wails bindings API (52 implemented + 20 planned = 72 total) with signatures, params, error handling |
+| `docs/04-api-reference.md` | Full Wails bindings API (69 implemented + 3 planned audit = 72 total) with signatures, params, error handling |
 | `docs/05-ui-pages.md` | UI layout, panels, components, modal list (8 modal + 2 panel), modular refactor plan |
 | `docs/06-security.md` | AES-256-GCM encryption, SQL injection defense, audit logging, known vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, CGO, contributing, design→implementation traceability |
 | `docs/ui-01-design-system.md` | Terminal Noir design system: color tokens (2 themes), typography, spacing, motion, DPI scaling |
 | `docs/ui-02-visual-spec.md` | 15 pixel-level visual specs (panels, dialogs, Redis browser, query history, about) |
 | `docs/ui-03-interaction-flow.md` | 18 interaction flows (DDL confirm, import, Monaco fallback, copy-paste, edge cases) |
-| `docs/10-interface-contract.md` | Frontend-backend interface contracts, type mapping, EditRequest V2 (PrimaryKey), Wails IPC perf |
+| `docs/10-interface-contract.md` | Frontend-backend interface contracts, type mapping, EditRequest V2 (PrimaryKey), Wails IPC perf, 契约实施状态追踪(C1-C7) |
+| `docs/08-migration-plan.md` | 设计→实施迁移计划: 3阶段(M1-M3), 37个迁移步骤, 安全修复追踪, 契约→迁移映射 |
+| `docs/09-test-strategy.md` | 测试分层策略, P0/P1模块测试计划(68+50测试), Mock Driver设计, 覆盖率路线图(<30%→>80%) |
+| `docs/11-release-process.md` | 版本号规范, 分支策略, 发布检查清单(代码/安全/功能/构建/文档5类) |
+| `ROADMAP.md` | 项目路线图: 完成度同步(代码源关联), 安全问题(SEC-001~010), 技术债, 版本规划(v1.5/v2.0/v3.0) |
+
+---
+
+## 文档闭环指引
+
+> 所有设计文档(D01-D11/U01-U03)与代码实现之间必须可追踪。闭环原则: **设计→契约→迁移→测试→发布**。
+
+### 闭环流程
+
+```
+1. 需求定义 → D02-feature-design (模块分解+追踪矩阵)
+2. 接口契约 → D10-interface-contract (契约实施状态C1-C7)
+3. 迁移计划 → D08-migration-plan (37步骤M1-M3, 关联契约项)
+4. 测试验证 → D09-test-strategy (P0/P1覆盖, 契约关联测试)
+5. 发布上线 → D11-release-process (检查清单, 安全/契约验证)
+6. 状态同步 → ROADMAP.md (完成度+问题追踪)
+```
+
+### 闭环断裂检测
+
+修改任何代码时, 检查:
+- 该改动是否涉及D10中的契约项? → 更新9.1状态表
+- 该改动是否有D08迁移步骤? → 更新迁移步骤状态
+- 该改动是否影响ROADMAP完成度? → 更新ROADMAP
+- 该改动是否需要测试? → 在D09中补充测试用例
