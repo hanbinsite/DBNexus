@@ -9,25 +9,18 @@ import (
 )
 
 const (
-	DefaultQueryTimeout = 30  // 默认查询超时时间（秒）
-	MaxQueryTimeout     = 300 // 最大查询超时时间（秒）
-	MinQueryTimeout     = 1   // 最小查询超时时间（秒）
+	DefaultQueryTimeout = 30
+	MaxQueryTimeout     = 300
+	MinQueryTimeout     = 1
 )
 
 var (
 	ErrQueryTimeout = errors.New("查询超时")
 )
 
-// QueryOptions 查询选项
-type QueryOptions struct {
-	Timeout int // 超时时间（秒），0表示使用默认值
-}
-
-// ExecuteQueryWithTimeout 执行带超时控制的查询
 func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query string, options QueryOptions) QueryResult {
 	startTime := time.Now()
 
-	// 设置超时时间
 	timeoutSeconds := options.Timeout
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = DefaultQueryTimeout
@@ -39,47 +32,22 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 		timeoutSeconds = MinQueryTimeout
 	}
 
-	// 创建带超时的 context
 	ctx, cancel := context.WithTimeout(a.ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
-
-	// 解密密码
-	if config.SavePassword && config.Password != "" {
-		decrypted, err := decryptPassword(config.Password)
-		if err == nil {
-			config.Password = decrypted
-		}
-	}
 
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	key := buildKey(dbConfig)
-	a.poolMutex.RLock()
-	pooledDriver, exists := a.pool.get(key)
-	a.poolMutex.RUnlock()
-
-	if !exists {
-		a.poolMutex.Lock()
-		if pooledDriver, exists = a.pool.get(key); !exists {
-			newDriver, err := a.driverManager.Connect(dbConfig)
-			if err != nil {
-				a.poolMutex.Unlock()
-				return QueryResult{
-					Error:    fmt.Sprintf("连接失败: %v", err),
-					Duration: time.Since(startTime).String(),
-				}
-			}
-			a.pool.set(key, newDriver)
-			pooledDriver, _ = a.pool.get(key)
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return QueryResult{
+			Error:    fmt.Sprintf("连接失败: %v", err),
+			Duration: time.Since(startTime).String(),
 		}
-		a.poolMutex.Unlock()
 	}
 
-	// 使用带超时的 context 执行查询
-	rows, err := pooledDriver.driver.Query(ctx, query)
+	rows, err := driver.Query(ctx, query)
 	if err != nil {
-		// 检查是否是超时错误
 		if errors.Is(err, context.DeadlineExceeded) {
 			return QueryResult{
 				Error:    fmt.Sprintf("查询超时（%d秒），请优化查询或增加超时时间。\n\n💡 提示：\n- 使用 LIMIT 限制返回行数\n- 添加适当的索引\n- 拆分复杂查询", timeoutSeconds),
@@ -109,7 +77,6 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 	}
 
 	for rows.Next() {
-		// 检查 context 是否已取消（防止读取过多数据）
 		select {
 		case <-ctx.Done():
 			return QueryResult{
@@ -133,7 +100,7 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 		row := make([]interface{}, len(columns))
 		for i, v := range values {
 			if v == nil {
-				row[i] = "NULL"
+				row[i] = nil
 			} else if b, ok := v.([]byte); ok {
 				row[i] = string(b)
 			} else {
@@ -151,11 +118,9 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 	}
 }
 
-// ExecuteMultiQueryWithTimeout 执行带超时控制的多查询
 func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, query string, options QueryOptions) MultiQueryResult {
 	startTime := time.Now()
 
-	// 设置超时时间
 	timeoutSeconds := options.Timeout
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = DefaultQueryTimeout
@@ -164,52 +129,27 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 		timeoutSeconds = MaxQueryTimeout
 	}
 
-	// 创建带超时的 context
 	ctx, cancel := context.WithTimeout(a.ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
-
-	if config.SavePassword && config.Password != "" {
-		decrypted, err := decryptPassword(config.Password)
-		if err == nil {
-			config.Password = decrypted
-		}
-	}
 
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	key := buildKey(dbConfig)
-	a.poolMutex.RLock()
-	pooled, exists := a.pool.get(key)
-	a.poolMutex.RUnlock()
-
-	if !exists {
-		a.poolMutex.Lock()
-		if pooled, exists = a.pool.get(key); !exists {
-			newDriver, err := a.driverManager.Connect(dbConfig)
-			if err != nil {
-				a.poolMutex.Unlock()
-				return MultiQueryResult{
-					TotalDuration: time.Since(startTime).String(),
-				}
-			}
-			a.pool.set(key, newDriver)
-			pooled, _ = a.pool.get(key)
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return MultiQueryResult{
+			TotalDuration: time.Since(startTime).String(),
 		}
-		a.poolMutex.Unlock()
 	}
 
-	// 分割查询
 	queries := splitQueries(query)
 
 	var results []SingleQueryResult
 	var totalDuration time.Duration
 
 	for _, q := range queries {
-		// 检查总超时
 		select {
 		case <-ctx.Done():
-			// 超时，返回已执行的结果
 			return MultiQueryResult{
 				Results:       results,
 				TotalCount:    len(results),
@@ -233,7 +173,6 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 			Status: "success",
 		}
 
-		// 检查是否是 SELECT 查询
 		upperQuery := strings.ToUpper(strings.TrimSpace(q))
 		isSelect := strings.HasPrefix(upperQuery, "SELECT") ||
 			strings.HasPrefix(upperQuery, "SHOW") ||
@@ -242,7 +181,7 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 			strings.HasPrefix(upperQuery, "WITH")
 
 		if isSelect {
-			rows, err := pooled.driver.Query(ctx, q)
+			rows, err := driver.Query(ctx, q)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					result.Error = fmt.Sprintf("查询超时（%d秒）", timeoutSeconds)
@@ -284,8 +223,7 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 			}
 			rows.Close()
 		} else {
-			// Non-SELECT: INSERT, UPDATE, DELETE, etc.
-			sqlResult, err := pooled.driver.Exec(ctx, q)
+			sqlResult, err := driver.Exec(ctx, q)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					result.Error = fmt.Sprintf("执行超时（%d秒）", timeoutSeconds)
@@ -321,7 +259,6 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 	}
 }
 
-// 辅助函数
 func countSuccess(results []SingleQueryResult) int {
 	count := 0
 	for _, r := range results {

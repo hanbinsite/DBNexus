@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// AutoCompleteType 自动补全类型
 type AutoCompleteType string
 
 const (
@@ -18,7 +17,6 @@ const (
 	AutoCompleteDatabase AutoCompleteType = "database"
 )
 
-// AutoCompleteItem 自动补全项
 type AutoCompleteItem struct {
 	Label         string           `json:"label"`
 	Kind          AutoCompleteType `json:"kind"`
@@ -28,21 +26,18 @@ type AutoCompleteItem struct {
 	SortText      string           `json:"sortText"`
 }
 
-// AutoCompleteResult 自动补全结果
 type AutoCompleteResult struct {
 	Suggestions []AutoCompleteItem `json:"suggestions"`
 	From        int                `json:"from"`
 	To          int                `json:"to"`
 }
 
-// SQLKeyword SQL 关键字
 type SQLKeyword struct {
 	Keyword string
 	Detail  string
 }
 
 var (
-	// SQL 关键字列表
 	sqlKeywords = []SQLKeyword{
 		{"SELECT", "从数据库中选取数据"},
 		{"FROM", "指定要查询的表"},
@@ -116,9 +111,7 @@ var (
 		{"RECURSIVE", "递归"},
 	}
 
-	// SQL 函数列表
 	sqlFunctions = []SQLKeyword{
-		// 字符串函数
 		{"CONCAT", "连接字符串"},
 		{"SUBSTRING", "截取子串"},
 		{"LENGTH", "字符串长度"},
@@ -136,7 +129,6 @@ var (
 		{"INSTR", "查找子串位置"},
 		{"LOCATE", "定位子串"},
 
-		// 数值函数
 		{"ABS", "绝对值"},
 		{"CEIL", "向上取整"},
 		{"FLOOR", "向下取整"},
@@ -151,7 +143,6 @@ var (
 		{"LOG", "对数"},
 		{"LOG10", "以10为底的对数"},
 
-		// 日期时间函数
 		{"NOW", "当前日期时间"},
 		{"CURDATE", "当前日期"},
 		{"CURTIME", "当前时间"},
@@ -169,7 +160,6 @@ var (
 		{"DATEDIFF", "日期差"},
 		{"TIMESTAMPDIFF", "时间戳差"},
 
-		// 聚合函数
 		{"COUNT", "计数"},
 		{"SUM", "求和"},
 		{"AVG", "平均值"},
@@ -177,24 +167,20 @@ var (
 		{"MIN", "最小值"},
 		{"GROUP_CONCAT", "分组连接"},
 
-		// 控制流函数
 		{"IF", "条件判断"},
 		{"IFNULL", "空值处理"},
 		{"NULLIF", "空值判断"},
 		{"COALESCE", "返回第一个非空值"},
 
-		// 类型转换函数
 		{"CAST", "类型转换"},
 		{"CONVERT", "类型转换"},
 
-		// 系统函数
 		{"USER", "当前用户"},
 		{"DATABASE", "当前数据库"},
 		{"VERSION", "数据库版本"},
 		{"LAST_INSERT_ID", "最后插入ID"},
 	}
 
-	// MySQL 特有函数
 	mysqlFunctions = []SQLKeyword{
 		{"IFNULL", "空值替换"},
 		{"GROUP_CONCAT", "分组连接字符串"},
@@ -206,7 +192,6 @@ var (
 		{"REGEXP", "正则匹配"},
 	}
 
-	// PostgreSQL 特有函数
 	postgresFunctions = []SQLKeyword{
 		{"STRING_AGG", "字符串聚合"},
 		{"ARRAY_AGG", "数组聚合"},
@@ -222,23 +207,18 @@ var (
 	}
 )
 
-// GetAutoCompleteSuggestions 获取自动补全建议
 func (a *App) GetAutoCompleteSuggestions(config Connection, database string, query string, position int) AutoCompleteResult {
 	ctx := context.Background()
 
-	// 分析当前光标位置的上下文
 	word, startPos, endPos := extractCurrentWord(query, position)
 	context := analyzeQueryContext(query, startPos)
 
 	var suggestions []AutoCompleteItem
 
-	// 根据上下文提供不同类型的补全
 	switch context {
 	case "FROM", "JOIN", "INTO", "UPDATE", "TABLE":
-		// 表名补全
 		suggestions = a.getTableSuggestions(ctx, config, database, word)
 	case "SELECT", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "SET":
-		// 列名或函数补全
 		columnSuggestions := a.getColumnSuggestions(ctx, config, database, word)
 		functionSuggestions := a.getFunctionSuggestions(word, config.Type)
 		keywordSuggestions := a.getKeywordSuggestions(word)
@@ -246,17 +226,14 @@ func (a *App) GetAutoCompleteSuggestions(config Connection, database string, que
 		suggestions = append(suggestions, functionSuggestions...)
 		suggestions = append(suggestions, keywordSuggestions...)
 	case "USE", "DATABASE":
-		// 数据库名补全
 		suggestions = a.getDatabaseSuggestions(ctx, config, word)
 	default:
-		// 默认：关键字和函数补全
 		keywordSuggestions := a.getKeywordSuggestions(word)
 		functionSuggestions := a.getFunctionSuggestions(word, config.Type)
 		suggestions = append(suggestions, keywordSuggestions...)
 		suggestions = append(suggestions, functionSuggestions...)
 	}
 
-	// 过滤和排序
 	suggestions = filterAndSortSuggestions(suggestions, word)
 
 	return AutoCompleteResult{
@@ -266,19 +243,16 @@ func (a *App) GetAutoCompleteSuggestions(config Connection, database string, que
 	}
 }
 
-// extractCurrentWord 提取当前光标位置的单词
 func extractCurrentWord(query string, position int) (string, int, int) {
 	if position < 0 || position > len(query) {
 		return "", 0, 0
 	}
 
-	// 向前查找单词开始
 	start := position
 	for start > 0 && isIdentifierChar(query[start-1]) {
 		start--
 	}
 
-	// 向后查找单词结束
 	end := position
 	for end < len(query) && isIdentifierChar(query[end]) {
 		end++
@@ -287,24 +261,18 @@ func extractCurrentWord(query string, position int) (string, int, int) {
 	return query[start:end], start, end
 }
 
-// isIdentifierChar 判断是否是标识符字符
 func isIdentifierChar(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
-// analyzeQueryContext 分析查询上下文
 func analyzeQueryContext(query string, position int) string {
-	// 获取光标前的文本
 	textBefore := strings.ToUpper(query[:position])
 
-	// 检查最后一个关键字
 	keywords := []string{"FROM", "JOIN", "INTO", "UPDATE", "SELECT", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "SET", "USE", "TABLE", "DATABASE"}
 
 	for _, keyword := range keywords {
-		// 查找关键字的位置
 		idx := strings.LastIndex(textBefore, keyword)
 		if idx != -1 {
-			// 检查关键字后是否有其他关键字
 			afterKeyword := strings.TrimSpace(textBefore[idx+len(keyword):])
 			hasOtherKeyword := false
 			for _, otherKeyword := range keywords {
@@ -322,11 +290,9 @@ func analyzeQueryContext(query string, position int) string {
 	return ""
 }
 
-// getTableSuggestions 获取表名建议
 func (a *App) getTableSuggestions(ctx context.Context, config Connection, database string, prefix string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
-	// 获取表列表
 	tables, err := a.GetTables(config, database)
 	if err != nil {
 		return items
@@ -348,17 +314,37 @@ func (a *App) getTableSuggestions(ctx context.Context, config Connection, databa
 	return items
 }
 
-// getColumnSuggestions 获取列名建议
 func (a *App) getColumnSuggestions(ctx context.Context, config Connection, database string, prefix string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
-	// 这里应该获取最近查询的表，简化版本返回空
-	// 完整版本需要分析 FROM 子句中的表
+	tables, err := a.GetTables(config, database)
+	if err != nil {
+		return items
+	}
+
+	prefix = strings.ToLower(prefix)
+
+	for _, table := range tables {
+		columns, err := a.GetTableColumns(config, database, table.Name)
+		if err != nil {
+			continue
+		}
+		for _, col := range columns {
+			if prefix == "" || strings.HasPrefix(strings.ToLower(col.Name), prefix) {
+				items = append(items, AutoCompleteItem{
+					Label:      col.Name,
+					Kind:       AutoCompleteColumn,
+					Detail:     fmt.Sprintf("%s (%s.%s)", col.Type, table.Name, col.Name),
+					InsertText: col.Name,
+					SortText:   "1" + col.Name,
+				})
+			}
+		}
+	}
 
 	return items
 }
 
-// getDatabaseSuggestions 获取数据库名建议
 func (a *App) getDatabaseSuggestions(ctx context.Context, config Connection, prefix string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
@@ -383,7 +369,6 @@ func (a *App) getDatabaseSuggestions(ctx context.Context, config Connection, pre
 	return items
 }
 
-// getKeywordSuggestions 获取关键字建议
 func (a *App) getKeywordSuggestions(prefix string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
@@ -404,11 +389,9 @@ func (a *App) getKeywordSuggestions(prefix string) []AutoCompleteItem {
 	return items
 }
 
-// getFunctionSuggestions 获取函数建议
 func (a *App) getFunctionSuggestions(prefix string, dbType string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
-	// 通用函数
 	allFunctions := append(sqlFunctions, getDBSpecificFunctions(dbType)...)
 
 	prefix = strings.ToUpper(prefix)
@@ -428,7 +411,6 @@ func (a *App) getFunctionSuggestions(prefix string, dbType string) []AutoComplet
 	return items
 }
 
-// getDBSpecificFunctions 获取数据库特定函数
 func getDBSpecificFunctions(dbType string) []SQLKeyword {
 	switch dbType {
 	case "mysql":
@@ -440,13 +422,11 @@ func getDBSpecificFunctions(dbType string) []SQLKeyword {
 	}
 }
 
-// filterAndSortSuggestions 过滤和排序建议
 func filterAndSortSuggestions(suggestions []AutoCompleteItem, prefix string) []AutoCompleteItem {
 	if prefix == "" {
 		return suggestions
 	}
 
-	// 过滤
 	var filtered []AutoCompleteItem
 	prefix = strings.ToLower(prefix)
 	for _, item := range suggestions {
@@ -455,12 +435,10 @@ func filterAndSortSuggestions(suggestions []AutoCompleteItem, prefix string) []A
 		}
 	}
 
-	// 排序
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].SortText < filtered[j].SortText
 	})
 
-	// 限制数量
 	if len(filtered) > 50 {
 		filtered = filtered[:50]
 	}
@@ -468,11 +446,9 @@ func filterAndSortSuggestions(suggestions []AutoCompleteItem, prefix string) []A
 	return filtered
 }
 
-// GetTableColumnsForAutoComplete 获取表列信息用于自动补全
 func (a *App) GetTableColumnsForAutoComplete(config Connection, database string, tableName string) ([]AutoCompleteItem, error) {
 	var items []AutoCompleteItem
 
-	// 获取表结构
 	columns, err := a.GetTableColumns(config, database, tableName)
 	if err != nil {
 		return items, err
@@ -500,14 +476,10 @@ func (a *App) GetTableColumnsForAutoComplete(config Connection, database string,
 	return items, nil
 }
 
-// GetQuickSuggestions 快速获取补全建议（不依赖数据库连接）
 func (a *App) GetQuickSuggestions(prefix string) []AutoCompleteItem {
 	var items []AutoCompleteItem
 
-	// 关键字
 	items = append(items, a.getKeywordSuggestions(prefix)...)
-
-	// 函数
 	items = append(items, a.getFunctionSuggestions(prefix, "")...)
 
 	return items

@@ -8,20 +8,28 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// MySQLDriver implements the DatabaseDriver interface for MySQL
 type MySQLDriver struct {
 	sqlDB *sql.DB
 }
 
-// NewMySQLDriver creates a new MySQLDriver
 func NewMySQLDriver() DatabaseDriver {
 	return &MySQLDriver{}
 }
 
-// Connect establishes a connection to MySQL
 func (d *MySQLDriver) Connect(config ConnectionConfig) error {
 	connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 		config.Username, config.Password, config.Host, config.Port, config.Database)
+
+	if config.SSLMode != "" {
+		switch config.SSLMode {
+		case "disabled":
+			connStr += "?tls=false"
+		case "preferred":
+			connStr += "?tls=preferred"
+		case "required", "verify-ca", "verify-full":
+			connStr += "?tls=true"
+		}
+	}
 
 	sqlDB, err := sql.Open("mysql", connStr)
 	if err != nil {
@@ -32,13 +40,11 @@ func (d *MySQLDriver) Connect(config ConnectionConfig) error {
 	return nil
 }
 
-// UseDatabase switches the current database context
 func (d *MySQLDriver) UseDatabase(ctx context.Context, database string) error {
 	_, err := d.Exec(ctx, fmt.Sprintf("USE `%s`", database))
 	return err
 }
 
-// Close closes the MySQL connection
 func (d *MySQLDriver) Close() error {
 	if d.sqlDB != nil {
 		return d.sqlDB.Close()
@@ -46,22 +52,18 @@ func (d *MySQLDriver) Close() error {
 	return nil
 }
 
-// Ping tests the MySQL connection
 func (d *MySQLDriver) Ping(ctx context.Context) error {
 	return d.sqlDB.PingContext(ctx)
 }
 
-// Query executes a query that returns rows
 func (d *MySQLDriver) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	return d.sqlDB.QueryContext(ctx, query, args...)
 }
 
-// Exec executes a query that doesn't return rows
 func (d *MySQLDriver) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	return d.sqlDB.ExecContext(ctx, query, args...)
 }
 
-// GetTables returns a list of tables in MySQL
 func (d *MySQLDriver) GetTables(ctx context.Context) ([]string, error) {
 	query := "SHOW TABLES"
 	rows, err := d.Query(ctx, query)
@@ -82,9 +84,8 @@ func (d *MySQLDriver) GetTables(ctx context.Context) ([]string, error) {
 	return tables, nil
 }
 
-// GetTableStructure returns the structure of a MySQL table
 func (d *MySQLDriver) GetTableStructure(ctx context.Context, tableName string) ([]ColumnInfo, error) {
-	query := "DESCRIBE " + tableName
+	query := "DESCRIBE `" + tableName + "`"
 	rows, err := d.Query(ctx, query)
 	if err != nil {
 		return nil, err

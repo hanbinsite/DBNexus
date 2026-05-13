@@ -175,32 +175,38 @@ func (d *RedisDriver) GetRedisKeyInfo(ctx context.Context, key string) (*RedisKe
 
 	switch keyType {
 	case "string":
-		value, err = d.client.Get(ctx, key).Result()
+		strVal, err2 := d.client.Get(ctx, key).Result()
+		value, err = strVal, err2
 		size = 1
 	case "list":
-		value, err = d.client.LRange(ctx, key, 0, -1).Result()
-		if value != nil {
-			size = int64(len(value.([]string)))
+		listVal, err2 := d.client.LRange(ctx, key, 0, -1).Result()
+		value, err = listVal, err2
+		if err == nil {
+			size = int64(len(listVal))
 		}
 	case "set":
-		value, err = d.client.SMembers(ctx, key).Result()
-		if value != nil {
-			size = int64(len(value.([]string)))
+		setVal, err2 := d.client.SMembers(ctx, key).Result()
+		value, err = setVal, err2
+		if err == nil {
+			size = int64(len(setVal))
 		}
 	case "zset":
-		value, err = d.client.ZRangeWithScores(ctx, key, 0, -1).Result()
-		if value != nil {
-			size = int64(len(value.([]redis.Z)))
+		zsetVal, err2 := d.client.ZRangeWithScores(ctx, key, 0, -1).Result()
+		value, err = zsetVal, err2
+		if err == nil {
+			size = int64(len(zsetVal))
 		}
 	case "hash":
-		value, err = d.client.HGetAll(ctx, key).Result()
-		if value != nil {
-			size = int64(len(value.(map[string]string)))
+		hashVal, err2 := d.client.HGetAll(ctx, key).Result()
+		value, err = hashVal, err2
+		if err == nil {
+			size = int64(len(hashVal))
 		}
 	case "stream":
-		value, err = d.client.XRange(ctx, key, "-", "+").Result()
-		if value != nil {
-			size = int64(len(value.([]redis.XMessage)))
+		streamVal, err2 := d.client.XRange(ctx, key, "-", "+").Result()
+		value, err = streamVal, err2
+		if err == nil {
+			size = int64(len(streamVal))
 		}
 	default:
 		return nil, fmt.Errorf("unsupported key type: %s", keyType)

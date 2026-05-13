@@ -12,7 +12,6 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// ExportFormat 导出格式
 type ExportFormat string
 
 const (
@@ -22,7 +21,6 @@ const (
 	ExportSQL   ExportFormat = "sql"
 )
 
-// ExportRequest 导出请求
 type ExportRequest struct {
 	Format   ExportFormat `json:"format"`
 	FileName string       `json:"fileName"`
@@ -33,7 +31,6 @@ type ExportRequest struct {
 	Offset   int          `json:"offset,omitempty"`
 }
 
-// ExportResult 导出结果
 type ExportResult struct {
 	Success   bool   `json:"success"`
 	FileName  string `json:"fileName"`
@@ -43,11 +40,9 @@ type ExportResult struct {
 	FilePath  string `json:"filePath,omitempty"`
 }
 
-// ExportData 导出数据
 func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 	auditLogger := GetAuditLogger()
 
-	// 验证请求
 	if req.Format == "" {
 		return ExportResult{
 			Success: false,
@@ -60,7 +55,6 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 		req.FileName = fmt.Sprintf("export_%s", time.Now().Format("20060102_150405"))
 	}
 
-	// 执行查询获取数据
 	var query string
 	if req.Query != "" {
 		query = req.Query
@@ -81,7 +75,6 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 		}
 	}
 
-	// 执行查询
 	result := a.ExecuteQuery(config, req.Database, query)
 	if result.Error != "" {
 		return ExportResult{
@@ -91,15 +84,13 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 		}
 	}
 
-	// 确定导出路径
 	homeDir, _ := os.UserHomeDir()
 	exportDir := filepath.Join(homeDir, ".db-client", "exports")
-	os.MkdirAll(exportDir, 0755)
+	os.MkdirAll(exportDir, 0700)
 
 	fileName := fmt.Sprintf("%s.%s", req.FileName, req.Format)
 	filePath := filepath.Join(exportDir, fileName)
 
-	// 根据格式导出
 	var err error
 	switch req.Format {
 	case ExportCSV:
@@ -134,7 +125,6 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 		}
 	}
 
-	// 记录审计日志
 	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
 		fmt.Sprintf("导出数据成功: %s", fileName),
 		map[string]interface{}{
@@ -153,7 +143,6 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 	}
 }
 
-// exportToCSV 导出为 CSV
 func (a *App) exportToCSV(result QueryResult, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -164,12 +153,10 @@ func (a *App) exportToCSV(result QueryResult, filePath string) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// 写入表头
 	if err := writer.Write(result.Columns); err != nil {
 		return err
 	}
 
-	// 写入数据行
 	for _, row := range result.Rows {
 		var record []string
 		for _, value := range row {
@@ -183,7 +170,6 @@ func (a *App) exportToCSV(result QueryResult, filePath string) error {
 	return nil
 }
 
-// exportToJSON 导出为 JSON
 func (a *App) exportToJSON(result QueryResult, filePath string) error {
 	var data []map[string]interface{}
 
@@ -200,23 +186,20 @@ func (a *App) exportToJSON(result QueryResult, filePath string) error {
 		return err
 	}
 
-	return os.WriteFile(filePath, jsonData, 0644)
+	return os.WriteFile(filePath, jsonData, 0600)
 }
 
-// exportToExcel 导出为 Excel
 func (a *App) exportToExcel(result QueryResult, filePath string) error {
 	f := excelize.NewFile()
 	defer f.Close()
 
 	sheet := "Sheet1"
 
-	// 写入表头
 	for i, col := range result.Columns {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, col)
 	}
 
-	// 写入数据
 	for rowIdx, row := range result.Rows {
 		for colIdx, value := range row {
 			cell, _ := excelize.CoordinatesToCellName(colIdx+1, rowIdx+2)
@@ -224,7 +207,6 @@ func (a *App) exportToExcel(result QueryResult, filePath string) error {
 		}
 	}
 
-	// 自动调整列宽
 	for i := range result.Columns {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		f.SetColWidth(sheet, col, col, 15)
@@ -233,7 +215,6 @@ func (a *App) exportToExcel(result QueryResult, filePath string) error {
 	return f.SaveAs(filePath)
 }
 
-// exportToSQL 导出为 SQL INSERT 语句
 func (a *App) exportToSQL(result QueryResult, filePath string, tableName string) error {
 	if tableName == "" {
 		tableName = "table_name"
@@ -258,10 +239,9 @@ func (a *App) exportToSQL(result QueryResult, filePath string, tableName string)
 		sqlBuilder.WriteString(sql)
 	}
 
-	return os.WriteFile(filePath, []byte(sqlBuilder.String()), 0644)
+	return os.WriteFile(filePath, []byte(sqlBuilder.String()), 0600)
 }
 
-// ImportRequest 导入请求
 type ImportRequest struct {
 	Format   ExportFormat `json:"format"`
 	FileName string       `json:"fileName"`
@@ -269,7 +249,6 @@ type ImportRequest struct {
 	Database string       `json:"database"`
 }
 
-// ImportResult 导入结果
 type ImportResult struct {
 	Success      bool   `json:"success"`
 	RowsImported int    `json:"rowsImported"`
@@ -277,11 +256,9 @@ type ImportResult struct {
 	Error        string `json:"error,omitempty"`
 }
 
-// ImportData 导入数据
 func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 	auditLogger := GetAuditLogger()
 
-	// 验证请求
 	if req.FileName == "" {
 		return ImportResult{
 			Success: false,
@@ -298,12 +275,19 @@ func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 		}
 	}
 
-	// 确定文件路径
 	homeDir, _ := os.UserHomeDir()
 	importDir := filepath.Join(homeDir, ".db-client", "imports")
-	filePath := filepath.Join(importDir, req.FileName)
+	os.MkdirAll(importDir, 0700)
 
-	// 读取文件
+	baseName := filepath.Base(req.FileName)
+	if baseName != req.FileName || strings.Contains(req.FileName, "..") {
+		return ImportResult{
+			Success: false,
+			Message: "无效的文件名",
+		}
+	}
+	filePath := filepath.Join(importDir, baseName)
+
 	var data []map[string]interface{}
 	var err error
 
@@ -328,7 +312,6 @@ func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 		}
 	}
 
-	// 批量插入数据
 	var rowsImported int
 	var errors []string
 
@@ -348,7 +331,6 @@ func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 		}
 	}
 
-	// 记录审计日志
 	if rowsImported > 0 {
 		auditLogger.Log(AuditLevelInfo, AuditEventQuery,
 			fmt.Sprintf("导入数据: %s -> %s", req.FileName, req.Table),
@@ -372,7 +354,6 @@ func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 	}
 }
 
-// importFromCSV 从 CSV 导入
 func (a *App) importFromCSV(filePath string) ([]map[string]interface{}, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -390,7 +371,6 @@ func (a *App) importFromCSV(filePath string) ([]map[string]interface{}, error) {
 		return []map[string]interface{}{}, nil
 	}
 
-	// 第一行是表头
 	headers := records[0]
 	var data []map[string]interface{}
 
@@ -407,7 +387,6 @@ func (a *App) importFromCSV(filePath string) ([]map[string]interface{}, error) {
 	return data, nil
 }
 
-// importFromJSON 从 JSON 导入
 func (a *App) importFromJSON(filePath string) ([]map[string]interface{}, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {

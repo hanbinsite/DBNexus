@@ -89,7 +89,7 @@ func (d *SQLiteDriver) GetTables(ctx context.Context) ([]string, error) {
 
 // GetTableStructure returns the structure of a SQLite table
 func (d *SQLiteDriver) GetTableStructure(ctx context.Context, tableName string) ([]ColumnInfo, error) {
-	query := fmt.Sprintf("PRAGMA table_info(%s)", tableName)
+	query := fmt.Sprintf("PRAGMA table_info(\"%s\")", tableName)
 	rows, err := d.Query(ctx, query)
 	if err != nil {
 		return nil, err

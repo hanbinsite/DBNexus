@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// CompareType 对比类型
 type CompareType string
 
 const (
@@ -15,7 +14,6 @@ const (
 	CompareTypeDatabase CompareType = "database"
 )
 
-// CompareMode 对比模式
 type CompareMode string
 
 const (
@@ -24,7 +22,6 @@ const (
 	CompareModeAll       CompareMode = "all"
 )
 
-// CompareRequest 对比请求
 type CompareRequest struct {
 	Type           CompareType `json:"type"`
 	Mode           CompareMode `json:"mode"`
@@ -38,7 +35,6 @@ type CompareRequest struct {
 	CompareColumns []string    `json:"compareColumns,omitempty"`
 }
 
-// CompareResult 对比结果
 type CompareResult struct {
 	Success         bool                     `json:"success"`
 	Message         string                   `json:"message"`
@@ -51,7 +47,6 @@ type CompareResult struct {
 	Error           string                   `json:"error,omitempty"`
 }
 
-// CompareSummary 对比摘要
 type CompareSummary struct {
 	SourceRowCount       int64   `json:"sourceRowCount"`
 	TargetRowCount       int64   `json:"targetRowCount"`
@@ -61,7 +56,6 @@ type CompareSummary struct {
 	MissingInTargetCount int     `json:"missingInTargetCount"`
 }
 
-// DifferenceItem 差异项
 type DifferenceItem struct {
 	RowKey      map[string]interface{} `json:"rowKey"`
 	ColumnName  string                 `json:"columnName"`
@@ -69,11 +63,9 @@ type DifferenceItem struct {
 	TargetValue interface{}            `json:"targetValue"`
 }
 
-// CompareTables 对比两个表
 func (a *App) CompareTables(config Connection, req CompareRequest) CompareResult {
 	auditLogger := GetAuditLogger()
 
-	// 验证请求
 	if req.SourceTable == "" || req.TargetTable == "" {
 		return CompareResult{
 			Success: false,
@@ -90,8 +82,8 @@ func (a *App) CompareTables(config Connection, req CompareRequest) CompareResult
 		}
 	}
 
-	// 获取源表数据
 	sourceQuery := buildCompareQuery(req.SourceTable, req.KeyColumns, req.CompareColumns)
+	targetQuery := buildCompareQuery(req.TargetTable, req.KeyColumns, req.CompareColumns)
 	sourceResult := a.ExecuteQuery(config, req.SourceDB, sourceQuery)
 	if sourceResult.Error != "" {
 		return CompareResult{
@@ -101,8 +93,7 @@ func (a *App) CompareTables(config Connection, req CompareRequest) CompareResult
 		}
 	}
 
-	// 获取目标表数据
-	targetResult := a.ExecuteQuery(config, req.TargetDB, sourceQuery)
+	targetResult := a.ExecuteQuery(config, req.TargetDB, targetQuery)
 	if targetResult.Error != "" {
 		return CompareResult{
 			Success: false,
@@ -111,10 +102,8 @@ func (a *App) CompareTables(config Connection, req CompareRequest) CompareResult
 		}
 	}
 
-	// 对比数据
 	result := a.performComparison(sourceResult, targetResult, req)
 
-	// 记录审计日志
 	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
 		fmt.Sprintf("数据对比: %s.%s vs %s.%s", req.SourceDB, req.SourceTable, req.TargetDB, req.TargetTable),
 		map[string]interface{}{
@@ -128,7 +117,6 @@ func (a *App) CompareTables(config Connection, req CompareRequest) CompareResult
 	return result
 }
 
-// buildCompareQuery 构建对比查询
 func buildCompareQuery(table string, keyColumns, compareColumns []string) string {
 	safeTable := sanitizeIdentifier(table)
 
@@ -144,7 +132,6 @@ func buildCompareQuery(table string, keyColumns, compareColumns []string) string
 	return fmt.Sprintf("SELECT %s FROM `%s`", strings.Join(selectColumns, ", "), safeTable)
 }
 
-// performComparison 执行对比
 func (a *App) performComparison(sourceResult, targetResult QueryResult, req CompareRequest) CompareResult {
 	result := CompareResult{
 		Success:         true,
@@ -153,23 +140,18 @@ func (a *App) performComparison(sourceResult, targetResult QueryResult, req Comp
 		MissingInTarget: []map[string]interface{}{},
 	}
 
-	// 构建数据映射
 	sourceMap := buildDataMap(sourceResult, req.KeyColumns)
 	targetMap := buildDataMap(targetResult, req.KeyColumns)
 
-	// 查找差异
 	for key, sourceRow := range sourceMap {
 		targetRow, exists := targetMap[key]
 		if !exists {
-			// 在目标中不存在
 			result.MissingInTarget = append(result.MissingInTarget, sourceRow)
 			continue
 		}
 
-		// 对比每列
 		diffFound := false
 		for _, col := range sourceResult.Columns {
-			// 跳过键列
 			if sliceContains(req.KeyColumns, col) {
 				continue
 			}
@@ -195,14 +177,12 @@ func (a *App) performComparison(sourceResult, targetResult QueryResult, req Comp
 		}
 	}
 
-	// 查找在源中不存在的行
 	for key, targetRow := range targetMap {
 		if _, exists := sourceMap[key]; !exists {
 			result.MissingInSource = append(result.MissingInSource, targetRow)
 		}
 	}
 
-	// 计算摘要
 	result.Summary = &CompareSummary{
 		SourceRowCount:       int64(len(sourceMap)),
 		TargetRowCount:       int64(len(targetMap)),
@@ -211,7 +191,6 @@ func (a *App) performComparison(sourceResult, targetResult QueryResult, req Comp
 		MissingInTargetCount: len(result.MissingInTarget),
 	}
 
-	// 计算匹配百分比
 	if result.Summary.SourceRowCount > 0 {
 		result.Summary.MatchPercentage = float64(result.IdenticalRows) / float64(result.Summary.SourceRowCount) * 100
 	}
@@ -222,11 +201,9 @@ func (a *App) performComparison(sourceResult, targetResult QueryResult, req Comp
 	return result
 }
 
-// buildDataMap 构建数据映射
 func buildDataMap(result QueryResult, keyColumns []string) map[string]map[string]interface{} {
 	dataMap := make(map[string]map[string]interface{})
 
-	// 找到键列的索引
 	keyIndexes := make([]int, len(keyColumns))
 	foundAll := true
 	for i, keyCol := range keyColumns {
@@ -244,20 +221,17 @@ func buildDataMap(result QueryResult, keyColumns []string) map[string]map[string
 		}
 	}
 
-	// 如果未找到所有键列，直接返回空映射
 	if !foundAll {
 		return dataMap
 	}
 
 	for _, row := range result.Rows {
-		// 构建键
 		var keyParts []string
 		for _, keyIdx := range keyIndexes {
 			keyParts = append(keyParts, fmt.Sprintf("%v", row[keyIdx]))
 		}
 		key := strings.Join(keyParts, "|")
 
-		// 存储行数据
 		dataMap[key] = make(map[string]interface{})
 		for i, val := range row {
 			dataMap[key][result.Columns[i]] = val
@@ -267,9 +241,7 @@ func buildDataMap(result QueryResult, keyColumns []string) map[string]map[string
 	return dataMap
 }
 
-// compareValues 对比值
 func compareValues(val1, val2 interface{}) bool {
-	// 处理 NULL
 	if val1 == nil && val2 == nil {
 		return true
 	}
@@ -277,11 +249,9 @@ func compareValues(val1, val2 interface{}) bool {
 		return false
 	}
 
-	// 转换为字符串比较
 	return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
 }
 
-// extractKeyValues 提取键值
 func extractKeyValues(row map[string]interface{}, columns []string, keyColumns []string) map[string]interface{} {
 	keyValues := make(map[string]interface{})
 	for _, keyCol := range keyColumns {
@@ -292,7 +262,6 @@ func extractKeyValues(row map[string]interface{}, columns []string, keyColumns [
 	return keyValues
 }
 
-// sliceContains checks if a string exists in a slice
 func sliceContains(s []string, str string) bool {
 	for _, v := range s {
 		if v == str {
@@ -302,7 +271,6 @@ func sliceContains(s []string, str string) bool {
 	return false
 }
 
-// CompareQueries 对比两个查询结果
 func (a *App) CompareQueries(config Connection, req CompareRequest) CompareResult {
 	if req.SourceQuery == "" || req.TargetQuery == "" {
 		return CompareResult{
@@ -312,7 +280,6 @@ func (a *App) CompareQueries(config Connection, req CompareRequest) CompareResul
 		}
 	}
 
-	// 执行查询
 	sourceResult := a.ExecuteQuery(config, req.SourceDB, req.SourceQuery)
 	if sourceResult.Error != "" {
 		return CompareResult{
@@ -331,16 +298,13 @@ func (a *App) CompareQueries(config Connection, req CompareRequest) CompareResul
 		}
 	}
 
-	// 自动检测键列（使用第一列）
 	if len(req.KeyColumns) == 0 && len(sourceResult.Columns) > 0 {
 		req.KeyColumns = []string{sourceResult.Columns[0]}
 	}
 
-	// 对比数据
 	return a.performComparison(sourceResult, targetResult, req)
 }
 
-// GetCompareReport 生成对比报告
 func (a *App) GetCompareReport(result CompareResult) string {
 	var report strings.Builder
 
@@ -367,7 +331,6 @@ func (a *App) GetCompareReport(result CompareResult) string {
 	return report.String()
 }
 
-// ExportCompareResult 导出对比结果
 func (a *App) ExportCompareResult(result CompareResult, format string) ([]byte, error) {
 	switch format {
 	case "json":
@@ -381,16 +344,13 @@ func (a *App) ExportCompareResult(result CompareResult, format string) ([]byte, 
 	}
 }
 
-// exportCompareToJSON 导出对比结果为 JSON
 func (a *App) exportCompareToJSON(result CompareResult) ([]byte, error) {
 	return json.MarshalIndent(result, "", "  ")
 }
 
-// exportCompareToCSV 导出对比结果为 CSV
 func (a *App) exportCompareToCSV(result CompareResult) ([]byte, error) {
 	var csv strings.Builder
 
-	// 写入差异
 	csv.WriteString("RowKey,ColumnName,SourceValue,TargetValue\n")
 	for _, diff := range result.Differences {
 		csv.WriteString(fmt.Sprintf("%v,%s,%v,%v\n",

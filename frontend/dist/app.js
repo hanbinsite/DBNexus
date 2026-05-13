@@ -304,22 +304,32 @@ function createNewTab() {
   const tabNumber = document.querySelectorAll('.tab[data-type="query"]').length + 1;
   const tabId = `query-${tabNumber}`;
 
-  const tabHtml = `
-    <div class="tab" data-tab="${tabId}" data-type="query">
+  const tabDiv = document.createElement('div');
+  tabDiv.className = 'tab';
+  tabDiv.dataset.tab = tabId;
+  tabDiv.dataset.type = 'query';
+
+  // Static SVG structure (safe innerHTML — no server data)
+  tabDiv.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+    </svg>
+    <span class="tab-name"></span>
+    <button class="tab-close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+        <path d="M18 6 6 18M6 6l12 12"/>
       </svg>
-      <span>查询 ${tabNumber}</span>
-      <button class="tab-close" onclick="closeTab('${tabId}', event)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6 6 18M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
+    </button>
   `;
 
-  document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
+  // Dynamic text via textContent (tabNumber is numeric — safe)
+  tabDiv.querySelector('.tab-name').textContent = `查询 ${tabNumber}`;
+
+  // Close button via addEventListener (no inline onclick XSS risk)
+  tabDiv.querySelector('.tab-close').addEventListener('click', (e) => closeTab(tabId, e));
+
+  document.getElementById('tabsContainer').appendChild(tabDiv);
   activateTab(tabId);
 
   // Hide welcome panel, show query editor
@@ -1158,32 +1168,38 @@ function addConnectionToList(connection) {
         sqlite: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
         redis: 'linear-gradient(135deg, #dc382d, #a4201a)'
     };
-    
-  const html = `
-<div class="connection-item" data-id="${connection.id}" onclick="selectConnection('${connection.id}')" ondblclick="connectToConnection('${connection.id}')">
-  <div class="connection-icon" style="background: ${iconColors[connection.type] || iconColors.postgresql}">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      ${typeIcons[connection.type] || typeIcons.postgresql}
-    </svg>
-  </div>
-  <div class="connection-info">
-    <span class="connection-name">${connection.name}</span>
-    <span class="connection-type">${connection.type.charAt(0).toUpperCase() + connection.type.slice(1)}</span>
-  </div>
-  <div class="connection-status disconnected">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M15 9l-6 6M9 9l6 6"/>
-    </svg>
-  </div>
-</div>
-`;
 
-  connectionList.insertAdjacentHTML('beforeend', html);
-  
+  // Build connection item with safe DOM creation (no inline event handlers)
+  const item = DomUtils.createElement('div', { className: 'connection-item', 'data-id': connection.id });
+
+  // Connection icon (SVG from hardcoded map — safe innerHTML, no server data)
+  const iconDiv = document.createElement('div');
+  iconDiv.className = 'connection-icon';
+  iconDiv.style.background = iconColors[connection.type] || iconColors.postgresql;
+  iconDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${typeIcons[connection.type] || typeIcons.postgresql}</svg>`;
+  item.appendChild(iconDiv);
+
+  // Connection info (safe textContent for server-provided name/type)
+  const infoDiv = DomUtils.createElement('div', { className: 'connection-info' });
+  const nameSpan = DomUtils.createElement('span', { className: 'connection-name', textContent: connection.name });
+  const typeSpan = DomUtils.createElement('span', { className: 'connection-type', textContent: connection.type.charAt(0).toUpperCase() + connection.type.slice(1) });
+  infoDiv.appendChild(nameSpan);
+  infoDiv.appendChild(typeSpan);
+  item.appendChild(infoDiv);
+
+  // Connection status (static SVG — safe innerHTML)
+  const statusDiv = DomUtils.createElement('div', { className: 'connection-status disconnected' });
+  statusDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>`;
+  item.appendChild(statusDiv);
+
+  // Bind click/dblclick via addEventListener (no inline onclick XSS risk)
+  item.addEventListener('click', () => selectConnection(connection.id));
+  item.addEventListener('dblclick', () => connectToConnection(connection.id));
+
+  connectionList.appendChild(item);
+
   // Bind context menu to newly added connection
-  const newItem = connectionList.lastElementChild;
-  newItem.addEventListener('contextmenu', (e) => {
+  item.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
     selectConnection(connection.id);
@@ -1273,7 +1289,7 @@ async function deleteConnection(id) {
 function updateConnectionStatusBar(connection) {
     const currentConnection = document.getElementById('currentConnection');
     if (currentConnection) {
-        currentConnection.innerHTML = `<span>${connection.name} (${connection.type})</span>`;
+        currentConnection.innerHTML = `<span>${DomUtils.escapeHtml(connection.name)} (${DomUtils.escapeHtml(connection.type)})</span>`;
     }
 }
 
@@ -1301,8 +1317,10 @@ function updateConnectionStatusIcon(id, connected) {
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                     <path d="M22 4L12 14.01l-3-3"/>
                 </svg>
-                <span>Connected</span>
             `;
+            const statusSpan = document.createElement('span');
+            statusSpan.textContent = 'Connected';
+            connectionStatus.appendChild(statusSpan);
         }
     } else {
         statusDiv.classList.remove('connected');
@@ -1379,12 +1397,9 @@ function populateDatabaseSelector(databases) {
     // Clear existing options except the first one
     selector.innerHTML = '<option value="">选择数据库</option>';
     
-    // Add all databases
+    // Add all databases (safe DOM creation)
     databases.forEach(db => {
-        const option = document.createElement('option');
-        option.value = db.name;
-        option.textContent = db.name;
-        selector.appendChild(option);
+        selector.appendChild(DomUtils.createOption(db.name, db.name));
     });
     
     // Select the previously selected database if exists
@@ -1587,14 +1602,14 @@ async function selectDatabase(databaseName) {
     const selector = document.getElementById('queryDatabase');
     const option = Array.from(selector.options).find(opt => opt.value === databaseName);
     if (!option) {
-        selector.insertAdjacentHTML('beforeend', `<option value="${databaseName}">${databaseName}</option>`);
+        selector.appendChild(DomUtils.createOption(databaseName, databaseName));
     }
     selector.value = databaseName;
     
     // Update status bar
     const currentDb = document.getElementById('currentConnection');
     if (currentDb && state.activeConnection) {
-        currentDb.innerHTML = `<span>${state.activeConnection.name} / ${databaseName}</span>`;
+        currentDb.innerHTML = `<span>${DomUtils.escapeHtml(state.activeConnection.name)} / ${DomUtils.escapeHtml(databaseName)}</span>`;
     }
     
     await loadTablesForDatabase(databaseName);
@@ -1609,7 +1624,7 @@ async function openTable(tableName, database) {
         const selector = document.getElementById('queryDatabase');
         const option = Array.from(selector.options).find(opt => opt.value === database);
         if (!option) {
-            selector.insertAdjacentHTML('beforeend', `<option value="${database}">${database}</option>`);
+            selector.appendChild(DomUtils.createOption(database, database));
         }
         selector.value = database;
     }
@@ -1624,21 +1639,32 @@ async function openTable(tableName, database) {
     let tab = document.querySelector(`[data-tab="${tabId}"]`);
     
     if (!tab) {
-        const tabHtml = `
-            <div class="tab" data-tab="${tabId}" data-type="table">
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'tab';
+        tabDiv.dataset.tab = tabId;
+        tabDiv.dataset.type = 'table';
+
+        // Static SVG structure (safe innerHTML — no server data)
+        tabDiv.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18M9 21V9"/>
+            </svg>
+            <span class="tab-name"></span>
+            <button class="tab-close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18M9 21V9"/>
+                    <path d="M18 6 6 18M6 6l12 12"/>
                 </svg>
-                <span>${tableName}</span>
-                <button class="tab-close" onclick="closeTab('${tabId}', event)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6 6 18M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
+            </button>
         `;
-        document.getElementById('tabsContainer').insertAdjacentHTML('beforeend', tabHtml);
+
+        // Dynamic text via textContent (tableName is server data — XSS-safe)
+        tabDiv.querySelector('.tab-name').textContent = tableName;
+
+        // Close button via addEventListener (no inline onclick XSS risk)
+        tabDiv.querySelector('.tab-close').addEventListener('click', (e) => closeTab(tabId, e));
+
+        document.getElementById('tabsContainer').appendChild(tabDiv);
     }
     
     activateTab(tabId);
@@ -1669,8 +1695,8 @@ function populateFilterDropdowns(columns) {
     sortColumn.innerHTML = '<option value="">无</option>';
     
     columns.forEach(col => {
-        filterColumn.insertAdjacentHTML('beforeend', `<option value="${col.name}">${col.name}</option>`);
-        sortColumn.insertAdjacentHTML('beforeend', `<option value="${col.name}">${col.name}</option>`);
+        filterColumn.appendChild(DomUtils.createOption(col.name, col.name));
+        sortColumn.appendChild(DomUtils.createOption(col.name, col.name));
     });
 }
 
@@ -1683,23 +1709,37 @@ function populateStructureView(columns) {
         const dataType = typeMatch ? typeMatch[1] : col.type;
         const length = typeMatch && typeMatch[2] ? typeMatch[2] : '';
         
-        const row = `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${col.name}</td>
-                <td>${dataType}</td>
-                <td>${length}</td>
-                <td></td>
-                <td><input type="checkbox" ${col.nullable ? '' : 'checked'}></td>
-                <td><input type="checkbox" ${col.primary_key ? 'checked' : ''}></td>
-                <td><input type="checkbox"></td>
-                <td>${col.default_value || ''}</td>
-                <td></td>
-                <td>utf8mb4</td>
-                <td>utf8mb4_general_ci</td>
-            </tr>
-        `;
-        tbody.insertAdjacentHTML('beforeend', row);
+        const row = DomUtils.createTableRow([
+            String(index + 1),
+            DomUtils.escapeHtml(col.name),
+            DomUtils.escapeHtml(dataType),
+            DomUtils.escapeHtml(length),
+            '',
+            { content: '' },
+            { content: '' },
+            { content: '' },
+            DomUtils.escapeHtml(col.default_value || ''),
+            '',
+            'utf8mb4',
+            'utf8mb4_general_ci'
+        ]);
+        
+        // Add checkboxes to appropriate cells
+        const nullableInput = document.createElement('input');
+        nullableInput.type = 'checkbox';
+        if (!col.nullable) nullableInput.checked = true;
+        row.cells[5].appendChild(nullableInput);
+        
+        const pkInput = document.createElement('input');
+        pkInput.type = 'checkbox';
+        if (col.primary_key) pkInput.checked = true;
+        row.cells[6].appendChild(pkInput);
+        
+        const autoInput = document.createElement('input');
+        autoInput.type = 'checkbox';
+        row.cells[7].appendChild(autoInput);
+        
+        tbody.appendChild(row);
     });
 }
 
@@ -1710,26 +1750,41 @@ function renderDataView(result) {
     // Store column widths in state
     state.columnWidths = state.columnWidths || {};
     
-    // Render header with resize handles
-    let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+    // Render header with resize handles (safe DOM manipulation — column names are server data)
+    header.innerHTML = '';
+    const headerRow = document.createElement('tr');
+    const checkboxTh = document.createElement('th');
+    checkboxTh.style.cssText = 'width: 50px; min-width: 50px; max-width: 50px;';
+    const selectAllInput = document.createElement('input');
+    selectAllInput.type = 'checkbox';
+    selectAllInput.id = 'selectAllRows';
+    checkboxTh.appendChild(selectAllInput);
+    headerRow.appendChild(checkboxTh);
     result.columns.forEach((col, index) => {
         const width = state.columnWidths[col] || 150;
-        headerHtml += `
-            <th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
-                <span class="th-content">${col}</span>
-                <div class="resize-handle" data-col="${index}"></div>
-            </th>`;
+        const th = document.createElement('th');
+        th.style.cssText = `width: ${width}px; min-width: 80px; max-width: 400px;`;
+        th.dataset.col = String(index);
+        th.dataset.colname = col;
+        const span = document.createElement('span');
+        span.className = 'th-content';
+        span.textContent = col;
+        const resizeDiv = document.createElement('div');
+        resizeDiv.className = 'resize-handle';
+        resizeDiv.dataset.col = String(index);
+        th.appendChild(span);
+        th.appendChild(resizeDiv);
+        headerRow.appendChild(th);
     });
-    headerHtml += '</tr>';
-    header.innerHTML = headerHtml;
+    header.appendChild(headerRow);
     
     // Render body
     let bodyHtml = '';
     result.rows.forEach((row, rowIndex) => {
         bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
         row.forEach((cell, colIndex) => {
-            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
-            bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
+            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(cell));
+            bodyHtml += `<td title="${cell === null ? 'NULL' : DomUtils.escapeHtml(String(cell))}">${displayValue}</td>`;
         });
         bodyHtml += '</tr>';
     });
@@ -2034,26 +2089,41 @@ function renderDataView(result) {
 	// Store column widths in state
 	state.columnWidths = state.columnWidths || {};
 
-	// Render header with resize handles
-	let headerHtml = '<tr><th style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" id="selectAllRows"></th>';
+	// Render header with resize handles (safe DOM manipulation — column names are server data)
+	header.innerHTML = '';
+	const headerRow = document.createElement('tr');
+	const checkboxTh = document.createElement('th');
+	checkboxTh.style.cssText = 'width: 50px; min-width: 50px; max-width: 50px;';
+	const selectAllInput = document.createElement('input');
+	selectAllInput.type = 'checkbox';
+	selectAllInput.id = 'selectAllRows';
+	checkboxTh.appendChild(selectAllInput);
+	headerRow.appendChild(checkboxTh);
 	result.columns.forEach((col, index) => {
 		const width = state.columnWidths[col] || 150;
-		headerHtml += `
-		<th style="width: ${width}px; min-width: 80px; max-width: 400px;" data-col="${index}" data-colname="${col}">
-		<span class="th-content">${col}</span>
-		<div class="resize-handle" data-col="${index}"></div>
-	</th>`;
+		const th = document.createElement('th');
+		th.style.cssText = `width: ${width}px; min-width: 80px; max-width: 400px;`;
+		th.dataset.col = String(index);
+		th.dataset.colname = col;
+		const span = document.createElement('span');
+		span.className = 'th-content';
+		span.textContent = col;
+		const resizeDiv = document.createElement('div');
+		resizeDiv.className = 'resize-handle';
+		resizeDiv.dataset.col = String(index);
+		th.appendChild(span);
+		th.appendChild(resizeDiv);
+		headerRow.appendChild(th);
 	});
-	headerHtml += '</tr>';
-	header.innerHTML = headerHtml;
+	header.appendChild(headerRow);
 
 	// Render body
 	let bodyHtml = '';
 	result.rows.forEach((row, rowIndex) => {
 		bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
 		row.forEach((cell, colIndex) => {
-			const displayValue = cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell));
-			bodyHtml += `<td title="${cell === null ? 'NULL' : cell}">${displayValue}</td>`;
+			const displayValue = cell === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(cell));
+			bodyHtml += `<td title="${cell === null ? 'NULL' : DomUtils.escapeHtml(String(cell))}">${displayValue}</td>`;
 		});
 		bodyHtml += '</tr>';
 	});
@@ -2102,7 +2172,7 @@ async function loadTableIndexes() {
             ]);
         }
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="8" class="error-cell">加载失败: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="error-cell">加载失败: ${DomUtils.escapeHtml(error.message)}</td></tr>`;
     }
 }
 
@@ -2206,7 +2276,7 @@ async function loadTableForeignKeys() {
             ]);
         }
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="9" class="error-cell">加载失败: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="error-cell">加载失败: ${DomUtils.escapeHtml(error.message)}</td></tr>`;
     }
 }
 
@@ -3096,7 +3166,7 @@ function showNotification(type, message) {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.innerHTML = `
-        <span>${message}</span>
+        <span>${DomUtils.escapeHtml(message)}</span>
         <button onclick="this.parentElement.remove()">×</button>
     `;
     
