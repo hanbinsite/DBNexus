@@ -3350,3 +3350,53 @@ body {
     height: 12px !important;
     cursor: se-resize !important;
 }
+
+/* ==========================================================================
+   Side Panels (Redis, Compare, Transaction)
+   ========================================================================== */
+.side-panel {
+    position: fixed;
+    top: var(--toolbar-height);
+    right: 0;
+    width: 420px;
+    height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    z-index: 100;
+    overflow-y: auto;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.3);
+}
+
+.side-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.side-panel-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.side-panel-body {
+    padding: 16px;
+}
+
+/* Status bar separators */
+.status-separator {
+    color: var(--text-secondary);
+    opacity: 0.3;
+    font-size: 12px;
+}
+
+/* ==========================================================================
+   Data View Tabs active state
+   ========================================================================== */
+.data-view-tab.active {
+    background: var(--bg-primary);
+    color: var(--accent-primary);
+    border-bottom: 2px solid var(--accent-primary);
+}

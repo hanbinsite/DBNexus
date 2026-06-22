@@ -3725,6 +3725,32 @@ window.contextAction = contextAction;
 window.selectConnection = selectConnection;
 window.connectToConnection = connectToConnection;
 window.fetchDatabases = fetchDatabases;
+window.openExportModal = openExportModal;
+window.closeExportModal = closeExportModal;
+window.browseExportPath = browseExportPath;
+window.executeExport = executeExport;
+window.openImportModal = openImportModal;
+window.closeImportModal = closeImportModal;
+window.browseImportPath = browseImportPath;
+window.executeImport = executeImport;
+window.openSqlPreview = openSqlPreview;
+window.closeSqlPreviewModal = closeSqlPreviewModal;
+window.copySqlPreview = copySqlPreview;
+window.openRedisPanel = openRedisPanel;
+window.closeRedisPanel = closeRedisPanel;
+window.scanRedisKeys = scanRedisKeys;
+window.setRedisKey = setRedisKey;
+window.loadRedisInfo = loadRedisInfo;
+window.openComparePanel = openComparePanel;
+window.closeComparePanel = closeComparePanel;
+window.switchCompareMode = switchCompareMode;
+window.executeCompare = executeCompare;
+window.openTransactionPanel = openTransactionPanel;
+window.closeTransactionPanel = closeTransactionPanel;
+window.startTransaction = startTransaction;
+window.executeInTx = executeInTx;
+window.commitTx = commitTx;
+window.rollbackTx = rollbackTx;
 
 // ==========================================================================
 // Language Settings
@@ -3917,4 +3943,445 @@ async function fetchDatabases() {
         dbSelect.innerHTML = '<option value="">获取失败</option>';
         showNotification('error', `获取数据库失败: ${error.message || error}`);
     }
+}
+
+// ==========================================================================
+// Export Dialog
+// ==========================================================================
+function openExportModal() {
+    if (state.currentTable) {
+        document.getElementById('exportTableName').value = state.currentTable.name;
+    }
+    document.getElementById('exportPath').value = '';
+    document.getElementById('exportModal').classList.add('active');
+}
+
+function closeExportModal() {
+    document.getElementById('exportModal').classList.remove('active');
+}
+
+async function browseExportPath() {
+    try {
+        if (isWailsAvailable()) {
+            const path = await WailsAPI.saveFileDialog('选择导出路径', `export_${new Date().toISOString().slice(0,10)}`);
+            if (path) document.getElementById('exportPath').value = path;
+        }
+    } catch (e) { showNotification('error', e.message); }
+}
+
+async function executeExport() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    const format = document.getElementById('exportFormat').value;
+    const tableName = document.getElementById('exportTableName').value;
+    const path = document.getElementById('exportPath').value;
+    if (!tableName) { showNotification('warning', '请指定表名'); return; }
+    if (!path) { showNotification('warning', '请选择导出路径'); return; }
+
+    showLoading('导出数据中...');
+    try {
+        const req = {
+            format: format,
+            table: tableName,
+            database: state.currentTable?.database || state.selectedDatabase || '',
+            file_path: path
+        };
+        const result = await WailsAPI.exportData(state.activeConnection, req);
+        hideLoading();
+        closeExportModal();
+        showNotification('success', `导出成功: ${result.file_path || path}`);
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `导出失败: ${e.message || e}`);
+    }
+}
+
+// ==========================================================================
+// Import Dialog
+// ==========================================================================
+function openImportModal() {
+    if (state.currentTable) {
+        document.getElementById('importTableName').value = state.currentTable.name;
+    }
+    document.getElementById('importPath').value = '';
+    document.getElementById('importModal').classList.add('active');
+}
+
+function closeImportModal() {
+    document.getElementById('importModal').classList.remove('active');
+}
+
+async function browseImportPath() {
+    try {
+        if (isWailsAvailable()) {
+            const path = await WailsAPI.openFileDialog('选择导入文件', [
+                { display: 'CSV', pattern: '*.csv' },
+                { display: 'JSON', pattern: '*.json' }
+            ]);
+            if (path) document.getElementById('importPath').value = path;
+        }
+    } catch (e) { showNotification('error', e.message); }
+}
+
+async function executeImport() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    const format = document.getElementById('importFormat').value;
+    const tableName = document.getElementById('importTableName').value;
+    const path = document.getElementById('importPath').value;
+    if (!tableName) { showNotification('warning', '请指定目标表'); return; }
+    if (!path) { showNotification('warning', '请选择导入文件'); return; }
+
+    showLoading('导入数据中...');
+    try {
+        const req = {
+            format: format,
+            table: tableName,
+            database: state.currentTable?.database || state.selectedDatabase || '',
+            file_path: path,
+            truncate_first: false
+        };
+        const result = await WailsAPI.importData(state.activeConnection, req);
+        hideLoading();
+        closeImportModal();
+        showNotification('success', `导入成功: ${result.rows_imported || 0} 行`);
+        refreshDataView();
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `导入失败: ${e.message || e}`);
+    }
+}
+
+// ==========================================================================
+// SQL Preview Dialog
+// ==========================================================================
+function openSqlPreview() {
+    if (!state.currentTable) { showNotification('warning', '请先打开一个表'); return; }
+    const tableName = state.currentTable.name;
+    WailsAPI.generateInsertStatement(tableName, {})
+        .then(sql => {
+            document.getElementById('sqlPreviewContent').textContent = sql || '-- 无数据';
+            document.getElementById('sqlPreviewModal').classList.add('active');
+        })
+        .catch(e => {
+            document.getElementById('sqlPreviewContent').textContent = `-- 生成失败: ${e.message}`;
+            document.getElementById('sqlPreviewModal').classList.add('active');
+        });
+}
+
+function closeSqlPreviewModal() {
+    document.getElementById('sqlPreviewModal').classList.remove('active');
+}
+
+function copySqlPreview() {
+    const content = document.getElementById('sqlPreviewContent').textContent;
+    navigator.clipboard.writeText(content).then(() => {
+        showNotification('success', 'SQL 已复制到剪贴板');
+    }).catch(() => {
+        showNotification('error', '复制失败');
+    });
+}
+
+// ==========================================================================
+// Redis Browser Panel
+// ==========================================================================
+function openRedisPanel() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接 Redis 数据库'); return; }
+    if (state.activeConnection.type !== 'redis') { showNotification('warning', '请先连接 Redis'); return; }
+    document.getElementById('redisPanel').style.display = 'block';
+    loadRedisDBSize();
+    scanRedisKeys();
+}
+
+function closeRedisPanel() {
+    document.getElementById('redisPanel').style.display = 'none';
+}
+
+async function loadRedisDBSize() {
+    try {
+        const size = await WailsAPI.getRedisDBSize(state.activeConnection);
+        document.getElementById('redisDBSize').textContent = `${size} keys`;
+    } catch (e) { document.getElementById('redisDBSize').textContent = '--'; }
+}
+
+async function scanRedisKeys() {
+    const pattern = document.getElementById('redisKeyPattern').value || '*';
+    const listEl = document.getElementById('redisKeyList');
+    listEl.innerHTML = '<div style="padding:8px;color:var(--text-secondary);">扫描中...</div>';
+    try {
+        const result = await WailsAPI.scanRedisKeys(state.activeConnection, pattern, 0, 100);
+        const keys = result.keys || [];
+        if (keys.length === 0) {
+            listEl.innerHTML = '<div style="padding:8px;color:var(--text-secondary);">无匹配 Key</div>';
+            return;
+        }
+        listEl.innerHTML = '';
+        keys.forEach(key => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border-color);cursor:pointer;';
+            item.innerHTML = `<span style="font-family:var(--font-mono);font-size:13px;">${DomUtils.escapeHtml(key)}</span>
+                <button class="action-btn-sm danger" title="删除" style="visibility:hidden;">x</button>`;
+            item.addEventListener('mouseenter', () => { item.querySelector('button').style.visibility = 'visible'; });
+            item.addEventListener('mouseleave', () => { item.querySelector('button').style.visibility = 'hidden'; });
+            item.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); deleteRedisKey(key); });
+            item.addEventListener('click', () => getRedisKeyDetail(key));
+            listEl.appendChild(item);
+        });
+    } catch (e) {
+        listEl.innerHTML = `<div style="padding:8px;color:var(--danger);">扫描失败: ${DomUtils.escapeHtml(e.message || e)}</div>`;
+    }
+}
+
+async function getRedisKeyDetail(key) {
+    try {
+        const info = await WailsAPI.getRedisKeyInfo(state.activeConnection, key);
+        const content = `类型: ${info.type}, TTL: ${info.ttl}s\n值: ${JSON.stringify(info.value, null, 2)}`;
+        showNotification('info', content.substring(0, 120));
+        document.getElementById('redisNewKey').value = key;
+        document.getElementById('redisNewValue').value = typeof info.value === 'string' ? info.value : JSON.stringify(info.value);
+    } catch (e) { showNotification('error', `获取失败: ${e.message}`); }
+}
+
+async function setRedisKey() {
+    const key = document.getElementById('redisNewKey').value.trim();
+    const value = document.getElementById('redisNewValue').value.trim();
+    if (!key) { showNotification('warning', '请输入 Key'); return; }
+    try {
+        await WailsAPI.setRedisKeyValue(state.activeConnection, key, value, 0);
+        showNotification('success', `SET ${key} OK`);
+        scanRedisKeys();
+    } catch (e) { showNotification('error', `SET 失败: ${e.message}`); }
+}
+
+async function deleteRedisKey(key) {
+    if (!confirm(`确定要删除 Key "${key}" 吗？`)) return;
+    try {
+        await WailsAPI.deleteRedisKey(state.activeConnection, key);
+        showNotification('success', `DEL ${key} OK`);
+        scanRedisKeys();
+    } catch (e) { showNotification('error', `删除失败: ${e.message}`); }
+}
+
+async function loadRedisInfo() {
+    const section = document.getElementById('redisInfoSection').value;
+    try {
+        const info = await WailsAPI.getRedisInfo(state.activeConnection, section);
+        const content = document.getElementById('redisInfoContent');
+        content.innerHTML = '';
+        for (const [k, v] of Object.entries(info)) {
+            const line = document.createElement('div');
+            line.style.cssText = 'padding:2px 0;border-bottom:1px solid var(--border-color);';
+            line.innerHTML = `<span style="color:var(--accent-primary);">${DomUtils.escapeHtml(k)}:</span> ${DomUtils.escapeHtml(String(v))}`;
+            content.appendChild(line);
+        }
+    } catch (e) {
+        document.getElementById('redisInfoContent').innerHTML = '(无数据)';
+    }
+}
+
+// ==========================================================================
+// Compare Panel
+// ==========================================================================
+function openComparePanel() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    document.getElementById('comparePanel').style.display = 'block';
+}
+
+function closeComparePanel() {
+    document.getElementById('comparePanel').style.display = 'none';
+}
+
+function switchCompareMode() {
+    const mode = document.getElementById('compareMode').value;
+    document.getElementById('compareTableFields').style.display = mode === 'table' ? 'block' : 'none';
+    document.getElementById('compareQueryFields').style.display = mode === 'query' ? 'block' : 'none';
+}
+
+async function executeCompare() {
+    if (!state.activeConnection) return;
+    const mode = document.getElementById('compareMode').value;
+    const resultEl = document.getElementById('compareResult');
+    resultEl.innerHTML = '<div style="padding:8px;color:var(--text-secondary);">对比中...</div>';
+    showLoading('对比中...');
+
+    try {
+        let result;
+        if (mode === 'table') {
+            const table1 = document.getElementById('compareTable1').value.trim();
+            const table2 = document.getElementById('compareTable2').value.trim();
+            if (!table1 || !table2) { hideLoading(); showNotification('warning', '请输入两个表名'); return; }
+            const excludeCols = document.getElementById('compareExcludeCols').value.split(',').map(s => s.trim()).filter(Boolean);
+            result = await WailsAPI.compareTables(state.activeConnection, {
+                table1, table2,
+                database: state.selectedDatabase || '',
+                exclude_columns: excludeCols
+            });
+        } else {
+            const query1 = document.getElementById('compareQuery1').value.trim();
+            const query2 = document.getElementById('compareQuery2').value.trim();
+            if (!query1 || !query2) { hideLoading(); showNotification('warning', '请输入两条查询'); return; }
+            result = await WailsAPI.compareQueries(state.activeConnection, {
+                query1, query2,
+                database: state.selectedDatabase || ''
+            });
+        }
+        hideLoading();
+        renderCompareResult(result);
+    } catch (e) {
+        hideLoading();
+        resultEl.innerHTML = `<div style="color:var(--danger);">对比失败: ${DomUtils.escapeHtml(e.message || e)}</div>`;
+    }
+}
+
+function renderCompareResult(result) {
+    const el = document.getElementById('compareResult');
+    if (!result) { el.innerHTML = '<div>无结果</div>'; return; }
+    let html = `<div style="margin-bottom:8px;">`;
+    html += `匹配: <b>${result.matched_count || 0}</b> / 差异: <b>${result.diff_count || 0}</b> / 仅左: <b>${result.left_only || 0}</b> / 仅右: <b>${result.right_only || 0}</b>`;
+    html += `</div>`;
+    const diffs = result.differences || [];
+    if (diffs.length === 0) {
+        html += '<div style="color:var(--success);">数据完全一致</div>';
+    } else {
+        html += '<table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="background:var(--bg-tertiary);">';
+        html += '<th style="padding:4px 8px;text-align:left;">行</th><th style="padding:4px 8px;text-align:left;">列</th>';
+        html += '<th style="padding:4px 8px;text-align:left;">左值</th><th style="padding:4px 8px;text-align:left;">右值</th></tr></thead><tbody>';
+        diffs.forEach(diff => {
+            html += `<tr style="border-bottom:1px solid var(--border-color);">`;
+            html += `<td style="padding:4px 8px;">${diff.row || ''}</td>`;
+            html += `<td style="padding:4px 8px;">${DomUtils.escapeHtml(diff.column || '')}</td>`;
+            html += `<td style="padding:4px 8px;color:var(--danger);">${DomUtils.escapeHtml(String(diff.left_value ?? 'NULL'))}</td>`;
+            html += `<td style="padding:4px 8px;color:var(--success);">${DomUtils.escapeHtml(String(diff.right_value ?? 'NULL'))}</td>`;
+            html += `</tr>`;
+        });
+        html += '</tbody></table>';
+    }
+    el.innerHTML = html;
+}
+
+// ==========================================================================
+// Transaction Panel
+// ==========================================================================
+let activeTxId = null;
+let txStartTime = null;
+let txTimerInterval = null;
+
+function openTransactionPanel() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    document.getElementById('transactionPanel').style.display = 'block';
+}
+
+function closeTransactionPanel() {
+    document.getElementById('transactionPanel').style.display = 'none';
+}
+
+function updateTransactionStatus() {
+    const label = document.getElementById('transactionLabel');
+    if (activeTxId) {
+        label.textContent = '事务';
+        label.style.color = 'var(--accent-primary)';
+    } else {
+        label.textContent = '事务';
+        label.style.color = '';
+    }
+}
+
+async function startTransaction() {
+    if (!state.activeConnection) return;
+    showLoading('开始事务...');
+    try {
+        const db = state.selectedDatabase || state.currentTable?.database || '';
+        const result = await WailsAPI.beginTransaction(state.activeConnection, db, { isolated: true });
+        activeTxId = result.tx_id || result.txID;
+        txStartTime = Date.now();
+        document.getElementById('txId').textContent = `TX: ${activeTxId}`;
+        document.getElementById('txNoActive').style.display = 'none';
+        document.getElementById('txActive').style.display = 'block';
+        document.getElementById('txResults').innerHTML = '';
+        document.getElementById('txQuery').value = '';
+        startTxTimer();
+        updateTransactionStatus();
+        hideLoading();
+        showNotification('success', '事务已开始');
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `开始事务失败: ${e.message || e}`);
+    }
+}
+
+function startTxTimer() {
+    if (txTimerInterval) clearInterval(txTimerInterval);
+    txTimerInterval = setInterval(() => {
+        if (!txStartTime) return;
+        const elapsed = Math.floor((Date.now() - txStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('txTimer').textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    }, 1000);
+}
+
+function stopTxTimer() {
+    if (txTimerInterval) { clearInterval(txTimerInterval); txTimerInterval = null; }
+}
+
+async function executeInTx() {
+    if (!activeTxId) { showNotification('warning', '无活动事务'); return; }
+    const query = document.getElementById('txQuery').value.trim();
+    if (!query) { showNotification('warning', '请输入 SQL'); return; }
+    showLoading('执行中...');
+    try {
+        const result = await WailsAPI.executeInTransaction(activeTxId, query);
+        hideLoading();
+        const resultsEl = document.getElementById('txResults');
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:6px 8px;background:var(--bg-primary);border-radius:var(--radius-md);margin-bottom:4px;font-family:var(--font-mono);font-size:12px;';
+        if (result.error) {
+            div.style.borderLeft = '3px solid var(--danger)';
+            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0,60))}...</span><br><span style="color:var(--danger);">${DomUtils.escapeHtml(result.error)}</span>`;
+        } else {
+            div.style.borderLeft = '3px solid var(--success)';
+            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0,60))}...</span><br>影响: ${result.rows_affected || 0} 行`;
+        }
+        resultsEl.insertBefore(div, resultsEl.firstChild);
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `执行失败: ${e.message || e}`);
+    }
+}
+
+async function commitTx() {
+    if (!activeTxId) return;
+    showLoading('提交事务中...');
+    try {
+        await WailsAPI.commitTransaction(activeTxId);
+        hideLoading();
+        showNotification('success', '事务已提交');
+        resetTxState();
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `提交失败: ${e.message || e}`);
+    }
+}
+
+async function rollbackTx() {
+    if (!activeTxId) return;
+    if (!confirm('确定要回滚事务吗？')) return;
+    showLoading('回滚事务中...');
+    try {
+        await WailsAPI.rollbackTransaction(activeTxId);
+        hideLoading();
+        showNotification('success', '事务已回滚');
+        resetTxState();
+    } catch (e) {
+        hideLoading();
+        showNotification('error', `回滚失败: ${e.message || e}`);
+    }
+}
+
+function resetTxState() {
+    activeTxId = null;
+    txStartTime = null;
+    stopTxTimer();
+    document.getElementById('txNoActive').style.display = 'block';
+    document.getElementById('txActive').style.display = 'none';
+    document.getElementById('txResults').innerHTML = '';
+    updateTransactionStatus();
 }

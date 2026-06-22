@@ -309,6 +309,27 @@
                                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                                 </svg>
                             </button>
+                            <div class="dv-divider"></div>
+                            <button class="dv-btn" title="导出" onclick="openExportModal()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </button>
+                            <button class="dv-btn" title="导入" onclick="openImportModal()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                            </button>
+                            <button class="dv-btn" title="SQL预览" onclick="openSqlPreview()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     
@@ -539,6 +560,31 @@
                 <div class="status-divider"></div>
                 <div class="status-item" id="currentConnection">
                     <span>无活动连接</span>
+                </div>
+                <span class="status-separator">|</span>
+                <div class="status-item" style="cursor:pointer;" onclick="openRedisPanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    <span>Redis</span>
+                </div>
+                <span class="status-separator">|</span>
+                <div class="status-item" style="cursor:pointer;" onclick="openComparePanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                        <line x1="12" y1="1" x2="12" y2="23"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                    <span>对比</span>
+                </div>
+                <span class="status-separator">|</span>
+                <div class="status-item" style="cursor:pointer;" id="transactionStatus" onclick="openTransactionPanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                        <polyline points="1 4 1 10 7 10"/>
+                        <polyline points="23 20 23 14 17 14"/>
+                        <path d="M20.49 15A9 9 0 0 0 3.51 9"/>
+                    </svg>
+                    <span id="transactionLabel">事务</span>
                 </div>
             </div>
             <div class="status-right">
@@ -871,6 +917,204 @@
             <span>删除</span>
         </div>
   </div>
+
+  <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal-container" style="width: 560px;">
+            <div class="modal-header">
+                <h2>导出数据</h2>
+                <button class="modal-close" onclick="closeExportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <span>导出格式</span>
+                        <select id="exportFormat">
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                            <option value="excel">Excel</option>
+                            <option value="sql">SQL INSERT</option>
+                        </select>
+                    </label>
+                    <label class="settings-label">
+                        <span>表名</span>
+                        <input type="text" id="exportTableName" readonly placeholder="从当前表自动填充">
+                    </label>
+                    <label class="settings-label">
+                        <span>输出路径</span>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="exportPath" placeholder="选择导出路径..." style="flex:1;">
+                            <button class="btn btn-secondary" onclick="browseExportPath()" style="white-space:nowrap;">浏览</button>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeExportModal()">取消</button>
+                <button class="btn btn-primary" onclick="executeExport()">导出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal-container" style="width: 560px;">
+            <div class="modal-header">
+                <h2>导入数据</h2>
+                <button class="modal-close" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <span>导入格式</span>
+                        <select id="importFormat">
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </label>
+                    <label class="settings-label">
+                        <span>目标表</span>
+                        <input type="text" id="importTableName" readonly placeholder="从当前表自动填充">
+                    </label>
+                    <label class="settings-label">
+                        <span>文件路径</span>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="importPath" placeholder="选择要导入的文件..." style="flex:1;">
+                            <button class="btn btn-secondary" onclick="browseImportPath()" style="white-space:nowrap;">浏览</button>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+                <button class="btn btn-primary" onclick="executeImport()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SQL Preview Modal -->
+    <div class="modal-overlay" id="sqlPreviewModal">
+        <div class="modal-container" style="width: 700px; max-height: 80vh;">
+            <div class="modal-header">
+                <h2>SQL 预览</h2>
+                <button class="modal-close" onclick="closeSqlPreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="sqlPreviewContent" style="background:var(--bg-primary);color:var(--text-primary);padding:16px;border-radius:var(--radius-md);overflow:auto;max-height:50vh;font-family:var(--font-mono);font-size:13px;white-space:pre-wrap;word-break:break-all;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSqlPreviewModal()">关闭</button>
+                <button class="btn btn-primary" onclick="copySqlPreview()">复制</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Redis Browser Panel -->
+    <div class="side-panel" id="redisPanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>Redis 浏览器</h3>
+            <button class="modal-close" onclick="closeRedisPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" id="redisKeyPattern" placeholder="Key 匹配模式 (* 通配)" value="*" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                <button class="btn btn-secondary btn-sm" onclick="scanRedisKeys()">扫描</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" id="redisNewKey" placeholder="新 Key" style="width:120px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                <input type="text" id="redisNewValue" placeholder="Value" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                <button class="btn btn-primary btn-sm" onclick="setRedisKey()">SET</button>
+            </div>
+            <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;">
+                <span style="font-size:12px;color:var(--text-secondary);">DB: </span>
+                <span id="redisDBSize" style="font-size:12px;">--</span>
+                <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">信息: </span>
+                <select id="redisInfoSection" onchange="loadRedisInfo()" style="font-size:12px;padding:2px 4px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);">
+                    <option value="server">Server</option>
+                    <option value="clients">Clients</option>
+                    <option value="memory">Memory</option>
+                    <option value="stats">Stats</option>
+                    <option value="keyspace">KeySpace</option>
+                </select>
+            </div>
+            <div id="redisInfoContent" style="font-size:12px;background:var(--bg-primary);padding:8px;border-radius:var(--radius-md);max-height:200px;overflow:auto;"></div>
+            <div id="redisKeyList" style="margin-top:12px;max-height:400px;overflow:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Compare Panel -->
+    <div class="side-panel" id="comparePanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>数据对比</h3>
+            <button class="modal-close" onclick="closeComparePanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <div class="settings-group">
+                <label class="settings-label">
+                    <span>对比类型</span>
+                    <select id="compareMode" onchange="switchCompareMode()" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                        <option value="table">表对比</option>
+                        <option value="query">查询对比</option>
+                    </select>
+                </label>
+                <div id="compareTableFields">
+                    <label class="settings-label">
+                        <span>表 1</span>
+                        <input type="text" id="compareTable1" placeholder="table_name" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    </label>
+                    <label class="settings-label">
+                        <span>表 2</span>
+                        <input type="text" id="compareTable2" placeholder="table_name" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    </label>
+                    <label class="settings-label">
+                        <span>排除列 (逗号分隔)</span>
+                        <input type="text" id="compareExcludeCols" placeholder="updated_at, created_at" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    </label>
+                </div>
+                <div id="compareQueryFields" style="display:none;">
+                    <label class="settings-label">
+                        <span>查询 1</span>
+                        <textarea id="compareQuery1" rows="3" placeholder="SELECT ..." style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100%;"></textarea>
+                    </label>
+                    <label class="settings-label">
+                        <span>查询 2</span>
+                        <textarea id="compareQuery2" rows="3" placeholder="SELECT ..." style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100%;"></textarea>
+                    </label>
+                </div>
+                <button class="btn btn-primary" onclick="executeCompare()" style="width:100%;">开始对比</button>
+            </div>
+            <div id="compareResult" style="margin-top:16px;font-size:12px;max-height:400px;overflow:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Transaction Panel -->
+    <div class="side-panel" id="transactionPanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>事务管理</h3>
+            <button class="modal-close" onclick="closeTransactionPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <div id="txNoActive" style="text-align:center;padding:24px;color:var(--text-secondary);">
+                <p>当前无活动事务</p>
+                <button class="btn btn-primary" onclick="startTransaction()" style="margin-top:12px;">开始事务</button>
+            </div>
+            <div id="txActive" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span id="txId" style="font-family:var(--font-mono);font-size:12px;"></span>
+                    <span id="txTimer" style="font-size:12px;color:var(--accent-primary);">00:00</span>
+                </div>
+                <textarea id="txQuery" rows="4" placeholder="在事务中执行 SQL..." style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px;font-family:var(--font-mono);font-size:13px;"></textarea>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button class="btn btn-primary btn-sm" onclick="executeInTx()" style="flex:1;">执行</button>
+                </div>
+                <div id="txResults" style="margin-top:12px;font-size:12px;max-height:200px;overflow:auto;"></div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="btn btn-primary" onclick="commitTx()" style="flex:1;">提交</button>
+                    <button class="btn btn-secondary" onclick="rollbackTx()" style="flex:1;">回滚</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
   <script src="modules/dom-utils.js"></script>
   <script src="i18n.js"></script>
