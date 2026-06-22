@@ -687,7 +687,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="testConnection()">
+                <button class="btn btn-secondary" onclick="testConnection(event)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
                     </svg>
@@ -781,11 +781,11 @@
                             </label>
                             <label class="settings-label">
                                 <span>连接超时（秒）</span>
-                                <input type="number" value="10">
+                                <input type="number" value="10" id="settingsConnTimeout">
                             </label>
                             <label class="settings-label">
                                 <span>查询超时（秒）</span>
-                                <input type="number" value="30">
+                                <input type="number" value="30" id="settingsQueryTimeout">
                             </label>
                         </div>
                     </div>
@@ -794,7 +794,7 @@
                         <div class="settings-group">
                             <label class="settings-label">
                                 <span data-i18n="fontSize">字体大小</span>
-                                <select>
+                                <select id="settingsFontSize">
                                     <option value="12">12px</option>
                                     <option value="14" selected>14px</option>
                                     <option value="16">16px</option>
@@ -803,14 +803,14 @@
                             </label>
                             <label class="settings-label">
                                 <span data-i18n="tabSize">Tab 大小</span>
-                                <select>
+                                <select id="settingsTabSize">
                                     <option value="2" selected>2 空格</option>
                                     <option value="4">4 空格</option>
                                 </select>
                             </label>
                             <label class="settings-label">
                                 <span data-i18n="lineNumbers">行号</span>
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="settingsLineNumbers" checked>
                             </label>
                         </div>
                     </div>
@@ -823,6 +823,14 @@
                                     <option value="dark">深色</option>
                                     <option value="light">浅色</option>
                                     <option value="system">跟随系统</option>
+                                </select>
+                            </label>
+                            <label class="settings-label">
+                                <span>信息密度</span>
+                                <select id="settingsDensity" onchange="setDensity(this.value)">
+                                    <option value="relaxed">宽松</option>
+                                    <option value="compact" selected>紧凑</option>
+                                    <option value="dense">密集</option>
                                 </select>
                             </label>
                         </div>

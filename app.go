@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"db-server/db"
 )
@@ -17,10 +16,8 @@ type App struct {
 	connections   []Connection
 	configPath    string
 	pool          *connectionPool
-	poolMutex     sync.RWMutex
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, ".db-client", "connections.json")
@@ -33,33 +30,35 @@ func NewApp() *App {
 	}
 }
 
-// startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	initEncryptionKey()
 	a.loadConnections()
 
-	// 初始化审计日志
-	auditLogger := GetAuditLogger()
-	auditLogger.Log(AuditLevelInfo, AuditEventLogin, "应用程序启动", nil)
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventLogin, "应用程序启动", nil)
 }
 
-// shutdown is called when the app closes
 func (a *App) shutdown(ctx context.Context) {
 	a.pool.closeAll()
 	a.saveConnections()
 
-	// 记录关闭日志
-	auditLogger := GetAuditLogger()
-	auditLogger.Log(AuditLevelInfo, AuditEventLogout, "应用程序关闭", nil)
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventLogout, "应用程序关闭", nil)
 }
 
-// ==========================================================================
-// Language / i18n
-// ==========================================================================
-
-// GetLanguage returns the current language setting
 func (a *App) GetLanguage() string {
+	homeDir, _ := os.UserHomeDir()
+	configFile := filepath.Join(homeDir, ".db-client", "config.json")
+
+	data, err := os.ReadFile(configFile)
+	if err == nil {
+		config := make(map[string]interface{})
+		if json.Unmarshal(data, &config) == nil {
+			if lang, ok := config["language"].(string); ok {
+				return lang
+			}
+		}
+	}
+
 	lang := os.Getenv("DB_CLIENT_LANG")
 	if lang == "" {
 		lang = "zh"
@@ -67,8 +66,11 @@ func (a *App) GetLanguage() string {
 	return lang
 }
 
-// SetLanguage sets the application language
 func (a *App) SetLanguage(lang string) error {
+	if lang != "zh" && lang != "en" {
+		return fmt.Errorf("unsupported language: %s, only zh/en allowed", lang)
+	}
+
 	homeDir, _ := os.UserHomeDir()
 	configDir := filepath.Join(homeDir, ".db-client")
 	os.MkdirAll(configDir, 0755)
@@ -88,4 +90,18 @@ func (a *App) SetLanguage(lang string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 	return os.WriteFile(configFile, data, 0644)
+}
+
+func (a *App) getCurrentLang() string {
+	return a.GetLanguage()
+}
+
+func (a *App) GetServerInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"version":      "1.0.0",
+		"wailsVersion": "2.12.0",
+		"goVersion":    "1.24.0",
+		"poolSize":     len(a.pool.connections),
+		"maxPoolSize":  MaxPoolSize,
+	}
 }

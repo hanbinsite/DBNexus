@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
-// AuditLogLevel 审计日志级别
 type AuditLogLevel string
 
 const (
@@ -19,7 +20,6 @@ const (
 	AuditLevelCritical AuditLogLevel = "CRITICAL"
 )
 
-// AuditEventType 审计事件类型
 type AuditEventType string
 
 const (
@@ -36,7 +36,6 @@ const (
 	AuditEventSensitiveData    AuditEventType = "SENSITIVE_DATA_ACCESS"
 )
 
-// AuditLog 审计日志条目
 type AuditLog struct {
 	ID         string                 `json:"id"`
 	Timestamp  string                 `json:"timestamp"`
@@ -54,7 +53,6 @@ type AuditLog struct {
 	UserAgent  string                 `json:"user_agent,omitempty"`
 }
 
-// AuditLogger 审计日志记录器
 type AuditLogger struct {
 	mu      sync.RWMutex
 	logFile string
@@ -68,30 +66,26 @@ var (
 	auditLoggerOnce sync.Once
 )
 
-// GetAuditLogger 获取审计日志记录器单例
 func GetAuditLogger() *AuditLogger {
 	auditLoggerOnce.Do(func() {
 		homeDir, _ := os.UserHomeDir()
 		logDir := filepath.Join(homeDir, ".db-client", "logs")
-		os.MkdirAll(logDir, 0755)
+		os.MkdirAll(logDir, 0700)
 
-		// 按日期创建日志文件
 		logFile := filepath.Join(logDir, fmt.Sprintf("audit_%s.log", time.Now().Format("2006-01-02")))
 
 		auditLogger = &AuditLogger{
 			logFile: logFile,
 			logs:    make([]AuditLog, 0),
-			maxLogs: 10000, // 内存中最多保留10000条日志
+			maxLogs: 10000,
 			enabled: true,
 		}
 
-		// 加载今日已有的日志
 		auditLogger.loadTodayLogs()
 	})
 	return auditLogger
 }
 
-// loadTodayLogs 加载今日的日志
 func (al *AuditLogger) loadTodayLogs() {
 	al.mu.Lock()
 	defer al.mu.Unlock()
@@ -101,13 +95,19 @@ func (al *AuditLogger) loadTodayLogs() {
 		return
 	}
 
-	var logs []AuditLog
-	if err := json.Unmarshal(data, &logs); err == nil {
-		al.logs = logs
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var log AuditLog
+		if err := json.Unmarshal([]byte(line), &log); err == nil {
+			al.logs = append(al.logs, log)
+		}
 	}
 }
 
-// Log 记录审计日志
 func (al *AuditLogger) Log(level AuditLogLevel, eventType AuditEventType, message string, details map[string]interface{}) {
 	al.mu.Lock()
 	defer al.mu.Unlock()
@@ -126,19 +126,15 @@ func (al *AuditLogger) Log(level AuditLogLevel, eventType AuditEventType, messag
 		Details:   details,
 	}
 
-	// 添加到内存
 	al.logs = append(al.logs, log)
 
-	// 如果超过最大数量，移除旧的
 	if len(al.logs) > al.maxLogs {
 		al.logs = al.logs[len(al.logs)-al.maxLogs:]
 	}
 
-	// 写入文件
-	al.writeToFile()
+	al.appendToFile(log)
 }
 
-// LogQuery 记录查询日志
 func (al *AuditLogger) LogQuery(connectionName, database, query, duration string, success bool, errMessage string) {
 	level := AuditLevelInfo
 	eventType := AuditEventQuery
@@ -160,7 +156,6 @@ func (al *AuditLogger) LogQuery(connectionName, database, query, duration string
 	al.Log(level, eventType, fmt.Sprintf("执行查询: %s", truncateQuery(query, 100)), details)
 }
 
-// LogConnection 记录连接日志
 func (al *AuditLogger) LogConnection(connectionName, database string, success bool, errMessage string) {
 	level := AuditLevelInfo
 	eventType := AuditEventConnect
@@ -180,7 +175,6 @@ func (al *AuditLogger) LogConnection(connectionName, database string, success bo
 	al.Log(level, eventType, fmt.Sprintf("连接数据库: %s", connectionName), details)
 }
 
-// LogSensitiveData 记录敏感数据访问
 func (al *AuditLogger) LogSensitiveData(connectionName, database, table, action string) {
 	al.Log(AuditLevelWarning, AuditEventSensitiveData,
 		fmt.Sprintf("敏感数据访问: %s.%s - %s", database, table, action),
@@ -192,28 +186,25 @@ func (al *AuditLogger) LogSensitiveData(connectionName, database, table, action 
 		})
 }
 
-// writeToFile 写入日志文件
-func (al *AuditLogger) writeToFile() {
-	data, err := json.MarshalIndent(al.logs, "", "  ")
+func (al *AuditLogger) appendToFile(log AuditLog) {
+	data, err := json.Marshal(log)
 	if err != nil {
 		fmt.Printf("审计日志序列化失败: %v\n", err)
 		return
 	}
 
-	// 使用临时文件避免写入过程中出现问题
-	tmpFile := al.logFile + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
-		fmt.Printf("写入审计日志失败: %v\n", err)
+	f, err := os.OpenFile(al.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Printf("打开审计日志文件失败: %v\n", err)
 		return
 	}
+	defer f.Close()
 
-	// 重命名临时文件
-	if err := os.Rename(tmpFile, al.logFile); err != nil {
-		fmt.Printf("重命名审计日志文件失败: %v\n", err)
+	if _, err := f.Write(append(data, '\n')); err != nil {
+		fmt.Printf("写入审计日志失败: %v\n", err)
 	}
 }
 
-// GetLogs 获取日志列表
 func (al *AuditLogger) GetLogs(limit int, level AuditLogLevel, eventType AuditEventType) []AuditLog {
 	al.mu.RLock()
 	defer al.mu.RUnlock()
@@ -221,11 +212,9 @@ func (al *AuditLogger) GetLogs(limit int, level AuditLogLevel, eventType AuditEv
 	var result []AuditLog
 	count := 0
 
-	// 从后往前遍历，获取最新的日志
 	for i := len(al.logs) - 1; i >= 0 && count < limit; i-- {
 		log := al.logs[i]
 
-		// 过滤条件
 		if level != "" && log.Level != level {
 			continue
 		}
@@ -240,7 +229,6 @@ func (al *AuditLogger) GetLogs(limit int, level AuditLogLevel, eventType AuditEv
 	return result
 }
 
-// ExportLogs 导出日志
 func (al *AuditLogger) ExportLogs(startTime, endTime string) ([]byte, error) {
 	al.mu.RLock()
 	defer al.mu.RUnlock()
@@ -256,7 +244,6 @@ func (al *AuditLogger) ExportLogs(startTime, endTime string) ([]byte, error) {
 	return json.MarshalIndent(filteredLogs, "", "  ")
 }
 
-// ClearOldLogs 清理旧日志
 func (al *AuditLogger) ClearOldLogs(daysToKeep int) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
@@ -264,7 +251,6 @@ func (al *AuditLogger) ClearOldLogs(daysToKeep int) error {
 	cutoffTime := time.Now().AddDate(0, 0, -daysToKeep)
 	cutoffStr := cutoffTime.Format("2006-01-02")
 
-	// 删除旧日志文件
 	homeDir, _ := os.UserHomeDir()
 	logDir := filepath.Join(homeDir, ".db-client", "logs")
 
@@ -278,10 +264,9 @@ func (al *AuditLogger) ClearOldLogs(daysToKeep int) error {
 			continue
 		}
 
-		// 解析文件名中的日期
 		name := entry.Name()
 		if len(name) >= len("audit_2006-01-02.log") {
-			dateStr := name[6:16] // 提取日期部分
+			dateStr := name[6:16]
 			if dateStr < cutoffStr {
 				filePath := filepath.Join(logDir, name)
 				os.Remove(filePath)
@@ -292,29 +277,26 @@ func (al *AuditLogger) ClearOldLogs(daysToKeep int) error {
 	return nil
 }
 
-// truncateQuery 截断查询字符串
 func truncateQuery(query string, maxLen int) string {
-	if len(query) <= maxLen {
+	if utf8.RuneCountInString(query) <= maxLen {
 		return query
 	}
-	return query[:maxLen] + "..."
+	runes := []rune(query)
+	return string(runes[:maxLen]) + "..."
 }
 
-// Enable 启用审计日志
 func (al *AuditLogger) Enable() {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	al.enabled = true
 }
 
-// Disable 禁用审计日志
 func (al *AuditLogger) Disable() {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	al.enabled = false
 }
 
-// IsEnabled 检查是否启用
 func (al *AuditLogger) IsEnabled() bool {
 	al.mu.RLock()
 	defer al.mu.RUnlock()

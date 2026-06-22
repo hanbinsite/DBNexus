@@ -38,7 +38,7 @@ type TransactionRequest struct {
 }
 
 const (
-	TransactionTimeout = 30 * time.Minute // 事务最大存活时间
+	TransactionTimeout = 30 * time.Minute
 )
 
 type activeTransaction struct {
@@ -51,9 +51,21 @@ type activeTransaction struct {
 var (
 	globalTransactions = make(map[string]*activeTransaction)
 	globalTxMutex      sync.RWMutex
+	cleanupOnce        sync.Once
 )
 
-// cleanupStaleTransactions 清理超时的事务
+func (a *App) startStaleTransactionCleanup() {
+	cleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				a.cleanupStaleTransactions()
+			}
+		}()
+	})
+}
+
 func (a *App) cleanupStaleTransactions() {
 	globalTxMutex.Lock()
 	defer globalTxMutex.Unlock()
@@ -68,33 +80,14 @@ func (a *App) cleanupStaleTransactions() {
 }
 
 func (a *App) BeginTransaction(config Connection, database string, options TransactionOptions) (string, error) {
-	if config.SavePassword && config.Password != "" {
-		decrypted, err := decryptPassword(config.Password)
-		if err == nil {
-			config.Password = decrypted
-		}
-	}
+	a.startStaleTransactionCleanup()
 
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	key := buildKey(dbConfig)
-	a.poolMutex.RLock()
-	pooledDriver, exists := a.pool.get(key)
-	a.poolMutex.RUnlock()
-
-	if !exists {
-		a.poolMutex.Lock()
-		if pooledDriver, exists = a.pool.get(key); !exists {
-			newDriver, err := a.driverManager.Connect(dbConfig)
-			if err != nil {
-				a.poolMutex.Unlock()
-				return "", fmt.Errorf("连接失败: %v", err)
-			}
-			a.pool.set(key, newDriver)
-			pooledDriver, _ = a.pool.get(key)
-		}
-		a.poolMutex.Unlock()
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return "", fmt.Errorf("连接失败: %v", err)
 	}
 
 	var sqlOpts *sql.TxOptions
@@ -115,10 +108,9 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 		sqlOpts.ReadOnly = options.ReadOnly
 	}
 
-	// 使用带超时的 context 测试连接，但事务本身使用无超时 context
 	connectCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	tx, err := pooledDriver.driver.BeginTx(connectCtx, sqlOpts)
-	cancel() // 立即取消连接 context
+	tx, err := driver.BeginTx(connectCtx, sqlOpts)
+	cancel()
 
 	if err != nil {
 		return "", fmt.Errorf("开始事务失败: %v", err)
@@ -128,8 +120,8 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 	globalTxMutex.Lock()
 	globalTransactions[txID] = &activeTransaction{
 		tx:      tx,
-		driver:  pooledDriver.driver,
-		ctx:     context.Background(), // 事务使用无超时 context
+		driver:  driver,
+		ctx:     context.Background(),
 		created: time.Now(),
 	}
 	globalTxMutex.Unlock()

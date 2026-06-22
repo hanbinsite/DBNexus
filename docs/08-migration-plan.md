@@ -45,11 +45,11 @@
 | M1-3 | EditRequest删除WhereClause, 强制PrimaryKey | SEC-006/D10-3.2 | types.go:91 | UPDATE/DELETE必须传primaryKey | ✅ 已完成 |
 | M1-4 | MySQL DESCRIBE参数化/sanitize | SEC-005 | db/mysql.go:88 | 恶意表名不执行 | 待实施 |
 | M1-5 | SQLite PRAGMA sanitize | SEC-005 | db/sqlite.go:92 | 恶意表名不执行 | 待实施 |
-| M1-6 | ImportData路径遍历检查 | SEC-007 | data_export.go:281 | `..`和绝对路径被拒绝 | 待实施 |
+| M1-6 | ImportData路径遍历检查 | SEC-007 | data_export.go:282-288 | `..`和绝对路径被拒绝 | 🚧 部分完成 (baseName检查 + `..`拒绝已实施，但绝对路径未完全覆盖) |
 | M1-7 | context.Background() → WithTimeout | D10-4.2 | redis_api.go(7处), autocomplete.go, query_analyzer.go | 所有查询30s超时 | 待实施 |
 | M1-8 | connections切片加sync.RWMutex | TECH-007 | app.go | 并发读写不panic | 待实施 |
 | M1-9 | MySQL SSLMode解析 | SEC-003 | db/mysql.go:23-32 | ssl_mode=required时tls=true | ✅ 部分已完成 |
-| M1-10 | 事务自动清理定时器 | ROADMAP-8 | transaction.go:57 | 5分钟清理过期事务 | ✅ 部分已完成(代码存在, 未自动调用) |
+| M1-10 | 事务自动清理定时器 | ROADMAP-8 | transaction.go:57 | 5分钟清理过期事务 | ✅ 已完成 (BeginTransaction() L83 自动调用 startStaleTransactionCleanup()) |
 
 ### 3.2 前端安全修复 (1.5周)
 
@@ -148,7 +148,7 @@ frontend/dist/
 
 | # | 任务 | 验收标准 |
 |---|------|---------|
-| M3-1 | 统一pool访问模式(删除poolMutex, 全用getOrCreate) | query/editor/transaction/analyzer无手动双重检查 |
+| M3-1 | 统一pool访问模式(删除poolMutex, 全用getOrCreate) | query/editor/transaction/analyzer无手动双重检查 | ✅ 已完成 |
 | M3-2 | 错误码体系(定义ErrorCode enum, 统一错误返回) | 所有API返回 {success, data?, error?, code?} |
 | M3-3 | Connection ID模式(前端只传ID, 后端查找配置) | IPC通道无密码传输 |
 | M3-4 | 包结构重构(package main → internal/pool, internal/crypto等) | 编译通过+测试通过 |
@@ -190,7 +190,7 @@ frontend/dist/
 | SEC-004 ExecuteQuery无超时 | P0 | M1-11 | v1.5 |
 | SEC-005 MySQL/SQLite未sanitize | P0 | M1-4, M1-5 | v1.5 |
 | SEC-006 WhereClause注入 | P0 | M1-3 | v1.5 |
-| SEC-007 路径遍历 | P0 | M1-6 | v1.5 |
+| SEC-007 路径遍历 | P0 | M1-6 | v1.5 (部分完成) |
 | SEC-008 前端XSS | P0 | M1-12~M1-15 | v1.5 |
 | SEC-009 审计O(n)写入 | P1 | M1-16 | v1.5 |
 | SEC-010 truncateQuery中文 | P2 | M1-17 | v1.5 |

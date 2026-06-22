@@ -11,10 +11,10 @@
 | 数据导出导入 | CSV/JSON/Excel/SQL导出、CSV/JSON导入 | 75% | data_export.go | SQL导出逐行INSERT性能差 |
 | 数据对比 | 表数据对比、查询结果对比、报告生成 | 70% | data_compare.go | 全量内存加载 |
 | Schema检查 | 索引/外键/统计信息/视图/函数查询 | 85% | schema.go | MySQL DESCRIBE未sanitize |
-| 事务管理 | 事务开始/提交/回滚/批量执行 | 60% | transaction.go | 无自动清理过期事务 |
+| 事务管理 | 事务开始/提交/回滚/批量执行 | 70% | transaction.go | ✅ 已修复 (BeginTransaction 自动调用 startStaleTransactionCleanup) |
 | 查询分析 | EXPLAIN解析、复杂度评估、优化建议 | 50% | query_analyzer.go | GetSlowQueries空实现 |
 | SQL格式化 | SQL美化/压缩/验证/结构分析 | 80% | sql_formatter.go | 基础验证不够严格 |
-| 自动补全 | 表名/列名/关键字/函数/数据库名补全 | 60% | autocomplete.go | 列名补全空实现 |
+| 自动补全 | 表名/列名/关键字/函数/数据库名补全 | 80% | autocomplete.go | ✅ 已实现 (getColumnSuggestions 遍历所有表获取列名) |
 | 审计日志 | 操作日志记录/查询/导出/清理 | 70% | audit.go | ✅已修复(appendToFile, audit.go:189) |
 | Redis API | Redis键值CRUD、命令执行、信息查询 | 85% | redis_api.go, db/redis.go | 类型断言可panic |
 | 国际化 | 中英文消息翻译 | 75% | i18n.go | 部分硬编码中文 |
@@ -331,7 +331,7 @@
 - ✅ 批量事务执行 (`ExecuteTransactionBatch`, 自动提交/回滚)
 - ✅ 事务超时配置 (30分钟 `TransactionTimeout`)
 - ✅ 全局事务map (`globalTransactions`, 线程安全)
-- 🚧 过期事务自动清理
+- ✅ 过期事务自动清理 (BeginTransaction() L83 自动调用 startStaleTransactionCleanup())
 - 📝 事务保存点(Savepoint)
 - 📝 事务状态查询
 - 📝 事务事件通知
@@ -349,7 +349,7 @@
 **数据模型**: `TransactionOptions`, `TransactionResult`, `TransactionQuery`, `TransactionRequest`, `activeTransaction`
 
 **已知缺陷**:
-- `cleanupStaleTransactions` 从未被自动调用, 过期事务不会被清理 (transaction.go:57-68)
+- ✅ 已修复: `cleanupStaleTransactions` 已在 BeginTransaction() 自动调用 (transaction.go:83)
 - 事务使用 `context.Background()` 无超时, 仅依赖 `TransactionTimeout` 常量但未实际使用 (transaction.go:132)
 - `ExecuteInTransaction` 直接拼接query执行, 无SQL注入防护 (transaction.go:149)
 - `BeginTransaction` 的连接context超时仅10秒, 但事务本身无限期 (transaction.go:119-121)
@@ -359,7 +359,7 @@
 - 事务隔离级别支持: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE (transaction.go:103-114)
 - 事务提交/回滚后自动从map中删除 (transaction.go:167, 186)
 - `ExecuteTransactionBatch` 在出错时自动回滚 (transaction.go:228)
-- 应添加定时器自动调用 `cleanupStaleTransactions`
+- ✅ 已修复: 定时器自动调用 `startStaleTransactionCleanup()` (transaction.go:83, 5min周期)
 
 ---
 
@@ -451,7 +451,7 @@
 - ✅ 上下文分析 (`analyzeQueryContext`)
 - ✅ 当前单词提取 (`extractCurrentWord`)
 - ✅ 快速补全(无需连接, `GetQuickSuggestions`)
-- 🚧 列名补全 (当前返回空列表)
+- ✅ 列名补全 (`getColumnSuggestions`, 遍历所有表获取列名，autocomplete.go:317-346)
 - 📝 智能提示(上下文相关)
 - 📝 代码片段(Snippet)库
 - 📝 多表JOIN列补全
@@ -467,7 +467,7 @@
 **数据模型**: `AutoCompleteItem`, `AutoCompleteResult`, `AutoCompleteType`, `SQLKeyword`
 
 **已知缺陷**:
-- `getColumnSuggestions` 返回空列表, 核心功能未实现 (autocomplete.go:352-358)
+- ✅ 已修复: `getColumnSuggestions` 已实现 (autocomplete.go:317-346), 遍历所有表获取列名
 - `analyzeQueryContext` 仅检查最后一个关键字, 无法处理嵌套上下文 (autocomplete.go:296-323)
 - `extractCurrentWord` 不支持 `.` 分隔的限定名(如 `schema.table`) (autocomplete.go:270-288)
 - 补全结果限制50条, 大表可能不够 (autocomplete.go:464-466)
@@ -625,16 +625,16 @@
 | 17 | 审计日志 | 审计日志 | (内部) | AuditLog | ✅ | P1 |
 | 18 | Redis操作 | Redis API | GetRedisKeyInfo/SetRedisKeyValue/etc | RedisKeyInfo | ✅ | P1 |
 | 19 | i18n支持 | 国际化 | GetLanguage/SetLanguage | - | ✅ | P2 |
-| 20 | WhereClause参数化 | 数据编辑 | EditTableData | EditRequest | 📝需修复 | P0 |
+| 20 | WhereClause参数化 | 数据编辑 | EditTableData | EditRequest | ✅ 已完成 | P0 |
 | 21 | 前端XSS防护 | 前端 | (前端改造) | - | 📝需修复 | P0 |
-| 22 | encryptionKey同步 | 连接管理 | initEncryptionKey | - | 📝需修复 | P0 |
-| 23 | ExecuteQuery废弃 | SQL编辑器 | ExecuteQuery | - | 📝需修复 | P0 |
-| 24 | 事务自动清理 | 事务管理 | cleanupStaleTransactions | - | 📝需修复 | P1 |
-| 25 | 列名自动补全 | 自动补全 | getColumnSuggestions | AutoCompleteItem | 📝需实现 | P1 |
+| 22 | encryptionKey同步 | 连接管理 | initEncryptionKey | - | ✅ 已完成 | P0 |
+| 23 | ExecuteQuery废弃 | SQL编辑器 | ExecuteQuery | - | ✅ 已完成 | P0 |
+| 24 | 事务自动清理 | 事务管理 | cleanupStaleTransactions | - | ✅ 已完成 | P1 |
+| 25 | 列名自动补全 | 自动补全 | getColumnSuggestions | AutoCompleteItem | ✅ 已完成 | P1 |
 | 26 | 慢查询分析 | 查询分析 | GetSlowQueries | - | 📝需实现 | P1 |
-| 27 | MySQL SSL支持 | 数据库驱动 | db/mysql.go | ConnectionConfig.SSLMode | 📝需实现 | P1 |
-| 28 | 审计日志追加写入 | 审计日志 | writeToFile | - | 📝需修复 | P2 |
-| 29 | 统一池访问模式 | 连接池 | poolMutex使用 | - | 📝需修复 | P2 |
+| 27 | MySQL SSL支持 | 数据库驱动 | db/mysql.go | ConnectionConfig.SSLMode | ✅ 已完成 | P1 |
+| 28 | 审计日志追加写入 | 审计日志 | writeToFile | - | ✅ 已完成 | P2 |
+| 29 | 统一池访问模式 | 连接池 | poolMutex使用 | - | ✅ 已完成 | P2 |
 | 30 | 连接分组管理 | 连接管理 | - | - | 📝待开发 | P2 |
 
 ---
@@ -643,18 +643,18 @@
 
 | # | 功能 | 模块 | 当前状态 | 需要的工作 | 优先级 | 预估工时 |
 |---|------|------|----------|------------|--------|----------|
-| 1 | WhereClause参数化 | 数据编辑 | 原文拼入SQL | 解析WhereClause为参数化条件,或强制使用PrimaryKey | P0 | 4h |
+| 1 | WhereClause参数化 | 数据编辑 | ✅ 已完成 | PrimaryKey 参数化已实施 | P0 | — |
 | 2 | 前端XSS防护 | 前端 | 57处innerHTML | 替换为textContent/createElement | P0 | 16h |
-| 3 | encryptionKey sync.Once | 加密 | 全局变量无保护 | 改用sync.Once初始化 | P0 | 2h |
-| 4 | ExecuteQuery添加超时 | 查询 | 无超时 | 添加context.WithTimeout或废弃此方法 | P0 | 2h |
-| 5 | 事务自动清理 | 事务 | cleanup函数存在但未调用 | 添加定时器或启动时调用 | P1 | 2h |
-| 6 | 列名自动补全 | 自动补全 | 返回空列表 | 分析FROM子句提取表名→获取列名 | P1 | 8h |
+| 3 | encryptionKey sync.Once | 加密 | ✅ 已完成 | sync.Once 已实施 | P0 | — |
+| 4 | ExecuteQuery添加超时 | 查询 | ✅ 已完成 | 委托给 ExecuteQueryWithTimeout | P0 | — |
+| 5 | 事务自动清理 | 事务 | ✅ 已完成 | BeginTransaction() 自动调用 startStaleTransactionCleanup() | P1 | — |
+| 6 | 列名自动补全 | 自动补全 | ✅ 已完成 | getColumnSuggestions() 已遍历所有表获取列名 | P1 | — |
 | 7 | 慢查询分析 | 查询分析 | 空实现 | 需查询pg_stat_statements/MySQL slow_log | P1 | 16h |
-| 8 | MySQL SSL/TLS | MySQL驱动 | 忽略SSLMode | 解析SSLMode→添加tls.Config | P1 | 4h |
-| 9 | 审计日志追加写入 | 审计 | 每次全量序列化 | 改为append-only行写入 | P2 | 4h |
-| 10 | 统一池访问 | 连接池 | 双重锁模式 | 移除poolMutex,统一用getOrCreate | P2 | 8h |
-| 11 | Redis类型安全 | Redis API | 原始类型断言 | 改用safe type switch | P2 | 4h |
-| 12 | truncateQuery按字符 | 审计 | 按字节截断 | 使用utf8.RuneCountInString | P2 | 1h |
+| 8 | MySQL SSL/TLS | MySQL驱动 | ✅ 已完成 | disabled/preferred/required/verify-ca/verify-full 已支持 | P1 | — |
+| 9 | 审计日志追加写入 | 审计 | ✅ 已完成 | appendToFile 使用 O_APPEND 增量追加 | P2 | — |
+| 10 | 统一池访问 | 连接池 | ✅ 已完成 | 移除 poolMutex，统一调用 getDriverForConfig() | P2 | — |
+| 11 | Redis类型安全 | Redis API | 原始类型断言 | 改用 safe type switch | P2 | 4h |
+| 12 | truncateQuery按字符 | 审计 | ✅ 已完成 | audit.go:280-285 使用 utf8.RuneCountInString | P2 | — |
 | 13 | 连接分组管理 | 连接管理 | 未实现 | Connection添加Group字段+前端分组UI | P2 | 16h |
 | 14 | SSH隧道连接 | 连接管理 | 未实现 | 添加SSH tunnel库+连接配置 | P2 | 24h |
 | 15 | 数据虚拟滚动 | 前端 | 未实现 | 实现虚拟滚动组件 | P2 | 16h |

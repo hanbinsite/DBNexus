@@ -30,20 +30,20 @@ go vet ./...               # Static analysis
 | File | Responsibility |
 |------|---------------|
 | `main.go` | Entry point, Wails v2 window config |
-| `app.go` | App struct: ctx, driverManager, connections, pool, poolMutex. Startup/shutdown lifecycle |
+| `app.go` | App struct: ctx, driverManager, connections, pool. Startup/shutdown lifecycle |
 | `types.go` | Connection, QueryResult, MultiQueryResult, TableInfo, DatabaseInfo, IndexInfo, ForeignKeyInfo, TableStats, EditRequest, EditResult |
 | `config.go` | connectionToDBConfig, getDriverForConfig (pool-aware), loadConnections, saveConnections |
-| `pool.go` | connectionPool with getOrCreate (double-check locking inside pool.mu), buildKey, evictOldest, GetHealthy, MaxPoolSize=50 |
+| `pool.go` | connectionPool with getOrCreate (double-check locking inside pool.mu), buildKey, evictOldest, getHealthy, MaxPoolSize=50 |
 | `crypto.go` | AES-256-GCM encrypt/decrypt, initEncryptionKey (global `var encryptionKey []byte`) |
 | `connection.go` | GetSupportedDatabases, SaveConnection, DeleteConnection, TestConnection, ConnectToDatabase (uses pool.getOrCreate) |
-| `query.go` | ExecuteQuery (NO timeout), ExecuteMultiQuery, ExecuteNonQuery, splitQueries |
+| `query.go` | ExecuteQuery (delegates to WithTimeout), ExecuteMultiQuery, ExecuteNonQuery, splitQueries |
 | `query_timeout.go` | ExecuteQueryWithTimeout (Default=30s, Max=300s), ExecuteMultiQueryWithTimeout |
 | `schema.go` | GetDatabases/Tables/Views/Functions/Columns/Indexes/ForeignKeys/Stats, sanitizeIdentifier, escapeStringLiteral |
-| `data_editor.go` | EditTableData (INSERT/UPDATE/DELETE), EditRequest with WhereClause, BatchEdit |
+| `data_editor.go` | EditTableData (INSERT/UPDATE/DELETE), EditRequest with PrimaryKey (parameterized), BatchEdit |
 | `data_export.go` | ExportData to CSV/JSON/Excel/SQL, ImportData |
 | `data_compare.go` | CompareTableData, CompareQueryData |
 | `transaction.go` | BeginTransaction, ExecuteInTransaction, Commit/Rollback, globalTransactions map |
-| `audit.go` | AuditLogger singleton (sync.Once), Log, writeToFile, truncateQuery, GetLogs |
+| `audit.go` | AuditLogger singleton (sync.Once), Log, appendToFile, truncateQuery (rune-based), GetLogs |
 | `redis_api.go` | Redis Wails bindings, getRedisDriver (type assertion to *db.RedisDriver) |
 | `i18n.go` | MessageKey enum, a.t(key, lang), zh/en message maps |
 | `autocomplete.go` | GetAutoCompleteSuggestions (table/column/keyword/function/database) |
@@ -59,7 +59,7 @@ go vet ./...               # Static analysis
 | `db/db.go` | DatabaseDriver interface, DriverManager, newDriver() switch, ConnectionConfig, ColumnInfo |
 | `db/types.go` | TableInfo, ViewInfo, FunctionInfo |
 | `db/postgresql.go` | PostgreSQL/PolarDB/GaussDB driver |
-| `db/mysql.go` | MySQL driver (no SSLMode → plaintext credentials) |
+| `db/mysql.go` | MySQL driver (SSLMode support: Tls=false/preferred/true) |
 | `db/sqlite.go` | SQLite driver (CGO) |
 | `db/redis.go` | Redis driver + RedisKeyInfo, SetRedisKeyValue, ExecuteRedisCommand, type assertions on value |
 
@@ -107,11 +107,11 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 ## Connection Pool
 
 - Max 50 connections (`MaxPoolSize` in pool.go:14)
-- Key format: `{type}:{host}:{port}:{username}:{database}` (pool.go:89-91)
+- Key format: `{type}:{host}:{port}:{username}:{database}` (pool.go:79-81)
 - `getOrCreate()` uses internal double-check locking with `pool.mu`
 - Eviction: oldest by `createdAt` (FIFO)
-- Health check: 3s ping timeout via `pingWithTimeout`
-- `GetHealthy`: validates with ping, but has stale reference race (see pitfalls)
+- Health check: 3s ping timeout
+- `getHealthy`: validates with ping, but has stale reference race (see pitfalls)
 
 ---
 
@@ -127,11 +127,11 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 
 ## Known Security Issues (Top 5)
 
-1. **WhereClause SQL injection** — `EditRequest.WhereClause` used raw in SQL (data_editor.go:256). Not sanitized, not parameterized.
-2. **Frontend XSS** — 57 uses of `innerHTML`/`insertAdjacentHTML` with server data (app.js). No sanitization before DOM insertion.
-3. **encryptionKey race condition** — Global `var encryptionKey []byte` has no `sync.Once` protection (crypto.go:14). Concurrent init can overwrite key file.
-4. **MySQL plaintext credentials** — Driver ignores SSLMode (db/mysql.go:23). Credentials sent unencrypted over network.
-5. **No query timeout by default** — `ExecuteQuery` has no deadline (query.go). Can freeze UI indefinitely. Must use `ExecuteQueryWithTimeout`.
+1. **Frontend XSS** — 57 uses of `innerHTML`/`insertAdjacentHTML` (some now fixed, see app.js). Any unsanitized server data in DOM poses XSS risk.
+2. **MySQL plaintext credentials by default** — Driver supports SSLMode (disabled/preferred/required/verify-ca/verify-full) but defaults to no TLS. Credentials sent unencrypted over network when SSLMode left empty.
+3. **Redis command injection** — `ExecuteRedisCommand` allows arbitrary commands including destructive ones like FLUSHALL. No whitelist applied.
+4. **No query audit coverage** — Core query operations (ExecuteQuery, ExecuteMultiQuery, ExecuteNonQuery) are not audit-logged.
+5. **Pool getHealthy TOCTOU race** — `getHealthy` reads driver under RLock, releases, pings. Between release and Lock re-acquire, entry could be removed. Stale reference race.
 
 ---
 

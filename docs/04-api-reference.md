@@ -156,23 +156,27 @@
 
 ### 2.8 GetSupportedFeatures
 
-**签名**: `GetSupportedFeatures(): Promise<Record<string, Array<string>>>`
+**签名**: `GetSupportedFeatures(arg1:string): Promise<Record<string, boolean>>`
 
 **源码**: connection.go:239
 
-**返回值**:
+**参数**: `dbType` — 数据库类型字符串
+
+**返回值**: `map[string]bool` with English boolean keys:
 ```json
 {
-  "postgresql": ["查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"],
-  "mysql": ["查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"],
-  "polardb": [...同PG...],
-  "gaussdb": [...同PG...],
-  "sqlite": ["查询", "插入", "更新", "删除", "事务", "视图", "索引"],
-  "redis": ["GET", "SET", "DEL", "EXISTS", "EXPIRE", "KEYS", "TYPE", "TTL"]
+  "query": true,
+  "multi_query": true,
+  "schema": true,
+  "data_edit": true,
+  "export": true,
+  "import": true,
+  "transaction": true,
+  "autocomplete": true
 }
 ```
 
-**注意**: 功能列表是静态声明，不代表全部已实现
+**注意**: Redis 类型时 `schema` 为 false
 
 ---
 
@@ -214,13 +218,13 @@
 
 ### 3.3 ExecuteNonQuery
 
-**签名**: `ExecuteNonQuery(arg1:main.Connection, arg2:string, arg3:string): Promise<number>`
+**签名**: `ExecuteNonQuery(arg1:main.Connection, arg2:string, arg3:string): Promise<[number, string]>`
 
 **源码**: query.go:70
 
 **参数**: `(Connection, database, query)`
 
-**返回值**: `rowsAffected` (int64 → number)
+**返回值**: `(int64, string, error)` → Wails 序列化为 `[rowsAffected, message]`
 
 **错误**: "connection failed" / "execution failed"
 
@@ -377,13 +381,13 @@
 
 **源码**: data_editor.go:18
 
-**参数**: `(Connection, EditRequest{operation, table, database, data, whereClause, primaryKey})`
+**参数**: `(Connection, EditRequest{operation, table, database, data, primaryKey})` — 注意 WHERE 通过 PrimaryKey 参数化，无 whereClause 字段
 
 **操作类型**: INSERT / UPDATE / DELETE
 
 **验证**: table 非空, database 非空, sanitizeIdentifier(table) 合法
 
-**⚠️ 安全注意**: `whereClause` 直接拼接进 SQL，未参数化
+**✅ 安全**: WHERE 条件从 `PrimaryKey` 字段构建参数化查询 (data_editor.go:159/217)
 
 ---
 
@@ -425,11 +429,11 @@
 
 ### 5.5 GenerateUpdateStatement
 
-**签名**: `GenerateUpdateStatement(arg1:string, arg2:Record<string, any>, arg3:string): Promise<string>`
+**签名**: `GenerateUpdateStatement(arg1:string, arg2:Record<string, any>, arg3:Record<string, any>): Promise<string>`
 
-**源码**: data_editor.go:309
+**源码**: data_editor.go:322
 
-**参数**: `(tableName, data, whereClause)`
+**参数**: `(tableName, data, primaryKey)` — primaryKey 是列名→值映射，用于参数化 WHERE
 
 **返回值**: SQL UPDATE 语句字符串
 
@@ -603,7 +607,7 @@
 
 **签名**: `GetRedisKeyInfo(arg1:main.Connection, arg2:string): Promise<db.RedisKeyInfo>`
 
-**源码**: redis_api.go:13-31
+**源码**: redis_api.go:13
 
 **参数**: `(Connection, keyName)`
 
@@ -625,7 +629,7 @@
 
 **签名**: `SetRedisKeyValue(arg1:main.Connection, arg2:string, arg3:any, arg4:number): Promise<void>`
 
-**源码**: redis_api.go:34-66
+**源码**: redis_api.go:34
 
 **参数**: `(Connection, key, value, ttl)` — ttl: 过期时间秒数, 0=永不过期
 
@@ -824,7 +828,7 @@
 
 **签名**: `AnalyzeQuery(arg1:string): Promise<main.QueryAnalysis>`
 
-**源码**: query_analyzer.go:549-587
+**源码**: query_analyzer.go:158
 
 **参数**: `query` — SQL 查询字符串
 
@@ -838,7 +842,7 @@
 
 **签名**: `GetSlowQueries(arg1:main.Connection, arg2:string, arg3:number): Promise<Array<Record<string, any>>>`
 
-**源码**: query_analyzer.go:707-711
+**源码**: query_analyzer.go:300
 
 **⚠️ 未实现**: 始终返回空数组
 
@@ -858,7 +862,7 @@
 
 **签名**: `AnalyzeTableUsage(arg1:main.Connection, arg2:string): Promise<Array<Record<string, any>>>`
 
-**源码**: query_analyzer.go:739-766
+**源码**: query_analyzer.go:327
 
 **返回值**: 每个表的 `{table_name, row_count, data_size, index_size, total_size}`
 
@@ -964,9 +968,32 @@
 
 ### 16.1 GetServerInfo
 
-**签名**: `GetServerInfo(arg1:main.Connection): Promise<Record<string, string>>`
+**签名**: `GetServerInfo(): Promise<Record<string, any>>`
 
-**源码**: test.go:86-136
+**源码**: app.go:99
+
+**参数**: 无
+
+**返回值**: `map[string]interface{}` — server metadata:
+```json
+{
+  "version": "1.0.0",
+  "wailsVersion": "2.12.0",
+  "goVersion": "1.24.0",
+  "poolSize": 3,
+  "maxPoolSize": 50
+}
+```
+
+---
+
+### 16.2 GetDatabaseServerInfo
+
+**签名**: `GetDatabaseServerInfo(arg1:main.Connection): Promise<Record<string, string>>`
+
+**源码**: test.go:71
+
+**参数**: `Connection` — 数据库连接配置
 
 **返回值**: `{type, host, port, database, version?, table_count?, error?}`
 
@@ -1071,10 +1098,10 @@ try {
 | Query Analyzer | GetExplainPlan, AnalyzeQuery, GetSlowQueries, AnalyzeTableUsage | 4 |
 | Window | WindowMinimize, WindowMaximize, WindowClose, WindowIsMaximized | 4 |
 | Language | GetLanguage, SetLanguage | 2 |
-| Server Info | GetServerInfo | 1 |
+| Server Info | GetServerInfo, GetDatabaseServerInfo | 2 |
 | File Dialog | OpenFileDialog, SaveFileDialog | 2 |
 | Test | RunAllTests, RunConnectionTest | 2 |
 | Audit *(规划)* | GetAuditLogs, ExportAuditLogs, ClearOldAuditLogs | 3* |
-| **Total** | | **72** |
+| **Total** | | **73** |
 
 **⚠️ 注意**: App.d.ts 列出 69 个方法声明（已实现的Go后端方法）。文档中额外标注了 3 个规划/扩展方法（Audit 3个 — GetAuditLogs/ExportAuditLogs/ClearOldAuditLogs），总计 72 个方法定义。`ScanRedisKeys` 的 Go 返回值 `([]string, uint64, error)` 在 Wails 中仅序列化第一个返回值。`ValidateSQL` 的 Go 返回值 `(bool, []string)` 在 App.d.ts 中映射为 `Promise<boolean|Array<string>>`。

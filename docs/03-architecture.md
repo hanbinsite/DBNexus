@@ -574,9 +574,9 @@ const WailsAPI = {
 
 | # | 问题 | 位置 | 影响 | 建议 |
 |---|------|------|------|------|
-| 9 | **getColumnSuggestions 返回空** | `autocomplete.go` "简化版本返回空" | 列名自动补全永远不工作，SELECT/WHERE 后无法补全当前表的列 | 实现 FROM 子句表名提取 + 列名查询，或至少调用 `GetTableColumnsForAutoComplete` |
+| 9 | **getColumnSuggestions 已实现** | `autocomplete.go:317-346` | ✅ 已修复: 遍历所有表获取列名补全 | — |
 | 10 | **i18n 覆盖不完整** | Go 侧大量硬编码中文 | `data_editor.go` "验证失败"/"连接数据库失败"、`connection.go:227` "连接失败"、`transaction.go:116` "开始事务失败" 等硬编码中文，`SetLanguage()` 改为英文后这些消息不变 | 将所有 Go 侧用户可见消息纳入 `i18n.go` messages map |
-| 11 | **MySQL/PG identifier 引号不一致** | `data_editor.go:126` 使用反引号 `` ` `` 包裹标识符（MySQL 风格），`schema.go` PG 使用双引号 `"` | data_editor 的 INSERT/UPDATE/DELETE 语句在 PostgreSQL 上使用反引号会语法错误 | 根据 `config.Type` 动态选择引号：MySQL → 反引号，PG → 双引号 |
+| 11 | **MySQL/PG identifier 引号不一致** | `data_editor.go:108-116` | ✅ 已修复: `quoteIdentifier()` 按 dbType 选择引号（PG → 双引号，MySQL/SQLite → 反引号） | — |
 | 12 | **事务超时 context 设计** | `transaction.go:111-127` | `BeginTx` 使用 10s timeout context 创建事务，但事务本身使用 `context.Background()`（无超时）。如果事务长时间持有，DB 端可能已超时，Go 侧事务仍存活 | 事务使用可取消的 context，前端 Commit/Rollback 时 cancel |
 | 13 | **front-end 纯 JS 无构建步骤** | `frontend/dist/app.js` 3502行单文件 | 无模块化、无 tree-shaking、无 lint/type check，维护困难 | 引入 Vite + TypeScript，拆分模块 |
 

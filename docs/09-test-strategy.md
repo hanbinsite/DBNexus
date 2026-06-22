@@ -11,10 +11,10 @@
 
 | 模块 | 测试文件 | 覆盖率 | 关键缺失 |
 |------|---------|--------|---------|
-| crypto.go | 无 | 0% | 加密/解密正确性、key竞态 |
-| pool.go | 无 | 0% | 并发getOrCreate、淘汰策略、GetHealthy竞态 |
-| connection.go | 无 | 0% | 连接CRUD、密码加密/解密流程 |
-| query.go | 无 | 0% | 查询执行、splitQueries |
+| crypto.go | app_test.go | ~80% | 并发竞态测试 |
+| pool.go | app_test.go | ~60% | GetHealthy 竞态、淘汰策略 |
+| connection.go | app_test.go | ~50% | Save/Delete/Test/Connect/GetSupportedDatabases/GetSupportedFeatures 已覆盖 |
+| query.go | app_test.go | ~60% | splitQueries 已覆盖，Execute 路径需要 mock driver |
 | query_timeout.go | 无 | 0% | 超时机制、行扫描中断 |
 | schema.go | 无 | 0% | sanitizeIdentifier、escapeStringLiteral |
 | data_editor.go | 无 | 0% | SQL注入防护、参数化值 |
@@ -66,48 +66,25 @@
 
 #### crypto.go — 加密/解密正确性
 
+> **已有测试** in app_test.go: TestEncryptDecrypt, TestCryptoEdgeCases
+
 ```
-TestEncryptDecrypt:
-  - 加密→解密还原原始密码
-  - 空字符串加密返回空
-  - 密钥错误时解密失败
-  - 并发调用initEncryptionKey不覆盖key
-
-TestEncryptPassword:
-  - 正常密码加密返回Base64
-  - 空密码返回空字符串
-
-TestDecryptPassword:
-  - 正常加密密文可解密
-  - 空密文返回空
-  - 无效Base64返回错误
-  - 截断密文返回错误
+TestEncryptDecrypt: ✅ 已有
+TestEncryptPassword: ✅ 已有
+TestDecryptPassword: ✅ 已有
+TestConcurrentInitEncryptionKey: (待添加)
 ```
 
 #### pool.go — 连接池并发安全
 
+> **已有测试** in app_test.go: TestConnectionPool, TestPoolEviction, TestPoolGetHealthy
+
 ```
-TestConnectionPool_GetOrCreate:
-  - 首次创建新driver
-  - 已有健康连接时复用
-  - 不健康连接时重新创建
-  - 并发getOrCreate不panic
-
-TestConnectionPool_EvictOldest:
-  - 超MaxPoolSize时淘汰最旧
-  - 空pool时evict不panic
-
-TestConnectionPool_Remove:
-  - 移除存在/不存在的key
-  - 移除时调用driver.Close
-
-TestConnectionPool_GetHealthy:
-  - 健康连接返回true
-  - 不健康连接移除并返回false
-  - 不存在的key返回false
-
-TestBuildKey:
-  - 键格式正确: {type}:{host}:{port}:{user}:{db}
+TestConnectionPool_GetOrCreate: ✅ 已有
+TestConnectionPool_EvictOldest: ✅ 已有
+TestConnectionPool_Remove: ✅ 已有
+TestConnectionPool_GetHealthy: ✅ 已有
+TestBuildKey: ✅ 已有
 ```
 
 #### schema.go — SQL注入防护
@@ -159,15 +136,10 @@ TestFormatValueForSQL:
 
 #### query.go — 查询分割
 
+> **已有测试** in app_test.go: TestSplitQueries
+
 ```
-TestSplitQueries:
-  - 单条查询
-  - 多条分号分隔查询
-  - 引号内分号不分割
-  - 反斜杠转义处理
-  - 末尾无分号的查询
-  - 空查询返回空数组
-  - 仅空白+分号返回空数组
+TestSplitQueries: ✅ 已有
 ```
 
 ### 3.2 优先级P1模块

@@ -79,11 +79,3 @@ func (a *App) t(key MessageKey, lang string) string {
 	}
 	return string(key)
 }
-
-func (a *App) getCurrentLang() string {
-	lang := a.GetLanguage()
-	if lang == "" {
-		lang = "zh"
-	}
-	return lang
-}

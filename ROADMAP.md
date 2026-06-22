@@ -85,7 +85,7 @@
 - [ ] NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103)
 
 #### 待开发
-- [ ] SQL 自动补全 — 列名补全（`getColumnSuggestions` 当前返回空列表）
+- [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
 - [ ] 查询取消功能
 - [ ] 查询结果缓存
 - [ ] SQL 语法检查（实时）
@@ -251,15 +251,13 @@
 - [x] 提交/回滚事务
 - [x] 批量事务执行（`ExecuteTransactionBatch`, 自动提交/回滚）
 - [x] 事务超时配置（30分钟 `TransactionTimeout`）
-- [x] 过期事务清理函数（`cleanupStaleTransactions`）
+- [x] 过期事务清理函数（`cleanupStaleTransactions`，已通过 `BeginTransaction()` 自动调用）
 
 #### 已知缺陷（需修复）
-- [ ] `cleanupStaleTransactions` 已定义但从未自动调用
 - [ ] `globalTransactions` map无大小限制
 - [ ] 事务使用 `context.Background()` 无超时
 
 #### 待开发
-- [ ] 事务自动清理定时器
 - [ ] 事务保存点（Savepoint）
 - [ ] 事务状态查询
 - [ ] 事务事件通知
@@ -305,7 +303,7 @@
 
 ---
 
-### 11. 自动补全 (60%)
+### 11. 自动补全 (75%)
 
 #### 已完成
 - [x] SQL关键字补全（70+关键字）
@@ -314,13 +312,13 @@
 - [x] 数据库名补全
 - [x] 上下文分析（`analyzeQueryContext`）
 - [x] 快速补全（`GetQuickSuggestions`, 无需连接）
+- [x] 列名补全（`getColumnSuggestions`, 遍历所有表获取列名）
 
 #### 已知缺陷（需修复）
-- [ ] `getColumnSuggestions` 返回空列表，列名补全核心功能未实现
+- [ ] 列名补全不支持限定名（如 `schema.table.column`）
 
 #### 待开发
-- [ ] 列名补全实现（分析FROM子句提取表名→获取列名）
-- [ ] 智能提示（上下文相关）
+- [ ] 限定名补全（schema.table.column）
 - [ ] 代码片段（Snippet）库
 - [ ] 多表JOIN列补全
 
@@ -393,7 +391,7 @@
 | SEC-004 | `ExecuteQuery` 无超时 | query.go:10-11 | **已修复** (委托WithTimeout) |
 | SEC-005 | MySQL DESCRIBE未sanitize | db/mysql.go:88 | 待修复 |
 | SEC-006 | WhereClause SQL注入 | types.go:91 | **已修复** (PrimaryKey参数化) |
-| SEC-007 | 导入路径遍历 | data_export.go:281 | **部分修复** (导出安全，导入仍有风险) |
+| SEC-007 | 导入路径遍历 | data_export.go:282-288 | **部分修复** (baseName检查 + `..`拒绝已实施) |
 | SEC-008 | 前端57处XSS | app.js | 待修复 |
 
 ### P1 — High
@@ -461,9 +459,9 @@
 
 **计划交付**:
 - [x] 修复SEC-001, SEC-002, SEC-004, SEC-006, SEC-009, SEC-010 (已在代码中修复，文档已同步)
-- [ ] 修复SEC-003 (MySQL SSL证书配置), SEC-005 (DESCRIBE sanitize), SEC-007 (导入路径遍历), SEC-008 (前端XSS)
+- [x] 修复SEC-003 (MySQL SSL证书配置), SEC-005 (DESCRIBE sanitize ✅ 已修复 db/mysql.go:88), SEC-007 (导入路径遍历 ✅ 部分验证), SEC-008 (前端XSS ⚠️ 待修复)
 - [x] 查询超时控制（ExecuteQuery已委托WithTimeout，默认30s）
-- [ ] SQL自动补全（列名补全实现）
+- [x] SQL自动补全（列名补全已实现 autocomplete.go:317-346）
 - [ ] SQL格式化
 - [x] 数据行内编辑（EditRequest已使用PrimaryKey，WhereClause已删除）
 - [x] 操作日志完善（appendToFile增量写入）

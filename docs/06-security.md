@@ -381,7 +381,7 @@ func truncateQuery(query string, maxLen int) string {  // audit.go:280 ✅ rune�
 | 1 | **encryptionKey race condition** | crypto.go:16 | Key corruption → saved passwords irrecoverable | `sync.Once` | ✅ 已修复 (crypto.go:17) |
 | 2 | **WhereClause SQL injection** | types.go:91, data_editor.go:159/180/217/228 | Arbitrary SQL execution via crafted WHERE clause | Parameterized queries with PrimaryKey | ✅ 已修复 (types.go:96) |
 | 3 | **Frontend XSS via innerHTML** | app.js (57 locations, 3502 lines) | Script injection via database data | textContent / createElement / DOMPurify | ⚠️ 待修复 |
-| 4 | **MySQL plaintext credentials** | db/mysql.go:23-32 | Credentials sent unencrypted over network | Parse SSLMode config, add tls=true to DSN | ⚠️ 部分修复 (basic SSL modes supported) |
+| 4 | **MySQL plaintext credentials** | db/mysql.go:23-32 | Credentials sent unencrypted over network | Parse SSLMode config, add tls=true to DSN | 🚧 部分修复 (disabled/preferred/required/verify-ca/verify-full 已支持) |
 | 5 | **No query timeout by default** | query.go:10-11 | Long-running queries block UI indefinitely | Always use ExecuteQueryWithTimeout (default 30s) | ✅ 已修复 (query.go:10-11 delegates) |
 | 6 | **Password exposed to frontend** | connection.go:22 | Encrypted passwords viewable in DevTools | Clear Password in GetConnections() response | ✅ 已修复 (connection.go:26) |
 
@@ -401,7 +401,7 @@ func truncateQuery(query string, maxLen int) string {  // audit.go:280 ✅ rune�
 | 11 | **truncateQuery UTF-8 truncation** | audit.go:280-285 | Corrupted audit log entries | rune-level truncation | ✅ 已修复 (audit.go:280-285) |
 | 12 | **config.json 0644 permissions** | app.go:92 | Other users can read config | Change to 0600 | ⚠️ 待修复 |
 | 13 | **exports directory was 0755** | data_export.go:89 | Other users could read exported data | Change to 0700 | ✅ 已修复 (now 0700) |
-| 14 | **SQLite identifier backticks for PG** | data_editor.go:126/175/185/233 | Syntax errors → potential error-based information leak | Dynamic quote selection | ⚠️ 待修复 |
+| 14 | **SQLite identifier backticks for PG** | data_editor.go:126/175/185/233 | Syntax errors → potential error-based information leak | ✅ 已修复: `quoteIdentifier()` (data_editor.go:108) 按 dbType 动态选择引号 |
 | 15 | **No rate limiting on Redis commands** | redis_api.go:64 | Repeated FLUSHALL via loop | Rate limit + command whitelist | ⚠️ 待修复 |
 
 ### P3 — Low
@@ -437,7 +437,8 @@ func truncateQuery(query string, maxLen int) string {  // audit.go:280 ✅ rune�
 2. **Query audit logging** — 所有 ExecuteQuery/ExecuteMultiQuery 添加审计
 3. **Config file permissions** — config.json 改为 0600
 4. **MySQL DESCRIBE unsanitized** — db/mysql.go:88 DESCRIBE + tableName 未使用 sanitizeIdentifier
-5. **Import path traversal** — data_export.go:281 importFromCSV 文件名未验证路径遍历
+5. **SQLite PRAGMA unsanitized** — db/sqlite.go:92 PRAGMA table_info + tableName 未使用 sanitizeIdentifier
+6. **Import path traversal** — data_export.go:282-288 `baseName` 检查 + `..` 拒绝 + `filepath.Base` 防路径遍历，**已部分验证**
 
 ### 8.3 Long-term (v3.0)
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"db-server/db"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,13 +14,14 @@ func TestSanitizeIdentifier(t *testing.T) {
 	}{
 		{"users", "users"},
 		{"user_data", "user_data"},
-		{"Table123", "Table123"},
-		{"public.users", "public.users"},
-		{"users123", "users123"},
-		{"table`name", "tablename"},
-		{"table'name", "tablename"},
-		{`table"name`, "tablename"},
-		{"normal_table", "normal_table"},
+		{"schema.table", "schema.table"},
+		{"", "invalid_identifier"},
+		{"..", "invalid_identifier"},
+		{"; DROP TABLE", "invalid_identifier"},
+		{"user--data", "invalid_identifier"},
+		{"user/*comment*/data", "invalid_identifier"},
+		{"a.b.c", "invalid_identifier"},
+		{"1tab", "1tab"},
 	}
 
 	for _, tt := range tests {
@@ -30,51 +32,20 @@ func TestSanitizeIdentifier(t *testing.T) {
 	}
 }
 
-func TestSanitizeIdentifierBlocksDangerous(t *testing.T) {
-	dangerous := []string{
-		"; DROP TABLE",
-		"-- comment",
-		"/* attack */",
-		"users; DROP",
-		"table' OR '1'='1",
-		"users UNION SELECT",
-		"table\x00name",
-		"table\nname",
-		"table\rname",
-		"table name",
-	}
-
-	for _, input := range dangerous {
-		result := sanitizeIdentifier(input)
-		if result == input || result == "" {
-			t.Errorf("sanitizeIdentifier(%q) was not properly sanitized, got %q", input, result)
-		}
-	}
-}
-
-func TestParsePostgresArray(t *testing.T) {
+func TestEscapeStringLiteral(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected []string
+		expected string
 	}{
-		{"{a,b,c}", []string{"a", "b", "c"}},
-		{"{single}", []string{"single"}},
-		{"{}", []string{}},
-		{`{"a,b",c}`, []string{"a,b", "c"}},
-		{"", []string{}},
-		{"invalid", []string{}},
+		{"normal", "normal"},
+		{"it's", "it''s"},
+		{"", ""},
 	}
 
 	for _, tt := range tests {
-		result := parsePostgresArray(tt.input)
-		if len(result) != len(tt.expected) {
-			t.Errorf("parsePostgresArray(%q) length = %d, want %d", tt.input, len(result), len(tt.expected))
-			continue
-		}
-		for i, v := range result {
-			if v != tt.expected[i] {
-				t.Errorf("parsePostgresArray(%q)[%d] = %q, want %q", tt.input, i, v, tt.expected[i])
-			}
+		result := escapeStringLiteral(tt.input)
+		if result != tt.expected {
+			t.Errorf("escapeStringLiteral(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
 	}
 }
@@ -114,7 +85,7 @@ func TestContains(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := contains(tt.s, tt.substr)
+		result := strings.Contains(tt.s, tt.substr)
 		if result != tt.expect {
 			t.Errorf("contains(%q, %q) = %v, want %v", tt.s, tt.substr, result, tt.expect)
 		}
@@ -131,36 +102,19 @@ func TestConnectionPool(t *testing.T) {
 	if pool.connections == nil {
 		t.Error("connection pool map not initialized")
 	}
-
-	pooled, exists := pool.get("nonexistent")
-	if exists {
-		t.Error("get on empty pool should return false")
-	}
-	if pooled != nil {
-		t.Error("get on empty pool should return nil pooled driver")
-	}
-}
-
-func TestConnectionPoolSetAndGet(t *testing.T) {
-	pool := newConnectionPool()
-	pool.set("test-key", nil)
-
-	pooled, exists := pool.get("test-key")
-	if !exists {
-		t.Error("expected driver to exist after set")
-	}
-	if pooled == nil {
-		t.Error("expected pooled driver to not be nil")
-	}
 }
 
 func TestConnectionPoolRemove(t *testing.T) {
 	pool := newConnectionPool()
-	pool.set("test-key", nil)
+	pool.connections["test-key"] = &pooledDriver{
+		driver:    nil,
+		createdAt: time.Now(),
+		lastPing:  time.Now(),
+	}
 
 	pool.remove("test-key")
 
-	_, exists := pool.get("test-key")
+	_, exists := pool.connections["test-key"]
 	if exists {
 		t.Error("expected driver to be removed after remove")
 	}
@@ -168,8 +122,16 @@ func TestConnectionPoolRemove(t *testing.T) {
 
 func TestConnectionPoolCloseAll(t *testing.T) {
 	pool := newConnectionPool()
-	pool.set("key1", nil)
-	pool.set("key2", nil)
+	pool.connections["key1"] = &pooledDriver{
+		driver:    nil,
+		createdAt: time.Now(),
+		lastPing:  time.Now(),
+	}
+	pool.connections["key2"] = &pooledDriver{
+		driver:    nil,
+		createdAt: time.Now(),
+		lastPing:  time.Now(),
+	}
 
 	pool.closeAll()
 
@@ -179,6 +141,8 @@ func TestConnectionPoolCloseAll(t *testing.T) {
 }
 
 func TestBuildKey(t *testing.T) {
+	pool := newConnectionPool()
+
 	tests := []struct {
 		dbType      string
 		host        string
@@ -199,7 +163,7 @@ func TestBuildKey(t *testing.T) {
 			Username: tt.user,
 			Database: tt.db,
 		}
-		key := buildKey(config)
+		key := pool.buildKey(config)
 		if key != tt.expectedKey {
 			t.Errorf("buildKey() = %q, want %q", key, tt.expectedKey)
 		}
@@ -288,7 +252,6 @@ func TestConnectionSaveAndDelete(t *testing.T) {
 		t.Errorf("expected connection name 'test-conn', got %q", app.connections[0].Name)
 	}
 
-	// Delete by ID
 	connID := app.connections[0].ID
 	err = app.DeleteConnection(connID)
 	if err != nil {
@@ -318,13 +281,21 @@ func TestGetSupportedDatabases(t *testing.T) {
 
 func TestGetSupportedFeatures(t *testing.T) {
 	app := &App{}
-	features := app.GetSupportedFeatures()
 
-	expectedTypes := []string{"postgresql", "mysql", "polardb", "gaussdb", "sqlite", "redis"}
-	for _, dbType := range expectedTypes {
-		if _, exists := features[dbType]; !exists {
-			t.Errorf("expected features for %q, but not found", dbType)
-		}
+	redisFeatures := app.GetSupportedFeatures("redis")
+	if redisFeatures["redis_commands"] != true {
+		t.Error("expected redis_commands to be true for redis")
+	}
+	if redisFeatures["transaction"] != false {
+		t.Error("expected transaction to be false for redis")
+	}
+
+	pgFeatures := app.GetSupportedFeatures("postgresql")
+	if pgFeatures["query"] != true {
+		t.Error("expected query to be true for postgresql")
+	}
+	if pgFeatures["transaction"] != true {
+		t.Error("expected transaction to be true for postgresql")
 	}
 }
 

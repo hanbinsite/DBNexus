@@ -21,16 +21,16 @@
 ```
 db-server/
 ├── main.go              # Entry point, Wails v2 config
-├── app.go               # App struct: ctx, driverManager, connections, pool, poolMutex
+├── app.go               # App struct: ctx, driverManager, connections, pool
 ├── types.go             # Connection, QueryResult, TableInfo, IndexInfo, ForeignKeyInfo, etc.
 ├── config.go            # connectionToDBConfig, getDriverForConfig, load/saveConnections
-├── pool.go              # connectionPool, getOrCreate, buildKey, evictOldest, GetHealthy
+├── pool.go              # connectionPool, getOrCreate, buildKey, evictOldest, getHealthy
 ├── crypto.go            # AES-256-GCM encrypt/decrypt, initEncryptionKey (global var)
 ├── connection.go        # CRUD, TestConnection, ConnectToDatabase, GetSupportedDatabases
 ├── query.go             # ExecuteQuery, ExecuteMultiQuery, splitQueries
 ├── query_timeout.go     # ExecuteQueryWithTimeout (Default=30s, Max=300s)
 ├── schema.go            # GetTables/Views/Functions/Columns/Indexes/ForeignKeys/Stats, sanitizeIdentifier
-├── data_editor.go       # EditTableData, EditRequest (WhereClause!), BatchEdit
+├── data_editor.go       # EditTableData, EditRequest (PrimaryKey!), BatchEdit
 ├── data_export.go       # ExportData CSV/JSON/Excel/SQL
 ├── data_compare.go      # CompareTableData, CompareQueryData
 ├── transaction.go       # Begin/Commit/Rollback, globalTransactions map
@@ -46,7 +46,7 @@ db-server/
 │   ├── db.go            # DatabaseDriver interface, DriverManager, ConnectionConfig, ColumnInfo
 │   ├── types.go         # TableInfo, ViewInfo, FunctionInfo (db package types)
 │   ├── postgresql.go    # PostgreSQL/PolarDB/GaussDB driver
-│   ├── mysql.go         # MySQL driver (no SSLMode support)
+│   ├── mysql.go         # MySQL driver (SSLMode support: disabled/preferred/required/verify-ca/verify-full)
 │   ├── sqlite.go        # SQLite driver
 │   └── redis.go         # Redis driver + RedisKeyInfo, type assertions on value
 ├── frontend/dist/
@@ -127,11 +127,9 @@ Extensive use of `innerHTML` and `insertAdjacentHTML` with data from server resp
 
 **Status**: **已修复**. `query.go:10-11` now delegates `ExecuteQuery` to `ExecuteQueryWithTimeout` with default `QueryOptions{}` (30s timeout). `ExecuteMultiQuery` similarly delegates at query.go:14-15. The old direct implementation with no timeout has been removed.
 
-### 5. globalTransactions cleanup implemented
+### 5. globalTransactions cleanup implemented — RESOLVED
 
-**File**: `transaction.go:57-69`
-
-`cleanupStaleTransactions()` exists at transaction.go:69 and `startStaleTransactionCleanup()` at transaction.go:57. However, `startStaleTransactionCleanup` is not called automatically in `startup()`. Abandoned transactions still accumulate until manual cleanup.
+**Status**: **已修复**. `cleanupStaleTransactions()` exists at transaction.go:69 and `startStaleTransactionCleanup()` at transaction.go:57. It is now auto-started on first `BeginTransaction()` call at transaction.go:83.
 
 ### 6. Dual pool locking pattern — RESOLVED
 
@@ -153,21 +151,15 @@ Extensive use of `innerHTML` and `insertAdjacentHTML` with data from server resp
 
 **Status**: **已修复**. `audit.go:280-285` now uses `utf8.RuneCountInString()` for length and `[]rune` slicing, correctly handling Chinese and other multi-byte characters.
 
-### 10. MySQL driver ignores SSLMode (plaintext credentials over network)
+### 10. MySQL driver now supports SSLMode — RESOLVED (basic modes)
 
-**File**: `db/mysql.go:23`
+**Status**: **已修复**. `db/mysql.go:23-32` now parses `config.SSLMode` and adds `?tls=false/preferred/true` to the MySQL connection string. Note: Default (empty SSLMode) still means no TLS, credentials sent plaintext by default.
 
-Connection string has no TLS config: `%s:%s@tcp(%s:%d)/%s`. SSLMode field is defined in ConnectionConfig but MySQL driver never uses it. Credentials transmitted plaintext.
+### 11. getHealthy has stale reference race between read and re-validate
 
-**Fix**: Parse `config.SSLMode` and add `tls=true` or custom TLS config to MySQL connection string.
+**File**: `pool.go:135-168`
 
-### 11. GetHealthy has stale reference race between read and re-validate
-
-**File**: `pool.go:197-223`
-
-`GetHealthy` reads `pooled` under RLock, releases lock, pings, then re-acquires Lock to update `lastPing`. Between releasing RLock and acquiring Lock, another goroutine could remove the entry, making the `pooled` reference stale.
-
-**Fix**: After ping succeeds, re-read `pooled` under Lock before updating, or re-validate existence.
+`getHealthy` reads `pooled` under RLock, releases lock, pings, then re-acquires Lock to update `lastPing`. Between releasing RLock (L144) and re-acquiring Lock (L150), another goroutine could remove the entry. The `driver` variable is snapshotted at L143 before release though, so the ping uses a valid (possibly stale) reference. After ping, L151-165 re-checks existence under Lock.
 
 ### 12. Don't add comments to Go code unless asked
 

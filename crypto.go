@@ -9,45 +9,48 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-var encryptionKey []byte
+var (
+	encryptionKey  []byte
+	encryptionOnce sync.Once
+	encryptionErr  error
+)
 
 func initEncryptionKey() error {
-	if encryptionKey != nil {
-		return nil
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	keyPath := filepath.Join(homeDir, ".db-client", ".key")
-
-	// Try to read existing key
-	data, err := os.ReadFile(keyPath)
-	if err == nil {
-		decoded, err := base64.StdEncoding.DecodeString(string(data))
-		if err == nil && len(decoded) == 32 {
-			encryptionKey = decoded
-			return nil
+	encryptionOnce.Do(func() {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			encryptionErr = err
+			return
 		}
-	}
 
-	// Generate new key
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return err
-	}
+		keyPath := filepath.Join(homeDir, ".db-client", ".key")
 
-	encryptionKey = key
+		data, err := os.ReadFile(keyPath)
+		if err == nil {
+			decoded, err := base64.StdEncoding.DecodeString(string(data))
+			if err == nil && len(decoded) == 32 {
+				encryptionKey = decoded
+				return
+			}
+		}
 
-	// Save key
-	configDir := filepath.Dir(keyPath)
-	os.MkdirAll(configDir, 0755)
-	encoded := base64.StdEncoding.EncodeToString(key)
-	return os.WriteFile(keyPath, []byte(encoded), 0600)
+		key := make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			encryptionErr = err
+			return
+		}
+
+		encryptionKey = key
+
+		configDir := filepath.Dir(keyPath)
+		os.MkdirAll(configDir, 0700)
+		encoded := base64.StdEncoding.EncodeToString(key)
+		encryptionErr = os.WriteFile(keyPath, []byte(encoded), 0600)
+	})
+	return encryptionErr
 }
 
 func encryptPassword(password string) (string, error) {

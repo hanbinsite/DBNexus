@@ -343,9 +343,8 @@ type EditRequest struct {
 ```go
 type EditResult struct {
     Success      bool   `json:"success"`          // 操作是否成功
-    Message      string `json:"message"`          // 结果消息 (中文)
-    RowsAffected int64  `json:"rowsAffected"`     // 影响行数
     Error        string `json:"error,omitempty"`  // 错误消息
+    RowsAffected int64  `json:"rows_affected,omitempty"` // 影响行数
 }
 ```
 

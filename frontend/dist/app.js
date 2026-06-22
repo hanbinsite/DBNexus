@@ -42,6 +42,8 @@ const WailsAPI = {
     executeQuery: (conn, db, query) => window.go.main.App.ExecuteQuery(conn, db, query),
     executeMultiQuery: (conn, db, query) => window.go.main.App.ExecuteMultiQuery(conn, db, query),
     executeNonQuery: (conn, db, query) => window.go.main.App.ExecuteNonQuery(conn, db, query),
+    executeQueryWithTimeout: (conn, db, query, options) => window.go.main.App.ExecuteQueryWithTimeout(conn, db, query, options),
+    executeMultiQueryWithTimeout: (conn, db, query, options) => window.go.main.App.ExecuteMultiQueryWithTimeout(conn, db, query, options),
     
     // Window Controls
     windowMinimize: () => window.go.main.App.WindowMinimize(),
@@ -61,15 +63,66 @@ const WailsAPI = {
     runConnectionTest: (conn) => window.go.main.App.RunConnectionTest(conn),
     runAllTests: () => window.go.main.App.RunAllTests(),
     getSupportedFeatures: () => window.go.main.App.GetSupportedFeatures(),
-    getServerInfo: (conn) => window.go.main.App.GetServerInfo(conn),
+    getServerInfo: () => window.go.main.App.GetServerInfo(),
+    getDatabaseServerInfo: (conn) => window.go.main.App.GetDatabaseServerInfo(conn),
     
     // Table Info
     getTableIndexes: (conn, db, table) => window.go.main.App.GetTableIndexes(conn, db, table),
     getTableForeignKeys: (conn, db, table) => window.go.main.App.GetTableForeignKeys(conn, db, table),
     getTableStats: (conn, db, table) => window.go.main.App.GetTableStats(conn, db, table),
     
-    // Utility
-    greet: (name) => window.go.main.App.Greet(name)
+    // Data Editing
+    editTableData: (conn, req) => window.go.main.App.EditTableData(conn, req),
+    batchEdit: (conn, requests) => window.go.main.App.BatchEdit(conn, requests),
+    getEditableColumns: (conn, db, table) => window.go.main.App.GetEditableColumns(conn, db, table),
+    generateInsertStatement: (table, data) => window.go.main.App.GenerateInsertStatement(table, data),
+    generateUpdateStatement: (table, data, pk) => window.go.main.App.GenerateUpdateStatement(table, data, pk),
+    
+    // Data Export/Import
+    exportData: (conn, req) => window.go.main.App.ExportData(conn, req),
+    importData: (conn, req) => window.go.main.App.ImportData(conn, req),
+    
+    // Data Compare
+    compareTables: (conn, req) => window.go.main.App.CompareTables(conn, req),
+    compareQueries: (conn, req) => window.go.main.App.CompareQueries(conn, req),
+    getCompareReport: (result) => window.go.main.App.GetCompareReport(result),
+    exportCompareResult: (result, format) => window.go.main.App.ExportCompareResult(result, format),
+    
+    // Transaction Management
+    beginTransaction: (conn, db, options) => window.go.main.App.BeginTransaction(conn, db, options),
+    executeInTransaction: (txID, query) => window.go.main.App.ExecuteInTransaction(txID, query),
+    commitTransaction: (txID) => window.go.main.App.CommitTransaction(txID),
+    rollbackTransaction: (txID) => window.go.main.App.RollbackTransaction(txID),
+    executeTransactionBatch: (req) => window.go.main.App.ExecuteTransactionBatch(req),
+    
+    // Redis
+    getRedisKeyInfo: (conn, key) => window.go.main.App.GetRedisKeyInfo(conn, key),
+    setRedisKeyValue: (conn, key, value, ttl) => window.go.main.App.SetRedisKeyValue(conn, key, value, ttl),
+    deleteRedisKey: (conn, ...keys) => window.go.main.App.DeleteRedisKey(conn, ...keys),
+    executeRedisCommand: (conn, cmd, ...args) => window.go.main.App.ExecuteRedisCommand(conn, cmd, ...args),
+    getRedisInfo: (conn, section) => window.go.main.App.GetRedisInfo(conn, section),
+    getRedisDBSize: (conn) => window.go.main.App.GetRedisDBSize(conn),
+    scanRedisKeys: (conn, pattern, cursor, count) => window.go.main.App.ScanRedisKeys(conn, pattern, cursor, count),
+    
+    // Autocomplete
+    getAutoCompleteSuggestions: (conn, db, query, pos) => window.go.main.App.GetAutoCompleteSuggestions(conn, db, query, pos),
+    getQuickSuggestions: (prefix) => window.go.main.App.GetQuickSuggestions(prefix),
+    getTableColumnsForAutoComplete: (conn, db, table) => window.go.main.App.GetTableColumnsForAutoComplete(conn, db, table),
+    
+    // SQL Formatter
+    formatSQL: (sql, options) => window.go.main.App.FormatSQL(sql, options),
+    minifySQL: (sql) => window.go.main.App.MinifySQL(sql),
+    validateSQL: (sql) => window.go.main.App.ValidateSQL(sql),
+    beautifySQL: (sql) => window.go.main.App.BeautifySQL(sql),
+    compactSQL: (sql) => window.go.main.App.CompactSQL(sql),
+    getSQLStructure: (sql) => window.go.main.App.GetSQLStructure(sql),
+    
+    // Query Analyzer
+    getExplainPlan: (conn, db, query) => window.go.main.App.GetExplainPlan(conn, db, query),
+    analyzeQuery: (query) => window.go.main.App.AnalyzeQuery(query),
+    getSlowQueries: (conn, db, threshold) => window.go.main.App.GetSlowQueries(conn, db, threshold),
+    analyzeTableUsage: (conn, db) => window.go.main.App.AnalyzeTableUsage(conn, db),
+    getTableStatistics: (conn, db, table) => window.go.main.App.GetTableStatistics(conn, db, table),
 };
 
 // Check if Wails is available
@@ -159,6 +212,24 @@ function setThemeFromSettings(value) {
         setTheme(prefersDark ? 'dark' : 'light');
     } else {
         setTheme(value);
+    }
+}
+
+function setDensity(value) {
+    document.documentElement.setAttribute('data-density', value);
+    localStorage.setItem('density', value);
+}
+
+function formatSQLViaAPI() {
+    if (!monacoEditor) return;
+    const sql = getEditorValue().trim();
+    if (!sql) return;
+    if (isWailsAvailable()) {
+        WailsAPI.beautifySQL(sql).then(formatted => {
+            if (formatted) setEditorValue(formatted);
+        }).catch(() => {});
+    } else {
+        formatSQL();
     }
 }
 
@@ -970,8 +1041,9 @@ function updateConnectionForm(type) {
     }
 }
 
-async function testConnection() {
-    const btn = event.target.closest('button');
+async function testConnection(e) {
+    const btn = (e && e.target) ? e.target.closest('button') : document.querySelector('#connectionModal .btn-primary');
+    if (!btn) return;
     const originalContent = btn.innerHTML;
     
     btn.innerHTML = '<span class="spinner"></span> 测试中...';
@@ -1051,7 +1123,7 @@ function showDetailedError(message) {
 
 function getConnectionFromForm() {
     const activeDbType = document.querySelector('.db-type-btn.active');
-    const colorBtn = document.querySelector('.color-option.selected');
+    const colorBtn = document.querySelector('.color-option.active');
     
     return {
         id: document.getElementById('connName').dataset.id || '',
@@ -1064,6 +1136,7 @@ function getConnectionFromForm() {
         database: document.getElementById('connDatabase').value,
         ssl_mode: 'disable',
         color: colorBtn ? colorBtn.dataset.color : '#6366f1',
+        path: document.getElementById('sqlitePath') ? document.getElementById('sqlitePath').value : '',
         save_password: document.getElementById('connSavePassword').checked,
         auto_connect: document.getElementById('connAutoConnect').checked
     };
@@ -1422,59 +1495,94 @@ function renderDatabaseTree(databases) {
   dbTree.innerHTML = '';
 
   databases.forEach(db => {
-    const dbHtml = `
-<div class="tree-node">
-  <div class="tree-item db-item" onclick="toggleDatabase('${db.name}')" oncontextmenu="event.preventDefault(); event.stopPropagation(); contextMenuTarget='database'; contextMenuData={dbName:'${db.name}'}; showDatabaseContextMenu(event.clientX, event.clientY, '${db.name}');">
-    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
-    <svg class="db-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-    </svg>
-    <span>${db.name}</span>
-  </div>
-  <div class="tree-children collapsed" id="db-${db.name}-children">
-    <div class="tree-branch">
-      <div class="tree-item branch-item" onclick="toggleTreeSection('tables-${db.name}')">
-        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m9 18 6-6-6-6"/>
-        </svg>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18M9 21V9"/>
-        </svg>
-        <span>表</span>
-      </div>
-      <div class="tree-children collapsed" id="tables-${db.name}Tree">
-        <div class="tree-loading">加载中...</div>
-      </div>
-    </div>
-    <div class="tree-branch">
-      <div class="tree-item branch-item" onclick="toggleTreeSection('views-${db.name}')">
-        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m9 18 6-6-6-6"/>
-                            </svg>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            <span>视图</span>
-                        </div>
-                        <div class="tree-children collapsed" id="views-${db.name}Tree">
-                            <div class="tree-loading">加载中...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        dbTree.insertAdjacentHTML('beforeend', dbHtml);
+    const dbName = DomUtils.escapeHtml(db.name);
+    const safeDbName = db.name;
+
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+
+    const dbItem = document.createElement('div');
+    dbItem.className = 'tree-item db-item';
+    dbItem.addEventListener('click', () => toggleDatabase(safeDbName));
+    dbItem.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showDatabaseContextMenu(e.clientX, e.clientY, safeDbName);
     });
-    
-    // Auto-load tables for first database
-    if (databases.length > 0) {
-        toggleDatabase(databases[0].name);
-    }
+
+    dbItem.innerHTML = `
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+      <svg class="db-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+      </svg>
+    `;
+    const dbSpan = document.createElement('span');
+    dbSpan.textContent = safeDbName;
+    dbItem.appendChild(dbSpan);
+    node.appendChild(dbItem);
+
+    const children = document.createElement('div');
+    children.className = 'tree-children collapsed';
+    children.id = `db-${dbName}-children`;
+
+    // Tables branch
+    const tablesBranch = document.createElement('div');
+    tablesBranch.className = 'tree-branch';
+    const tablesBranchItem = document.createElement('div');
+    tablesBranchItem.className = 'tree-item branch-item';
+    tablesBranchItem.addEventListener('click', () => toggleTreeSection(`tables-${safeDbName}`));
+    tablesBranchItem.innerHTML = `
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 21V9"/>
+      </svg>
+      <span>表</span>
+    `;
+    tablesBranch.appendChild(tablesBranchItem);
+    const tablesTreeDiv = document.createElement('div');
+    tablesTreeDiv.className = 'tree-children collapsed';
+    tablesTreeDiv.id = `tables-${safeDbName}Tree`;
+    tablesTreeDiv.innerHTML = '<div class="tree-loading">加载中...</div>';
+    tablesBranch.appendChild(tablesTreeDiv);
+    children.appendChild(tablesBranch);
+
+    // Views branch
+    const viewsBranch = document.createElement('div');
+    viewsBranch.className = 'tree-branch';
+    const viewsBranchItem = document.createElement('div');
+    viewsBranchItem.className = 'tree-item branch-item';
+    viewsBranchItem.addEventListener('click', () => toggleTreeSection(`views-${safeDbName}`));
+    viewsBranchItem.innerHTML = `
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span>视图</span>
+    `;
+    viewsBranch.appendChild(viewsBranchItem);
+    const viewsTreeDiv = document.createElement('div');
+    viewsTreeDiv.className = 'tree-children collapsed';
+    viewsTreeDiv.id = `views-${safeDbName}Tree`;
+    viewsTreeDiv.innerHTML = '<div class="tree-loading">加载中...</div>';
+    viewsBranch.appendChild(viewsTreeDiv);
+    children.appendChild(viewsBranch);
+
+    node.appendChild(children);
+    dbTree.appendChild(node);
+  });
+
+  if (databases.length > 0) {
+    toggleDatabase(databases[0].name);
+  }
 }
 
 function toggleDatabase(dbName) {
@@ -1570,16 +1678,26 @@ function renderTablesTree(tables, dbName) {
   tablesTree.innerHTML = '';
 
   tables.forEach(table => {
-    const tableHtml = `
-<div class="tree-item" onclick="openTable('${table.name}', '${dbName}')" oncontextmenu="event.preventDefault(); event.stopPropagation(); contextMenuTarget='table'; contextMenuData={tableName:'${table.name}', dbName:'${dbName}'}; showTableContextMenu(event.clientX, event.clientY, '${table.name}', '${dbName}');">
-  <svg class="table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <path d="M3 9h18M9 21V9"/>
-  </svg>
-  <span>${table.name}</span>
-</div>
-`;
-    tablesTree.insertAdjacentHTML('beforeend', tableHtml);
+    const item = document.createElement('div');
+    item.className = 'tree-item';
+    item.innerHTML = `
+      <svg class="table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 21V9"/>
+      </svg>
+    `;
+    const span = document.createElement('span');
+    span.textContent = table.name;
+    item.appendChild(span);
+
+    item.addEventListener('click', () => openTable(table.name, dbName));
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showTableContextMenu(e.clientX, e.clientY, table.name, dbName);
+    });
+
+    tablesTree.appendChild(item);
   });
 }
 
@@ -1743,68 +1861,6 @@ function populateStructureView(columns) {
     });
 }
 
-function renderDataView(result) {
-    const header = document.getElementById('dataViewHeader');
-    const body = document.getElementById('dataViewBody');
-    
-    // Store column widths in state
-    state.columnWidths = state.columnWidths || {};
-    
-    // Render header with resize handles (safe DOM manipulation — column names are server data)
-    header.innerHTML = '';
-    const headerRow = document.createElement('tr');
-    const checkboxTh = document.createElement('th');
-    checkboxTh.style.cssText = 'width: 50px; min-width: 50px; max-width: 50px;';
-    const selectAllInput = document.createElement('input');
-    selectAllInput.type = 'checkbox';
-    selectAllInput.id = 'selectAllRows';
-    checkboxTh.appendChild(selectAllInput);
-    headerRow.appendChild(checkboxTh);
-    result.columns.forEach((col, index) => {
-        const width = state.columnWidths[col] || 150;
-        const th = document.createElement('th');
-        th.style.cssText = `width: ${width}px; min-width: 80px; max-width: 400px;`;
-        th.dataset.col = String(index);
-        th.dataset.colname = col;
-        const span = document.createElement('span');
-        span.className = 'th-content';
-        span.textContent = col;
-        const resizeDiv = document.createElement('div');
-        resizeDiv.className = 'resize-handle';
-        resizeDiv.dataset.col = String(index);
-        th.appendChild(span);
-        th.appendChild(resizeDiv);
-        headerRow.appendChild(th);
-    });
-    header.appendChild(headerRow);
-    
-    // Render body
-    let bodyHtml = '';
-    result.rows.forEach((row, rowIndex) => {
-        bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
-        row.forEach((cell, colIndex) => {
-            const displayValue = cell === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(cell));
-            bodyHtml += `<td title="${cell === null ? 'NULL' : DomUtils.escapeHtml(String(cell))}">${displayValue}</td>`;
-        });
-        bodyHtml += '</tr>';
-    });
-    body.innerHTML = bodyHtml;
-    
-    // Update record count
-    document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
-    document.getElementById('dvSelectedCount').textContent = '已选: 0';
-    
-    // Add event listeners
-    document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
-    document.querySelectorAll('.row-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateSelectedCount);
-    });
-    
-    // Initialize column resize
-    initColumnResize();
-}
-
-// Column resize functionality
 function initColumnResize() {
     const table = document.getElementById('dvTable');
     const headers = table.querySelectorAll('th');
@@ -1933,15 +1989,35 @@ document.addEventListener('DOMContentLoaded', () => {
 // Data view actions
 function addNewRow() {
     const body = document.getElementById('dataViewBody');
-    const columnCount = document.querySelectorAll('#dataViewHeader th').length - 1;
+    const headerThs = document.querySelectorAll('#dataViewHeader th');
+    const columns = [];
+    headerThs.forEach((th, i) => {
+        if (i === 0) return;
+        columns.push(th.dataset.colname || `col_${i}`);
+    });
     
-    let rowHtml = '<tr class="new-row editing"><td><input type="checkbox" class="row-checkbox"></td>';
-    for (let i = 0; i < columnCount; i++) {
-        rowHtml += '<td><input type="text" placeholder="NULL"></td>';
-    }
-    rowHtml += '</tr>';
+    const tr = document.createElement('tr');
+    tr.className = 'new-row editing';
     
-    body.insertAdjacentHTML('afterbegin', rowHtml);
+    const cbTd = document.createElement('td');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'row-checkbox';
+    cbTd.appendChild(cb);
+    tr.appendChild(cbTd);
+    
+    columns.forEach(col => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'NULL';
+        input.dataset.column = col;
+        td.appendChild(input);
+        tr.appendChild(td);
+    });
+    
+    body.insertBefore(tr, body.firstChild);
+    tr.querySelector('input[type="text"]')?.focus();
 }
 
 function deleteSelectedRows() {
@@ -1952,14 +2028,124 @@ function deleteSelectedRows() {
     }
     
     if (confirm(`确定要删除选中的 ${selected.length} 行吗？`)) {
-        selected.forEach(cb => cb.closest('tr').remove());
+        selected.forEach(cb => {
+            const tr = cb.closest('tr');
+            tr.classList.add('deleted-row');
+            if (!tr.classList.contains('new-row')) {
+                tr.style.display = 'none';
+            } else {
+                tr.remove();
+            }
+        });
         updateSelectedCount();
-        showNotification('success', `已删除 ${selected.length} 行`);
+        showNotification('success', `已标记 ${selected.length} 行待删除（点击"保存更改"生效）`);
     }
 }
 
 function saveDataChanges() {
-    showNotification('info', '保存更改功能开发中...');
+    if (!state.activeConnection || !state.currentTable) {
+        showNotification('warning', '请先连接数据库并打开表');
+        return;
+    }
+    
+    const newRows = document.querySelectorAll('#dataViewBody tr.new-row');
+    const modifiedRows = document.querySelectorAll('#dataViewBody tr.modified-row');
+    const deletedRows = document.querySelectorAll('#dataViewBody tr.deleted-row');
+    
+    const total = newRows.length + modifiedRows.length + deletedRows.length;
+    if (total === 0) {
+        showNotification('info', '没有需要保存的更改');
+        return;
+    }
+    
+    if (!confirm(`确定要保存 ${total} 条数据更改吗？`)) return;
+    
+    const pending = [];
+    
+    // Collect deleted rows (Primary Key from data attributes)
+    deletedRows.forEach(row => {
+        const pkStr = row.dataset.primaryKey;
+        if (pkStr) {
+            try {
+                const pk = JSON.parse(pkStr);
+                pending.push({
+                    operation: 'DELETE',
+                    table: state.currentTable.name,
+                    database: state.currentTable.database,
+                    primaryKey: pk
+                });
+            } catch (e) {}
+        }
+    });
+    
+    // Collect new rows
+    newRows.forEach(row => {
+        const inputs = row.querySelectorAll('input:not([type="checkbox"])');
+        const data = {};
+        inputs.forEach(input => {
+            if (input.dataset.column) {
+                data[input.dataset.column] = input.value || null;
+            }
+        });
+        if (Object.keys(data).length > 0) {
+            pending.push({
+                operation: 'INSERT',
+                table: state.currentTable.name,
+                database: state.currentTable.database,
+                data: data
+            });
+        }
+    });
+    
+    // Collect modified rows (Primary Key approach)
+    modifiedRows.forEach(row => {
+        const pkStr = row.dataset.primaryKey;
+        const inputs = row.querySelectorAll('input:not([type="checkbox"])');
+        if (!pkStr) return;
+        try {
+            const pk = JSON.parse(pkStr);
+            const data = {};
+            inputs.forEach(input => {
+                if (input.dataset.column) {
+                    const origVal = input.dataset.originalValue || '';
+                    if (input.value !== origVal) {
+                        data[input.dataset.column] = input.value || null;
+                    }
+                }
+            });
+            if (Object.keys(data).length > 0) {
+                pending.push({
+                    operation: 'UPDATE',
+                    table: state.currentTable.name,
+                    database: state.currentTable.database,
+                    data: data,
+                    primaryKey: pk
+                });
+            }
+        } catch (e) {}
+    });
+    
+    if (pending.length === 0) {
+        showNotification('info', '没有检测到数据变更');
+        return;
+    }
+    
+    showLoading('保存数据更改中...');
+    WailsAPI.batchEdit(state.activeConnection, pending)
+        .then(results => {
+            hideLoading();
+            const errors = results.filter(r => !r.success);
+            if (errors.length > 0) {
+                showNotification('error', `保存失败: ${errors.length} 条出错 - ${errors[0].error}`);
+            } else {
+                showNotification('success', `成功保存 ${results.length} 条数据更改`);
+                refreshDataView();
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showNotification('error', `保存失败: ${error.message || error}`);
+        });
 }
 
 function discardChanges() {
@@ -1975,19 +2161,78 @@ function refreshDataView() {
 }
 
 function applyFilter() {
-    showNotification('info', '筛选功能开发中...');
-}
-
-function clearFilter() {
-    document.getElementById('filterColumn').value = '';
-    document.getElementById('filterValue').value = '';
-    refreshDataView();
+    const filterColumn = document.getElementById('filterColumn').value;
+    const filterOperator = document.getElementById('filterOperator').value;
+    const filterValue = document.getElementById('filterValue').value.trim();
+    
+    if (!filterColumn || !filterValue) {
+        refreshDataView();
+        return;
+    }
+    
+    if (!pagination.allData || pagination.allData.length === 0) return;
+    
+    const colIndex = pagination.columns.indexOf(filterColumn);
+    if (colIndex === -1) return;
+    
+    let filtered = pagination.allData.filter(row => {
+        const cellValue = row[colIndex];
+        if (cellValue === null || cellValue === undefined) {
+            return filterOperator === 'IS NULL' || filterOperator === 'IS NOT NULL' ? true : false;
+        }
+        const strVal = String(cellValue).toLowerCase();
+        const filterVal = filterValue.toLowerCase();
+        
+        switch (filterOperator) {
+            case '=': return strVal === filterVal;
+            case '!=': return strVal !== filterVal;
+            case '>': return parseFloat(strVal) > parseFloat(filterVal);
+            case '<': return parseFloat(strVal) < parseFloat(filterVal);
+            case '>=': return parseFloat(strVal) >= parseFloat(filterVal);
+            case '<=': return parseFloat(strVal) <= parseFloat(filterVal);
+            case 'LIKE': return strVal.includes(filterVal);
+            case 'IN': return filterVal.split(',').some(v => strVal === v.trim().toLowerCase());
+            case 'IS NULL': return false;
+            case 'IS NOT NULL': return true;
+            default: return strVal.includes(filterVal);
+        }
+    });
+    
+    initPagination(filtered.length);
+    pagination.allData = filtered;
+    pagination.currentPage = 1;
+    updatePaginationUI();
+    renderCurrentPage();
 }
 
 function toggleSortOrder() {
     const btn = document.getElementById('sortOrder');
+    const sortColumn = document.getElementById('sortColumn').value;
     btn.classList.toggle('desc');
-    showNotification('info', '排序功能开发中...');
+    
+    if (!sortColumn || !pagination.allData || pagination.allData.length === 0) {
+        showNotification('info', '请选择排序列');
+        return;
+    }
+    
+    const colIndex = pagination.columns.indexOf(sortColumn);
+    if (colIndex === -1) return;
+    
+    const isDesc = btn.classList.contains('desc');
+    pagination.allData.sort((a, b) => {
+        const va = a[colIndex], vb = b[colIndex];
+        if (va === null || va === undefined) return isDesc ? -1 : 1;
+        if (vb === null || vb === undefined) return isDesc ? 1 : -1;
+        const na = isNaN(va) ? String(va) : Number(va);
+        const nb = isNaN(vb) ? String(vb) : Number(vb);
+        if (na < nb) return isDesc ? 1 : -1;
+        if (na > nb) return isDesc ? -1 : 1;
+        return 0;
+    });
+    
+    pagination.currentPage = 1;
+    updatePaginationUI();
+    renderCurrentPage();
 }
 
 // ==========================================================================
@@ -2130,9 +2375,10 @@ function renderDataView(result) {
 	body.innerHTML = bodyHtml;
 
 	// Update record count
-	document.getElementById('dvRecordCount').textContent = `${result.row_count} 条记录`;
-	document.getElementById('resultCount').textContent = `${result.row_count} 条记录`;
-	document.getElementById('dvSelectedCount').textContent = '已选: 0';
+	const dvRecordCount = document.getElementById('dvRecordCount');
+	if (dvRecordCount) dvRecordCount.textContent = `${result.row_count} 条记录`;
+	const dvSelectedCount = document.getElementById('dvSelectedCount');
+	if (dvSelectedCount) dvSelectedCount.textContent = '已选: 0';
 
 	// Add event listeners
 	document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
@@ -2185,57 +2431,76 @@ function renderIndexes(indexes) {
         return;
     }
     
-    let html = '';
+    tbody.innerHTML = '';
     indexes.forEach((idx, index) => {
         const typeBadge = idx.type === 'PRIMARY' ? 'badge-primary' : 
                          idx.type === 'UNIQUE' ? 'badge-unique' : 'badge-index';
         
-        html += `
-            <tr data-index="${idx.name}">
-                <td><input type="checkbox" class="index-checkbox" data-index="${idx.name}"></td>
-                <td><strong>${idx.name}</strong></td>
-                <td><span class="badge ${typeBadge}">${idx.type}</span></td>
-                <td>${idx.unique ? '是' : '否'}</td>
-                <td>${idx.columns.join(', ')}</td>
-                <td>${idx.cardinality || '-'}</td>
-                <td>${idx.comment || ''}</td>
-                <td class="row-actions">
-                    <button class="action-btn-sm" onclick="editIndex('${idx.name}')" title="编辑">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="action-btn-sm danger" onclick="dropIndex('${idx.name}')" title="删除">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                </td>
-            </tr>
+        const row = document.createElement('tr');
+        row.dataset.index = idx.name;
+        row.innerHTML = `
+            <td><input type="checkbox" class="index-checkbox" data-index="${DomUtils.escapeHtml(idx.name)}"></td>
+            <td><strong>${DomUtils.escapeHtml(idx.name)}</strong></td>
+            <td><span class="badge ${typeBadge}">${DomUtils.escapeHtml(idx.type)}</span></td>
+            <td>${idx.unique ? '是' : '否'}</td>
+            <td>${DomUtils.escapeHtml(idx.columns.join(', '))}</td>
+            <td>${idx.cardinality || '-'}</td>
+            <td>${DomUtils.escapeHtml(idx.comment || '')}</td>
+            <td class="row-actions"></td>
         `;
+        
+        // Edit button
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn-sm';
+        editBtn.title = '编辑';
+        editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        editBtn.addEventListener('click', () => editIndex(idx.name));
+        row.cells[7].appendChild(editBtn);
+        
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'action-btn-sm danger';
+        delBtn.title = '删除';
+        delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+        delBtn.addEventListener('click', () => dropIndex(idx.name));
+        row.cells[7].appendChild(delBtn);
+        
+        tbody.appendChild(row);
     });
-    
-    tbody.innerHTML = html;
     document.getElementById('indexCount').textContent = indexes.length;
     
-    // Add select all listener
     document.getElementById('selectAllIndexes')?.addEventListener('change', (e) => {
         document.querySelectorAll('.index-checkbox').forEach(cb => cb.checked = e.target.checked);
     });
 }
 
 function showCreateIndexDialog() {
-    showNotification('info', '新建索引功能开发中...');
+    showNotification('info', '请在 SQL 编辑器中执行 CREATE INDEX 语句来创建索引');
 }
 
 function editIndex(indexName) {
-    showNotification('info', `编辑索引 ${indexName} 功能开发中...`);
+    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE 语句来修改索引');
 }
 
 function dropIndex(indexName) {
-    if (confirm(`确定要删除索引 "${indexName}" 吗？`)) {
-        showNotification('info', `删除索引 ${indexName} 功能开发中...`);
+    if (!state.activeConnection || !state.currentTable) return;
+    if (confirm(`确定要删除索引 "${indexName}" 吗？此操作不可撤销。`)) {
+        const sql = `DROP INDEX \`${indexName}\` ON \`${state.currentTable.name}\``;
+        showLoading('删除索引中...');
+        WailsAPI.executeQuery(state.activeConnection, state.currentTable.database, sql)
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showNotification('error', `删除失败: ${result.error}`);
+                } else {
+                    showNotification('success', `索引 ${indexName} 已删除`);
+                    loadTableIndexes();
+                }
+            })
+            .catch(err => {
+                hideLoading();
+                showNotification('error', `删除失败: ${err.message || err}`);
+            });
     }
 }
 
@@ -2245,8 +2510,24 @@ function deleteSelectedIndexes() {
         showNotification('warning', '请先选择要删除的索引');
         return;
     }
-    if (confirm(`确定要删除选中的 ${selected.length} 个索引吗？`)) {
-        showNotification('info', '批量删除索引功能开发中...');
+    const names = Array.from(selected).map(cb => cb.dataset.index);
+    if (confirm(`确定要删除选中的 ${selected.length} 个索引吗？\n${names.join(', ')}`)) {
+        if (!state.activeConnection || !state.currentTable) return;
+        let completed = 0;
+        showLoading('批量删除索引中...');
+        const runNext = () => {
+            if (completed >= names.length) {
+                hideLoading();
+                showNotification('success', `已删除 ${completed} 个索引`);
+                loadTableIndexes();
+                return;
+            }
+            const sql = `DROP INDEX \`${names[completed]}\` ON \`${state.currentTable.name}\``;
+            WailsAPI.executeQuery(state.activeConnection, state.currentTable.database, sql)
+                .then(() => { completed++; runNext(); })
+                .catch(() => { completed++; runNext(); });
+        };
+        runNext();
     }
 }
 
@@ -2290,42 +2571,42 @@ function renderForeignKeys(fks) {
         return;
     }
     
-    let html = '';
+    tbody.innerHTML = '';
     fks.forEach((fk, index) => {
-        html += `
-            <tr data-fk="${fk.name}">
-                <td><input type="checkbox" class="fk-checkbox" data-fk="${fk.name}"></td>
-                <td><strong>${fk.name}</strong></td>
-                <td>${fk.column_name}</td>
-                <td class="arrow-cell">→</td>
-                <td>${fk.ref_table}</td>
-                <td>${fk.ref_column}</td>
-                <td><span class="fk-rule">${fk.on_update}</span></td>
-                <td><span class="fk-rule">${fk.on_delete}</span></td>
-                <td class="row-actions">
-                    <button class="action-btn-sm" onclick="editForeignKey('${fk.name}')" title="编辑">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="action-btn-sm danger" onclick="dropForeignKey('${fk.name}')" title="删除">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                </td>
-            </tr>
+        const row = document.createElement('tr');
+        row.dataset.fk = fk.name;
+        row.innerHTML = `
+            <td><input type="checkbox" class="fk-checkbox" data-fk="${DomUtils.escapeHtml(fk.name)}"></td>
+            <td><strong>${DomUtils.escapeHtml(fk.name)}</strong></td>
+            <td>${DomUtils.escapeHtml(fk.column_name)}</td>
+            <td class="arrow-cell">→</td>
+            <td>${DomUtils.escapeHtml(fk.ref_table)}</td>
+            <td>${DomUtils.escapeHtml(fk.ref_column)}</td>
+            <td><span class="fk-rule">${DomUtils.escapeHtml(fk.on_update)}</span></td>
+            <td><span class="fk-rule">${DomUtils.escapeHtml(fk.on_delete)}</span></td>
+            <td class="row-actions"></td>
         `;
+        
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn-sm';
+        editBtn.title = '编辑';
+        editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        editBtn.addEventListener('click', () => editForeignKey(fk.name));
+        row.cells[8].appendChild(editBtn);
+        
+        const delBtn = document.createElement('button');
+        delBtn.className = 'action-btn-sm danger';
+        delBtn.title = '删除';
+        delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+        delBtn.addEventListener('click', () => dropForeignKey(fk.name));
+        row.cells[8].appendChild(delBtn);
+        
+        tbody.appendChild(row);
     });
-    
-    tbody.innerHTML = html;
     document.getElementById('fkCount').textContent = fks.length;
     
-    // Render foreign key visualization
     renderFKVisualization(fks);
     
-    // Add select all listener
     document.getElementById('selectAllFK')?.addEventListener('change', (e) => {
         document.querySelectorAll('.fk-checkbox').forEach(cb => cb.checked = e.target.checked);
     });
@@ -2379,16 +2660,32 @@ function renderFKVisualization(fks) {
 }
 
 function showAddForeignKeyDialog() {
-    showNotification('info', '新建外键功能开发中...');
+    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE ADD CONSTRAINT 语句来添加外键');
 }
 
 function editForeignKey(fkName) {
-    showNotification('info', `编辑外键 ${fkName} 功能开发中...`);
+    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE 语句来修改外键');
 }
 
 function dropForeignKey(fkName) {
-    if (confirm(`确定要删除外键 "${fkName}" 吗？`)) {
-        showNotification('info', `删除外键 ${fkName} 功能开发中...`);
+    if (!state.activeConnection || !state.currentTable) return;
+    if (confirm(`确定要删除外键 "${fkName}" 吗？此操作不可撤销。`)) {
+        const sql = `ALTER TABLE \`${state.currentTable.name}\` DROP FOREIGN KEY \`${fkName}\``;
+        showLoading('删除外键中...');
+        WailsAPI.executeQuery(state.activeConnection, state.currentTable.database, sql)
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showNotification('error', `删除失败: ${result.error}`);
+                } else {
+                    showNotification('success', `外键 ${fkName} 已删除`);
+                    loadTableForeignKeys();
+                }
+            })
+            .catch(err => {
+                hideLoading();
+                showNotification('error', `删除失败: ${err.message || err}`);
+            });
     }
 }
 
@@ -2398,8 +2695,24 @@ function deleteSelectedForeignKeys() {
         showNotification('warning', '请先选择要删除的外键');
         return;
     }
-    if (confirm(`确定要删除选中的 ${selected.length} 个外键吗？`)) {
-        showNotification('info', '批量删除外键功能开发中...');
+    const names = Array.from(selected).map(cb => cb.dataset.fk);
+    if (confirm(`确定要删除选中的 ${selected.length} 个外键吗？\n${names.join(', ')}`)) {
+        if (!state.activeConnection || !state.currentTable) return;
+        let completed = 0;
+        showLoading('批量删除外键中...');
+        const runNext = () => {
+            if (completed >= names.length) {
+                hideLoading();
+                showNotification('success', `已删除 ${completed} 个外键`);
+                loadTableForeignKeys();
+                return;
+            }
+            const sql = `ALTER TABLE \`${state.currentTable.name}\` DROP FOREIGN KEY \`${names[completed]}\``;
+            WailsAPI.executeQuery(state.activeConnection, state.currentTable.database, sql)
+                .then(() => { completed++; runNext(); })
+                .catch(() => { completed++; runNext(); });
+        };
+        runNext();
     }
 }
 
@@ -2548,7 +2861,7 @@ function openFunction(funcName) {
     createNewTab();
     
     const editor = document.getElementById('queryEditor');
-    editor.value = `SELECT * FROM ${funcName}();`;
+    setEditorValue(`SELECT * FROM ${DomUtils.escapeHtml(funcName)}();`);
     updateLineNumbers();
 }
 
@@ -2828,6 +3141,23 @@ async function executeQuery() {
   let query = selected || getEditorValue().trim();
   if (!query) {
     showNotification('warning', '请输入查询语句');
+    return;
+  }
+
+  // DDL safety check — confirm before destructive operations
+  const ddlPattern = /\b(CREATE\s+(TABLE|INDEX|DATABASE|SCHEMA|VIEW|FUNCTION|PROCEDURE)|DROP\s+(TABLE|INDEX|DATABASE|SCHEMA|VIEW|FUNCTION|PROCEDURE)|ALTER\s+(TABLE|INDEX|DATABASE)|TRUNCATE\s+(TABLE)?|DELETE\s+FROM\b(?!.*\bWHERE\b))/i;
+  const queries = query.split(';').filter(q => q.trim());
+  let hasDestructive = false;
+  for (const q of queries) {
+    const trimmedQ = q.trim().toUpperCase();
+    if (ddlPattern.test(trimmedQ)) {
+      if (trimmedQ.startsWith('DELETE') && trimmedQ.includes('WHERE')) continue;
+      if (trimmedQ.startsWith('ALTER') && trimmedQ.includes('ADD CONSTRAINT')) continue;
+      hasDestructive = true;
+      break;
+    }
+  }
+  if (hasDestructive && !confirm('检测到 DDL/Destructive 操作 (CREATE/DROP/ALTER/TRUNCATE/DELETE without WHERE)。\n\n确定要执行吗？此操作不可撤销。')) {
     return;
   }
 
@@ -3312,7 +3642,30 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeConnectionDialog();
         closeSettings();
+        closeLanguageDialog();
     }
+    
+    // Ctrl/Cmd + Shift + F to format SQL
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        formatSQLViaAPI();
+    }
+    
+    // Ctrl/Cmd + W to close current tab
+    if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+        e.preventDefault();
+        if (state.activeTab) {
+            closeTab(state.activeTab, e);
+        }
+    }
+    
+    // F5 to refresh
+    if (e.key === 'F5') {
+        e.preventDefault();
+        refreshDataView();
+    }
+    
+    // Ctrl/Cmd + B to toggle sidebar (reserved for future sidebar toggle)
 });
 
 // ==========================================================================
@@ -3356,6 +3709,8 @@ window.browseSQLiteFile = browseSQLiteFile;
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.setThemeFromSettings = setThemeFromSettings;
+window.setDensity = setDensity;
+window.formatSQLViaAPI = formatSQLViaAPI;
 window.minimizeWindow = minimizeWindow;
 window.maximizeWindow = maximizeWindow;
 window.closeWindow = closeWindow;
@@ -3426,13 +3781,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Add language modal close to escape handler
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeLanguageDialog();
-    }
-});
-
 // ==========================================================================
 // Test Services
 // ==========================================================================
@@ -3496,9 +3844,9 @@ async function getServerInfo() {
     
     try {
         if (isWailsAvailable()) {
-            const info = await WailsAPI.getServerInfo(state.activeConnection);
+            const info = await WailsAPI.getServerInfo();
             console.log('Server Info:', info);
-            showNotification('info', `数据库: ${info.type}, 表数量: ${info.table_count || 'N/A'}`);
+            showNotification('info', `版本: ${info.version || 'N/A'}, 连接池: ${info.poolSize || 0}/${info.maxPoolSize || 50}`);
         } else {
             showNotification('info', '服务器信息: PostgreSQL 14.0 (模拟)');
         }

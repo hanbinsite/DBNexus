@@ -7,7 +7,6 @@ import (
 	"db-server/db"
 )
 
-// RunConnectionTest runs a connection test
 func (a *App) RunConnectionTest(config Connection) TestResult {
 	startTime := time.Now()
 	lang := a.getCurrentLang()
@@ -58,7 +57,6 @@ func (a *App) RunConnectionTest(config Connection) TestResult {
 	}
 }
 
-// RunAllTests runs tests for all saved connections
 func (a *App) RunAllTests() []TestResult {
 	var results []TestResult
 
@@ -70,20 +68,7 @@ func (a *App) RunAllTests() []TestResult {
 	return results
 }
 
-// GetSupportedFeatures returns supported features for each database type
-func (a *App) GetSupportedFeatures() map[string][]string {
-	return map[string][]string{
-		"postgresql": {"查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"},
-		"mysql":      {"查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"},
-		"polardb":    {"查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"},
-		"gaussdb":    {"查询", "插入", "更新", "删除", "事务", "存储过程", "视图", "索引"},
-		"sqlite":     {"查询", "插入", "更新", "删除", "事务", "视图", "索引"},
-		"redis":      {"GET", "SET", "DEL", "EXISTS", "EXPIRE", "KEYS", "TYPE", "TTL"},
-	}
-}
-
-// GetServerInfo returns server information
-func (a *App) GetServerInfo(config Connection) map[string]string {
+func (a *App) GetDatabaseServerInfo(config Connection) map[string]string {
 	info := map[string]string{
 		"type":     config.Type,
 		"host":     config.Host,

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"db-server/db"
 	"fmt"
 	"strings"
 	"time"
+
+	"db-server/db"
 )
 
-// GetSupportedDatabases returns a list of supported database types
 func (a *App) GetSupportedDatabases() []map[string]string {
 	return []map[string]string{
 		{"id": "postgresql", "name": "PostgreSQL", "default_port": "5432"},
@@ -19,19 +19,20 @@ func (a *App) GetSupportedDatabases() []map[string]string {
 	}
 }
 
-// GetConnections returns all saved connections
 func (a *App) GetConnections() []Connection {
-	return a.connections
+	safe := make([]Connection, len(a.connections))
+	copy(safe, a.connections)
+	for i := range safe {
+		safe[i].Password = ""
+	}
+	return safe
 }
 
-// SaveConnection saves a connection
 func (a *App) SaveConnection(conn Connection) error {
-	// Generate ID if new
 	if conn.ID == "" {
 		conn.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
-	// Encrypt password before saving
 	if conn.SavePassword && conn.Password != "" {
 		encrypted, err := encryptPassword(conn.Password)
 		if err != nil {
@@ -42,11 +43,9 @@ func (a *App) SaveConnection(conn Connection) error {
 		conn.Password = ""
 	}
 
-	// Find existing or add new
 	found := false
 	for i, c := range a.connections {
 		if c.ID == conn.ID {
-			// Preserve encrypted password if not changed
 			if conn.Password == "" && c.Password != "" && !conn.SavePassword {
 				conn.Password = c.Password
 			}
@@ -60,9 +59,7 @@ func (a *App) SaveConnection(conn Connection) error {
 		a.connections = append(a.connections, conn)
 	}
 
-	// 记录审计日志
-	auditLogger := GetAuditLogger()
-	auditLogger.Log(AuditLevelInfo, AuditEventConnectionSave,
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventConnectionSave,
 		fmt.Sprintf("保存连接配置: %s", conn.Name),
 		map[string]interface{}{
 			"connection_id":   conn.ID,
@@ -73,7 +70,6 @@ func (a *App) SaveConnection(conn Connection) error {
 	return a.saveConnections()
 }
 
-// DeleteConnection deletes a connection
 func (a *App) DeleteConnection(id string) error {
 	var connName string
 	for i, c := range a.connections {
@@ -84,27 +80,20 @@ func (a *App) DeleteConnection(id string) error {
 		}
 	}
 
-	// 记录审计日志
-	auditLogger := GetAuditLogger()
-	auditLogger.Log(AuditLevelWarning, AuditEventConnectionDelete,
+	GetAuditLogger().Log(AuditLevelWarning, AuditEventConnectionDelete,
 		fmt.Sprintf("删除连接配置: %s", connName),
-		map[string]interface{}{
-			"connection_id": id,
-		})
+		map[string]interface{}{"connection_id": id})
 
 	return a.saveConnections()
 }
 
-// TestConnection tests a database connection
 func (a *App) TestConnection(config Connection) (bool, string) {
 	lang := a.getCurrentLang()
 
-	// Decrypt password if it's saved encrypted
 	if config.SavePassword && config.Password != "" {
 		decrypted, err := decryptPassword(config.Password)
 		if err != nil {
-			return false, fmt.Sprintf("%s: %v", a.t(MsgConnectionFailed, lang),
-				fmt.Sprintf("密码解密失败，请重新输入密码 (错误: %v)", err))
+			return false, fmt.Sprintf("%s: password decrypt failed", a.t(MsgConnectionFailed, lang))
 		}
 		config.Password = decrypted
 	}
@@ -149,38 +138,28 @@ func (a *App) TestConnection(config Connection) (bool, string) {
 	return true, fmt.Sprintf(a.t(MsgConnectionSuccess, lang), database)
 }
 
-// formatError formats error message with helpful hints
 func (a *App) formatError(prefix string, err error, dbType string, lang string) string {
 	errMsg := err.Error()
-
-	// Add specific hints based on error type
 	hint := ""
 	switch {
-	case contains(errMsg, "connection refused"):
+	case strings.Contains(errMsg, "connection refused"):
 		hint = a.t(MsgHintConnection, lang)
-	case contains(errMsg, "authentication failed"):
+	case strings.Contains(errMsg, "authentication failed"):
 		hint = a.t(MsgHintAuth, lang)
-	case contains(errMsg, "no such host"):
+	case strings.Contains(errMsg, "no such host"):
 		hint = a.t(MsgHintHost, lang)
-	case contains(errMsg, "timeout"):
+	case strings.Contains(errMsg, "timeout"):
 		hint = a.t(MsgHintTimeout, lang)
-	case contains(errMsg, "Unknown database"):
+	case strings.Contains(errMsg, "Unknown database"):
 		hint = a.t(MsgHintDatabase, lang)
-	case dbType == "mysql" && contains(errMsg, "Access denied"):
+	case dbType == "mysql" && strings.Contains(errMsg, "Access denied"):
 		hint = a.t(MsgHintMySQLAccess, lang)
-	case dbType == "postgresql" && contains(errMsg, "no password supplied"):
+	case dbType == "postgresql" && strings.Contains(errMsg, "no password supplied"):
 		hint = a.t(MsgHintPGPassword, lang)
 	}
-
 	return fmt.Sprintf("%s: %s%s", prefix, errMsg, hint)
 }
 
-// contains checks if string contains substring
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-
-// getDefaultDatabase returns the default database for connection
 func (a *App) getDefaultDatabase(dbType string) string {
 	switch dbType {
 	case "postgresql", "polardb", "gaussdb":
@@ -190,15 +169,13 @@ func (a *App) getDefaultDatabase(dbType string) string {
 	case "redis":
 		return "0"
 	case "sqlite":
-		return "" // SQLite requires a path
+		return ""
 	default:
 		return ""
 	}
 }
 
-// ConnectToDatabase connects to a database and returns connection status
 func (a *App) ConnectToDatabase(config Connection) (bool, string) {
-	// Decrypt password if it's saved encrypted
 	if config.SavePassword && config.Password != "" {
 		decrypted, err := decryptPassword(config.Password)
 		if err == nil {
@@ -206,7 +183,6 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		}
 	}
 
-	// Use default database if not specified
 	database := config.Database
 	if database == "" {
 		database = a.getDefaultDatabase(config.Type)
@@ -222,18 +198,14 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		SSLMode:  config.SSLMode,
 	}
 
-	// Use buildKey (includes database name) for consistent connection pooling
-	key := buildKey(dbConfig)
+	key := a.pool.buildKey(dbConfig)
 
-	// 使用原子性的getOrCreate方法，避免竞态条件
 	_, err := a.pool.getOrCreate(key, func() (db.DatabaseDriver, error) {
-		// 创建新连接
 		driver, err := a.driverManager.Connect(dbConfig)
 		if err != nil {
 			return nil, err
 		}
 
-		// Ping with retry logic (up to 3 attempts)
 		var pingErr error
 		for i := 0; i < 3; i++ {
 			pingErr = driver.Ping(a.ctx)
@@ -258,9 +230,36 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 	return true, "Connected successfully"
 }
 
-// DisconnectFromDatabase disconnects from a database
 func (a *App) DisconnectFromDatabase(config Connection) error {
-	key := buildKey(a.connectionToDBConfig(config))
+	key := a.pool.buildKey(a.connectionToDBConfig(config))
 	a.pool.remove(key)
 	return nil
+}
+
+func (a *App) GetSupportedFeatures(dbType string) map[string]bool {
+	features := map[string]bool{
+		"query":        true,
+		"multi_query":  true,
+		"schema":       true,
+		"data_edit":    true,
+		"export":       true,
+		"import":       true,
+		"transaction":  true,
+		"autocomplete": true,
+	}
+
+	switch dbType {
+	case "redis":
+		features["schema"] = false
+		features["data_edit"] = false
+		features["export"] = false
+		features["import"] = false
+		features["transaction"] = false
+		features["autocomplete"] = false
+		features["redis_commands"] = true
+	case "sqlite":
+		features["transaction"] = false
+	}
+
+	return features
 }

@@ -32,7 +32,7 @@
 │  │  │  (app.go:13)                          │                      │   │
 │  │  │  Fields: ctx, driverManager,          │                      │   │
 │  │  │          connections, configPath,     │                      │   │
-│  │  │          pool, poolMutex              │                      │   │
+│  │  │          pool                         │                      │   │
 │  │  └─────────────────┬────────────────────┘                      │   │
 │  │                    │                                           │   │
 │  │  ┌─────────────────▼──────────────────────────────────────┐   │   │
@@ -108,7 +108,6 @@ type App struct {
     connections   []Connection
     configPath    string
     pool          *connectionPool
-    poolMutex     sync.RWMutex
 }
 ```
 
@@ -120,7 +119,7 @@ type App struct {
 - `GetLanguage()` (L48): 读取 `DB_CLIENT_LANG` env var，默认 "zh"
 - `SetLanguage(lang)` (L69): 写入 `~/.db-client/config.json`
 
-**已知问题**: `poolMutex` (app.go:19) 与 `pool.mu` (pool.go:16) 构成双重锁体系（详见 Section 7）
+**已知问题**: 无 — 原 poolMutex (app.go:19) 已移除，所有池访问统一通过 `getDriverForConfig()` (config.go:32) 使用 `pool.getOrCreate()`
 
 ---
 
@@ -281,7 +280,7 @@ type pooledDriver struct {
 **事务存储**: `globalTransactions map[string]*activeTransaction` + `globalTxMutex sync.RWMutex` (L51)
 **超时**: `TransactionTimeout = 30 * time.Minute` (L41)
 
-**已知问题**: `cleanupStaleTransactions()` (L69) 已定义但未自动调用
+**已知问题**: 无 — `cleanupStaleTransactions()` (L69) 已由 `startStaleTransactionCleanup()` (L57) 在 `BeginTransaction()` (L83) 自动调用
 
 ---
 
@@ -313,7 +312,7 @@ type pooledDriver struct {
 
 **数据源**: `sqlKeywords` (L41, 65条), `sqlFunctions` (L114, 55条), `mysqlFunctions` (L184), `postgresFunctions` (L195)
 
-**已知问题**: `getColumnSuggestions()` (L317) 返回空数组，列名补全未实现
+**已知问题**: 无 — `getColumnSuggestions()` (L317) 已实现，遍历所有表获取列名补全
 
 ---
 
@@ -558,27 +557,19 @@ type DatabaseDriver interface {
 └──────────────────────────────────────────────────┘
 ```
 
-### 5.2 Dual Locking Problem
+### 5.2 Pool Access (Unified)
 
-存在两套锁机制:
+所有池访问已统一到 `getDriverForConfig()` (config.go:32)，内部使用 `pool.getOrCreate()`。原 `poolMutex` 双重锁模式已移除:
 
-1. **pool.mu** (pool.go:16): pool 内部 RWMutex，`getOrCreate()` 使用
-2. **App.poolMutex** (app.go:19): App 层级 RWMutex，`query.go`/`data_editor.go`/`transaction.go` 使用
-
-不同代码路径使用不同锁策略:
-
-| 路径 | 使用锁 | 代码位置 |
-|------|--------|----------|
-| `ConnectToDatabase()` | 仅 pool.mu (通过 `getOrCreate`) | connection.go:203 |
-| `redis_api.go` | 仅 pool.mu (通过 `getDriverForConfig`) | redis_api.go:125 |
-| `ExecuteQuery()` | App.poolMutex + pool.get/set | query.go:10-12 |
-| `ExecuteMultiQuery()` | App.poolMutex + pool.get/set | query.go:14-16 |
-| `EditTableData()` | App.poolMutex + pool.get/set | data_editor.go:32 |
-| `BeginTransaction()` | App.poolMutex + pool.get/set | transaction.go:88 |
-| `GetExplainPlan()` | App.poolMutex + pool.get/set | query_analyzer.go:95 |
-| `getDriverForConfig()` | App.poolMutex + pool.get/set | config.go:32-42 |
-
-**风险**: 两条路径同时操作可能产生死锁或数据不一致
+| 调用路径 | 旧锁机制 | 新机制 | 状态 |
+|----------|---------|--------|------|
+| `ConnectToDatabase()` | 仅 pool.mu | 无变化 | ✅ 正常 |
+| `redis_api.go` | 仅 pool.mu | 无变化 | ✅ 正常 |
+| `ExecuteQuery()` | App.poolMutex | getDriverForConfig() | ✅ 已修复 |
+| `ExecuteMultiQuery()` | App.poolMutex | getDriverForConfig() | ✅ 已修复 |
+| `EditTableData()` | App.poolMutex | getDriverForConfig() | ✅ 已修复 |
+| `BeginTransaction()` | App.poolMutex | getDriverForConfig() | ✅ 已修复 |
+| `GetExplainPlan()` | App.poolMutex | getDriverForConfig() | ✅ 已修复 |
 
 ---
 
@@ -629,27 +620,27 @@ test.go ← {db, crypto, i18n}
 
 | # | Issue | Location | Impact | Fix |
 |---|-------|----------|--------|-----|
-| 1 | **encryptionKey race condition** | `crypto.go:16` | Multi-goroutine init may corrupt key | Use `sync.Once`（已修复，L17 `encryptionOnce`） |
-| 2 | **Dual locking inconsistency** | `App.poolMutex` vs `pool.mu` | Deadlock risk, inconsistent locking | Unify to `pool.getOrCreate()` |
-| 3 | **WhereClause SQL injection (已修复)** | `data_editor.go:159,180,217,228` | Raw WhereClause 已被 PrimaryKey 字段替代 | EditRequest 现使用 PrimaryKey (types.go:91) 参数化 WHERE 条件 |
+| 1 | **encryptionKey race condition** | `crypto.go:16` | Multi-goroutine init may corrupt key | ✅ 已修复: `sync.Once` (L17 `encryptionOnce`) |
+| 2 | **Dual locking inconsistency** | `App.poolMutex` vs `pool.mu` | Deadlock risk, inconsistent locking | ✅ 已修复: 统一使用 `getDriverForConfig()` |
+| 3 | **WhereClause SQL injection** | `data_editor.go:159,180,217,228` | Raw WhereClause 已被 PrimaryKey 字段替代 | ✅ 已修复: EditRequest 使用 PrimaryKey (types.go:91) 参数化 WHERE 条件 |
 
 ### P1 — High (Performance/Maintainability)
 
 | # | Issue | Location | Impact | Fix |
 |---|-------|----------|--------|-----|
-| 4 | **Audit log full serialization** | `audit.go:196-214` | O(n) per log entry | Append-only JSON lines |
-| 5 | **Repeated password decryption** | Every method | Code redundancy | Centralize in `connectionToDBConfig()` |
-| 6 | **6 duplicate pool double-check blocks** | query/editor/transaction/analyzer | ~120 lines redundant code | Use `pool.getOrCreate()` |
-| 7 | **Stale transactions not cleaned** | `transaction.go:57-68` | `globalTransactions` unbounded growth | Auto-cleanup goroutine |
-| 8 | **Identifier quotes inconsistent** | `data_editor.go` uses backticks for all | PG syntax error with backticks | Dynamic quote selection by db type |
+| 4 | **Audit log full serialization** | `audit.go:189` | O(n) per log entry (was writeToFile, now appendToFile) | ✅ 已修复: Append-only JSON lines (audit.go:189-206) |
+| 5 | **Repeated password decryption** | Every method | Code redundancy | ✅ 已修复: 统一使用 `getDriverForConfig()` 内的 `connectionToDBConfig()` |
+| 6 | **6 duplicate pool double-check blocks** | query/editor/transaction/analyzer | ~120 lines redundant code | ✅ 已修复: 统一使用 `getDriverForConfig()` |
+| 7 | **Stale transactions not cleaned** | `transaction.go:57-68` | `globalTransactions` unbounded growth | ✅ 已修复: `startStaleTransactionCleanup()` 在 `BeginTransaction()` 自动调用 |
+| 8 | **Identifier quotes inconsistent** | `data_editor.go` uses backticks for all | PG syntax error with backticks | ✅ 已修复: `quoteIdentifier()` 按 dbType 选择引号 |
 
 ### P2 — Medium (Completeness/Quality)
 
 | # | Issue | Location | Impact | Fix |
 |---|-------|----------|--------|-----|
-| 9 | **getColumnSuggestions returns empty** | `autocomplete.go:352-359` | Column completion never works | Implement FROM clause parsing |
+| 9 | **getColumnSuggestions implemented** | `autocomplete.go:317-346` | Column completion now works | ✅ 已完成: 从所有表获取列名 |
 | 10 | **i18n incomplete** | Go side hardcoded Chinese | SetLanguage(en) won't change messages | Add all Go messages to i18n map |
-| 11 | **GetSlowQueries stub** | `query_analyzer.go:300-302` | Always returns empty | Implement pg_stat_statements/slow_query_log |
+| 11 | **GetSlowQueries stub** | `query_analyzer.go:300` | Always returns empty | Implement pg_stat_statements/slow_query_log |
 | 12 | **Frontend XSS risk** | 57 `innerHTML`/`insertAdjacentHTML` calls | Unsanitized data injection | Use textContent or sanitize |
 
 ### P3 — Low (Improvement)
@@ -659,5 +650,5 @@ test.go ← {db, crypto, i18n}
 | 13 | All code in `package main` | Split to `internal/pool`, `internal/crypto`, etc |
 | 14 | Connection vs ConnectionConfig duplication | Unify or add explicit conversion layer |
 | 15 | `go.mod` module name `db-server` | Use `github.com/user/db-client` style |
-| 16 | `truncateQuery` byte truncation | Use rune-level truncation for UTF-8 |
+| 16 | `truncateQuery` byte truncation | ✅ 已修复: audit.go:280-285 使用 rune-level truncation 处理 UTF-8 |
 | 17 | Frontend 3502-line single JS file | Introduce Vite + TypeScript |

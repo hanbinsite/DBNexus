@@ -4,9 +4,35 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func sanitizeIdentifier(identifier string) string {
+	if identifier == "" {
+		return "invalid_identifier"
+	}
+	if strings.Contains(identifier, "..") {
+		return "invalid_identifier"
+	}
+	if strings.ContainsAny(identifier, ";--/*\\=(){}[]&|!<>") {
+		return "invalid_identifier"
+	}
+	cleaned := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
+			return r
+		}
+		return -1
+	}, identifier)
+	if cleaned == "" {
+		return "invalid_identifier"
+	}
+	if len(cleaned) > 64 {
+		return cleaned[:64]
+	}
+	return cleaned
+}
 
 // SQLiteDriver implements the DatabaseDriver interface for SQLite
 type SQLiteDriver struct {
@@ -89,7 +115,8 @@ func (d *SQLiteDriver) GetTables(ctx context.Context) ([]string, error) {
 
 // GetTableStructure returns the structure of a SQLite table
 func (d *SQLiteDriver) GetTableStructure(ctx context.Context, tableName string) ([]ColumnInfo, error) {
-	query := fmt.Sprintf("PRAGMA table_info(\"%s\")", tableName)
+	safeTableName := sanitizeIdentifier(tableName)
+	query := fmt.Sprintf("PRAGMA table_info(\"%s\")", safeTableName)
 	rows, err := d.Query(ctx, query)
 	if err != nil {
 		return nil, err

@@ -85,7 +85,7 @@ func (d *MySQLDriver) GetTables(ctx context.Context) ([]string, error) {
 }
 
 func (d *MySQLDriver) GetTableStructure(ctx context.Context, tableName string) ([]ColumnInfo, error) {
-	query := "DESCRIBE `" + tableName + "`"
+	query := "DESCRIBE `" + sanitizeIdentifier(tableName) + "`"
 	rows, err := d.Query(ctx, query)
 	if err != nil {
 		return nil, err

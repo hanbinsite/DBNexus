@@ -2,12 +2,13 @@ package main
 
 import (
 	"database/sql"
-	"db-server/db"
 	"fmt"
 	"strings"
+	"unicode/utf8"
+
+	"db-server/db"
 )
 
-// GetDatabases returns a list of databases
 func (a *App) GetDatabases(config Connection) ([]DatabaseInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 
@@ -29,11 +30,8 @@ func (a *App) GetDatabases(config Connection) ([]DatabaseInfo, error) {
 	return result, nil
 }
 
-// GetTables returns a list of tables
 func (a *App) GetTables(config Connection, database string) ([]TableInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
-
-	// IMPORTANT: Set the database for this operation
 	dbConfig.Database = database
 
 	driver, err := a.getDriverForConfig(dbConfig)
@@ -41,7 +39,6 @@ func (a *App) GetTables(config Connection, database string) ([]TableInfo, error)
 		return nil, err
 	}
 
-	// Ensure the driver is actually pointing to the requested database
 	if err := driver.UseDatabase(a.ctx, database); err != nil {
 		return nil, fmt.Errorf("切换数据库 %s 失败: %v", database, err)
 	}
@@ -59,7 +56,6 @@ func (a *App) GetTables(config Connection, database string) ([]TableInfo, error)
 	return result, nil
 }
 
-// GetViews returns a list of views
 func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
@@ -114,7 +110,6 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 	return views, nil
 }
 
-// GetFunctions returns a list of stored functions/procedures
 func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
@@ -170,16 +165,7 @@ func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, err
 	return functions, nil
 }
 
-// GetTableColumns returns column information for a table
 func (a *App) GetTableColumns(config Connection, database string, table string) ([]db.ColumnInfo, error) {
-	// Decrypt password if stored encrypted
-	if config.SavePassword && config.Password != "" {
-		decrypted, err := decryptPassword(config.Password)
-		if err == nil {
-			config.Password = decrypted
-		}
-	}
-
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
@@ -191,24 +177,19 @@ func (a *App) GetTableColumns(config Connection, database string, table string) 
 	return driver.GetTableStructure(a.ctx, table)
 }
 
-// sanitizeIdentifier sanitizes a SQL identifier (table/column name) to prevent SQL injection
 func sanitizeIdentifier(identifier string) string {
-	// Check for empty input
 	if identifier == "" {
 		return "invalid_identifier"
 	}
 
-	// Block path traversal attempts
 	if strings.Contains(identifier, "..") {
 		return "invalid_identifier"
 	}
 
-	// Block dangerous characters
 	if strings.ContainsAny(identifier, ";--/*\\=(){}[]&|!<>") {
 		return "invalid_identifier"
 	}
 
-	// Only allow alphanumeric characters, underscores, and dots (for schema.table)
 	cleaned := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
 			return r
@@ -220,12 +201,11 @@ func sanitizeIdentifier(identifier string) string {
 		return "invalid_identifier"
 	}
 
-	// Limit identifier length to prevent DOS attacks
-	if len(cleaned) > 64 {
-		cleaned = cleaned[:64]
+	if utf8.RuneCountInString(cleaned) > 64 {
+		runes := []rune(cleaned)
+		cleaned = string(runes[:64])
 	}
 
-	// Validate schema.table format (at most one dot)
 	if dotCount := strings.Count(cleaned, "."); dotCount > 1 {
 		return "invalid_identifier"
 	}
@@ -233,13 +213,10 @@ func sanitizeIdentifier(identifier string) string {
 	return cleaned
 }
 
-// escapeStringLiteral escapes a string literal for SQL to prevent injection
 func escapeStringLiteral(s string) string {
-	// Replace single quotes with two single quotes (SQL standard)
 	return strings.ReplaceAll(s, "'", "''")
 }
 
-// GetTableIndexes returns indexes for a table
 func (a *App) GetTableIndexes(config Connection, database string, table string) ([]IndexInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
@@ -282,7 +259,6 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 	defer rows.Close()
 
 	if config.Type == "mysql" {
-		// MySQL format: Table, Non_unique, Key_name, Seq_in_index, Column_name, ...
 		type mysqlIndex struct {
 			Table        string
 			NonUnique    int
@@ -334,7 +310,6 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 			indexes = append(indexes, *idx)
 		}
 	} else {
-		// PostgreSQL format
 		for rows.Next() {
 			var idx IndexInfo
 			var columnsArray string
@@ -351,7 +326,6 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 				idx.Type = "INDEX"
 			}
 
-			// Parse PostgreSQL array format
 			idx.Columns = parsePostgresArray(columnsArray)
 			indexes = append(indexes, idx)
 		}
@@ -360,7 +334,6 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 	return indexes, nil
 }
 
-// GetTableForeignKeys returns foreign keys for a table
 func (a *App) GetTableForeignKeys(config Connection, database string, table string) ([]ForeignKeyInfo, error) {
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
@@ -444,7 +417,6 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 	return foreignKeys, nil
 }
 
-// GetTableStats returns table statistics
 func (a *App) GetTableStats(config Connection, database string, table string) (TableStats, error) {
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
@@ -514,7 +486,6 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 	return stats, nil
 }
 
-// parsePostgresArray parses PostgreSQL array string like "{a,b,c}"
 func parsePostgresArray(arr string) []string {
 	if len(arr) < 2 || arr[0] != '{' || arr[len(arr)-1] != '}' {
 		return []string{}
@@ -566,7 +537,6 @@ func parsePostgresArray(arr string) []string {
 	return result
 }
 
-// convertRefAction converts reference action codes
 func convertRefAction(action string) string {
 	switch action {
 	case "a":
