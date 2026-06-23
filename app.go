@@ -89,7 +89,7 @@ func (a *App) SetLanguage(lang string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	return os.WriteFile(configFile, data, 0644)
+	return os.WriteFile(configFile, data, 0600)
 }
 
 func (a *App) getCurrentLang() string {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"db-server/db"
 )
@@ -65,6 +66,42 @@ func (a *App) ExecuteRedisCommand(config Connection, cmd string, args ...interfa
 	driver, err := a.getRedisDriver(config)
 	if err != nil {
 		return nil, err
+	}
+
+	cmdUpper := strings.ToUpper(cmd)
+
+	redisSafeCommands := map[string]bool{
+		"GET": true, "SET": true, "MGET": true, "MSET": true, "GETSET": true,
+		"DEL": true, "EXISTS": true, "TYPE": true, "TTL": true, "PTTL": true,
+		"EXPIRE": true, "EXPIREAT": true, "PEXPIRE": true, "PEXPIREAT": true,
+		"PERSIST": true, "RENAME": true, "RENAMENX": true, "DUMP": true, "RESTORE": true,
+		"KEYS": true, "SCAN": true, "RANDOMKEY": true,
+		"STRLEN": true, "APPEND": true, "GETRANGE": true, "SETRANGE": true,
+		"INCR": true, "INCRBY": true, "DECR": true, "DECRBY": true, "INCRBYFLOAT": true,
+		"LPUSH": true, "LPOP": true, "RPUSH": true, "RPOP": true,
+		"LLEN": true, "LRANGE": true, "LINDEX": true, "LSET": true, "LREM": true,
+		"SADD": true, "SREM": true, "SMEMBERS": true, "SISMEMBER": true,
+		"SCARD": true, "SINTER": true, "SUNION": true, "SDIFF": true,
+		"ZADD": true, "ZREM": true, "ZRANGE": true, "ZREVRANGE": true,
+		"ZRANGEBYSCORE": true, "ZCARD": true, "ZSCORE": true, "ZRANK": true, "ZREVRANK": true,
+		"HSET": true, "HGET": true, "HMSET": true, "HMGET": true, "HGETALL": true,
+		"HDEL": true, "HEXISTS": true, "HLEN": true, "HKEYS": true, "HVALS": true,
+		"PUBLISH": true, "SUBSCRIBE": true, "UNSUBSCRIBE": true,
+		"INFO": true, "PING": true, "ECHO": true, "DBSIZE": true,
+		"CLIENT": true, "CLUSTER": true, "COMMAND": true,
+		"SELECT": true, "AUTH": true,
+	}
+
+	if !redisSafeCommands[cmdUpper] {
+		auditLogger := GetAuditLogger()
+		auditLogger.Log(AuditLevelError, AuditEventQuery,
+			fmt.Sprintf("拒绝危险Redis命令: %s", cmd),
+			map[string]interface{}{
+				"command": cmd,
+				"args":    args,
+			},
+		)
+		return nil, fmt.Errorf("危险命令拒绝: %s 不在允许列表内", cmd)
 	}
 
 	ctx := context.Background()

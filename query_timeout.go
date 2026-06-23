@@ -38,13 +38,22 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-	driver, err := a.getDriverForConfig(dbConfig)
+driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return QueryResult{
 			Error:    fmt.Sprintf("连接失败: %v", err),
 			Duration: time.Since(startTime).String(),
 		}
 	}
+
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("执行查询 (单): %s", truncateQuery(query, 200)),
+		map[string]interface{}{
+			"database": database,
+			"timeout":  timeoutSeconds,
+		},
+	)
 
 	rows, err := driver.Query(ctx, query)
 	if err != nil {

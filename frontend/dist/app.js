@@ -2621,10 +2621,10 @@ function renderFKVisualization(fks) {
     
     let html = '<div class="fk-diagram">';
     html += '<div class="fk-current-table">';
-    html += `<span class="fk-table-name">${state.currentTable?.name || '当前表'}</span>`;
+    html += `<span class="fk-table-name">${DomUtils.escapeHtml(state.currentTable?.name || '当前表')}</span>`;
     html += '<div class="fk-columns">';
     fks.forEach(fk => {
-        html += `<span class="fk-column">${fk.column_name}</span>`;
+        html += `<span class="fk-column">${DomUtils.escapeHtml(fk.column_name)}</span>`;
     });
     html += '</div></div>';
     
@@ -2636,7 +2636,7 @@ function renderFKVisualization(fks) {
                     <line x1="0" y1="12" x2="70" y2="12" stroke="var(--accent-primary)" stroke-width="2"/>
                     <polygon points="70,6 84,12 70,18" fill="var(--accent-primary)"/>
                 </svg>
-                <span class="fk-rule-badge">${fk.on_delete}</span>
+                <span class="fk-rule-badge">${DomUtils.escapeHtml(fk.on_delete)}</span>
             </div>
         `;
     });
@@ -2646,9 +2646,9 @@ function renderFKVisualization(fks) {
     fks.forEach(fk => {
         html += `
             <div class="fk-ref-table">
-                <span class="fk-table-name">${fk.ref_table}</span>
+                <span class="fk-table-name">${DomUtils.escapeHtml(fk.ref_table)}</span>
                 <div class="fk-columns">
-                    <span class="fk-column pk-column">${fk.ref_column} (PK)</span>
+                    <span class="fk-column pk-column">${DomUtils.escapeHtml(fk.ref_column)} (PK)</span>
                 </div>
             </div>
         `;

@@ -76,8 +76,23 @@ func (a *App) ExecuteNonQuery(config Connection, database string, query string) 
 		return 0, "", fmt.Errorf("connection failed: %v", err)
 	}
 
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("执行非查询 (NonQuery): %s", truncateQuery(query, 200)),
+		map[string]interface{}{
+			"database": database,
+		},
+	)
+
 	result, err := driver.Exec(a.ctx, query)
 	if err != nil {
+		auditLogger.Log(AuditLevelError, AuditEventQuery,
+			fmt.Sprintf("非查询失败: %v", err),
+			map[string]interface{}{
+				"database": database,
+				"query":    truncateQuery(query, 200),
+			},
+		)
 		return 0, "", fmt.Errorf("execution failed: %v", err)
 	}
 
