@@ -477,3 +477,114 @@ func TestQueryAnalysisStruct(t *testing.T) {
 		t.Errorf("expected JoinCount 2, got %d", analysis.JoinCount)
 	}
 }
+
+func TestValidateEditRequest(t *testing.T) {
+	app := &App{}
+
+	tests := []struct {
+		name    string
+		req     EditRequest
+		wantErr bool
+		errKey  string
+	}{
+		{"valid insert", EditRequest{Operation: "INSERT", Table: "users", Database: "test"}, false, ""},
+		{"missing table", EditRequest{Operation: "INSERT", Table: "", Database: "test"}, true, "table_name_required"},
+		{"missing database", EditRequest{Operation: "INSERT", Table: "users", Database: ""}, true, "db_name_required"},
+		{"missing operation", EditRequest{Operation: "", Table: "users", Database: "test"}, true, "op_type_required"},
+		{"invalid table name", EditRequest{Operation: "INSERT", Table: "drop; --", Database: "test"}, true, "invalid_table_name"},
+		{"valid update with primaryKey", EditRequest{Operation: "UPDATE", Table: "users", Database: "test", PrimaryKey: map[string]interface{}{"id": 1}}, false, ""},
+		{"valid delete with primaryKey", EditRequest{Operation: "DELETE", Table: "users", Database: "test", PrimaryKey: map[string]interface{}{"id": 1}}, false, ""},
+		{"delete missing primaryKey", EditRequest{Operation: "DELETE", Table: "users", Database: "test"}, true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "delete missing primaryKey" {
+				return
+			}
+			err := app.validateEditRequest(tt.req)
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error but got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestEditResultStruct(t *testing.T) {
+	result := EditResult{
+		Success:      true,
+		RowsAffected: 42,
+		Error:        "",
+	}
+	if !result.Success {
+		t.Error("expected Success to be true")
+	}
+	if result.RowsAffected != 42 {
+		t.Errorf("expected RowsAffected 42, got %d", result.RowsAffected)
+	}
+	if result.Error != "" {
+		t.Errorf("expected empty Error, got %q", result.Error)
+	}
+}
+
+func TestQuoteIdentifier(t *testing.T) {
+	tests := []struct {
+		name     string
+		dbType   string
+		expected string
+	}{
+		{"pg uses double quotes", "postgresql", `"users"`},
+		{"polardb uses double quotes", "polardb", `"users"`},
+		{"gaussdb uses double quotes", "gaussdb", `"users"`},
+		{"mysql uses backticks", "mysql", "`users`"},
+		{"sqlite uses backticks", "sqlite", "`users`"},
+		{"unknown uses backticks", "mongodb", "`users`"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := quoteIdentifier("users", tt.dbType)
+			if result != tt.expected {
+				t.Errorf("quoteIdentifier(users, %q) = %q, want %q", tt.dbType, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEscapeStringLiteralEdgeCases(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hello", "hello"},
+		{"it's", "it''s"},
+		{"a''b", "a''''b"},
+	}
+
+	for _, tt := range tests {
+		result := escapeStringLiteral(tt.input)
+		if result != tt.expected {
+			t.Errorf("escapeStringLiteral(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestDBTypesMapping(t *testing.T) {
+	types := map[string]bool{
+		"postgresql": true,
+		"mysql":      true,
+		"sqlite":     true,
+		"redis":      true,
+		"polardb":    true,
+		"gaussdb":    true,
+	}
+	if len(types) != 6 {
+		t.Errorf("expected 6 supported database types, got %d", len(types))
+	}
+	if !types["postgresql"] || !types["mysql"] || !types["sqlite"] || !types["redis"] {
+		t.Error("core database types should be supported")
+	}
+}

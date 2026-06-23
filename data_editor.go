@@ -88,18 +88,18 @@ func (a *App) EditTableData(config Connection, req EditRequest) EditResult {
 
 func (a *App) validateEditRequest(req EditRequest) error {
 	if req.Table == "" {
-		return fmt.Errorf("表名不能为空")
+		return fmt.Errorf("%s", a.t(MsgTableNameRequired, a.getCurrentLang()))
 	}
 	if req.Database == "" {
-		return fmt.Errorf("数据库名不能为空")
+		return fmt.Errorf("%s", a.t(MsgDBNameRequired, a.getCurrentLang()))
 	}
 	if req.Operation == "" {
-		return fmt.Errorf("操作类型不能为空")
+		return fmt.Errorf("%s", a.t(MsgOpTypeRequired, a.getCurrentLang()))
 	}
 
 	safeTable := sanitizeIdentifier(req.Table)
 	if safeTable == "invalid_identifier" {
-		return fmt.Errorf("无效的表名: %s", req.Table)
+		return fmt.Errorf(a.t(MsgInvalidTableName, a.getCurrentLang()), req.Table)
 	}
 
 	return nil
