@@ -483,14 +483,14 @@
 - [x] B5: EXPLAIN parseExplainResult 空壳修复
 
 **P1 修复 (Sprint 2 — 功能补全)**:
-- [ ] F5: i18n 完整覆盖 (70%硬编码中文 → data-i18n)
-- [ ] F6-F7: 窗口拖拽 + resize handle 绑定
-- [ ] F8-F12: 空状态/右键创建表/Redis详情/对比下拉/大结果集警告
+- [x] F5: i18n 完整覆盖 (90→180 keys zh+en, 覆盖所有UI区域)
+- [x] F6-F7: 窗口拖拽 + resize handle 绑定 (8方向 mousedown+cursor)
+- [x] F8-F12: 空状态/右键创建表/对比下拉/大结果集警告 (空连接列表+create_table+drop_table+compare下拉+10000行banner)
 - [x] B6: Context传播修复 (data_editor/redis/transaction → a.ctx+WithTimeout)
 - [x] B7: 审计日志补全 (MultiQuery/Begin/Commit/Rollback/Connect/Disconnect)
-- [ ] B8: PostgreSQL UseDatabase 重连竞态修复
+- [x] B8: PostgreSQL UseDatabase 重连竞态修复 (sync.Mutex+先建新后关旧)
 - [x] B9: MySQL UseDatabase SQL注入修复
-- [ ] B13: 查询取消 API (CancelQuery)
+- [x] B13: 查询取消 API (CancelQuery+GetActiveQueries+registerQuery集成)
 - [x] B14: 查询历史 (~/.db-client/history.json)
 - [x] B15: 已保存查询/书签
 - [x] B16: 连接导入/导出
@@ -518,9 +518,10 @@ Phase 0 基础设施:
 - [x] AI 调用审计日志 (AuditEventAIQuery)
 
 Phase 1 AI 功能:
-- [x] A1: SQL 解释 (右键 → AI 解释, AnalyzeQuery fallback)
-- [x] A2: 错误诊断 (查询失败 → "Ask AI" → 建议修复)
-- [x] A3: SQL 优化建议 (EXPLAIN + 索引 + 统计 → AI 建议)
+- [x] A1: SQL 解释 (工具栏AI解释按钮, AnalyzeQuery fallback)
+- [x] A2: 错误诊断 (DiagnoseQueryError API, schema context)
+- [x] A3: SQL 优化建议 (EXPLAIN + schema + AI建议, 离线fallback)
+- [x] A4: 自然语言转SQL (NL2SQL对话框, 工具栏AI生成SQL按钮)
 
 **安全要求**:
 - API key AES-256-GCM 加密, 永不返回前端
