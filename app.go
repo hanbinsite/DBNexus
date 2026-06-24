@@ -104,11 +104,15 @@ func (a *App) getCurrentLang() string {
 }
 
 func (a *App) GetServerInfo() map[string]interface{} {
+	poolSize := 0
+	if a.pool != nil && a.pool.connections != nil {
+		poolSize = len(a.pool.connections)
+	}
 	return map[string]interface{}{
 		"version":      "1.0.0",
 		"wailsVersion": "2.12.0",
 		"goVersion":    "1.24.0",
-		"poolSize":     len(a.pool.connections),
+		"poolSize":     poolSize,
 		"maxPoolSize":  MaxPoolSize,
 	}
 }

@@ -15,7 +15,10 @@ const state = {
     sidebarWidth: 260,
     editorHeight: 300,
     isResizing: false,
-    wailsReady: false
+    wailsReady: false,
+    currentTable: null,
+    selectedDatabase: null,
+    columnWidths: {}
 };
 
 // ==========================================================================
@@ -57,6 +60,11 @@ const WailsAPI = {
     readFile: (path) => window.go.main.App.ReadFile(path),
     writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
     
+    // Audit Logs
+    getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
+    exportAuditLogs: (startTime, endTime) => window.go.main.App.ExportAuditLogs(startTime, endTime),
+    clearOldAuditLogs: (daysToKeep) => window.go.main.App.ClearOldAuditLogs(daysToKeep),
+    
     // Language
     getLanguage: () => window.go.main.App.GetLanguage(),
     setLanguage: (lang) => window.go.main.App.SetLanguage(lang),
@@ -64,7 +72,7 @@ const WailsAPI = {
     // Test Services
     runConnectionTest: (conn) => window.go.main.App.RunConnectionTest(conn),
     runAllTests: () => window.go.main.App.RunAllTests(),
-    getSupportedFeatures: () => window.go.main.App.GetSupportedFeatures(),
+    getSupportedFeatures: (dbType) => window.go.main.App.GetSupportedFeatures(dbType),
     getServerInfo: () => window.go.main.App.GetServerInfo(),
     getDatabaseServerInfo: (conn) => window.go.main.App.GetDatabaseServerInfo(conn),
     
@@ -2207,6 +2215,16 @@ function applyFilter() {
     renderCurrentPage();
 }
 
+function clearFilter() {
+    const filterCol = document.getElementById('filterColumn');
+    const filterVal = document.getElementById('filterValue');
+    const filterOp = document.getElementById('filterOperator');
+    if (filterCol) filterCol.value = '';
+    if (filterVal) filterVal.value = '';
+    if (filterOp) filterOp.value = '=';
+    refreshDataView();
+}
+
 function toggleSortOrder() {
     const btn = document.getElementById('sortOrder');
     const sortColumn = document.getElementById('sortColumn').value;
@@ -2246,7 +2264,8 @@ let pagination = {
     totalRows: 0,
     totalPages: 1,
     allData: [],
-    currentData: []
+    currentData: [],
+    columns: []
 };
 
 function initPagination(totalRows) {
@@ -2883,7 +2902,6 @@ function openFunction(funcName) {
     console.log('Opening function:', funcName);
     createNewTab();
     
-    const editor = document.getElementById('queryEditor');
     setEditorValue(`SELECT * FROM ${DomUtils.escapeHtml(funcName)}();`);
     updateLineNumbers();
 }
@@ -3785,6 +3803,7 @@ window.startTransaction = startTransaction;
 window.executeInTx = executeInTx;
 window.commitTx = commitTx;
 window.rollbackTx = rollbackTx;
+window.clearFilter = clearFilter;
 
 // ==========================================================================
 // Language Settings
@@ -3979,8 +3998,6 @@ async function fetchDatabases() {
     }
 }
 
-// ==========================================================================
-// Export Dialog
 // ==========================================================================
 function openExportModal() {
     if (state.currentTable) {
@@ -4291,131 +4308,3 @@ function renderCompareResult(result) {
     el.innerHTML = html;
 }
 
-// ==========================================================================
-// Transaction Panel
-// ==========================================================================
-let activeTxId = null;
-let txStartTime = null;
-let txTimerInterval = null;
-
-function openTransactionPanel() {
-    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
-    document.getElementById('transactionPanel').style.display = 'block';
-}
-
-function closeTransactionPanel() {
-    document.getElementById('transactionPanel').style.display = 'none';
-}
-
-function updateTransactionStatus() {
-    const label = document.getElementById('transactionLabel');
-    if (activeTxId) {
-        label.textContent = '事务';
-        label.style.color = 'var(--accent-primary)';
-    } else {
-        label.textContent = '事务';
-        label.style.color = '';
-    }
-}
-
-async function startTransaction() {
-    if (!state.activeConnection) return;
-    showLoading('开始事务...');
-    try {
-        const db = state.selectedDatabase || state.currentTable?.database || '';
-        const result = await WailsAPI.beginTransaction(state.activeConnection, db, { isolated: true });
-        activeTxId = result.tx_id || result.txID;
-        txStartTime = Date.now();
-        document.getElementById('txId').textContent = `TX: ${activeTxId}`;
-        document.getElementById('txNoActive').style.display = 'none';
-        document.getElementById('txActive').style.display = 'block';
-        document.getElementById('txResults').innerHTML = '';
-        document.getElementById('txQuery').value = '';
-        startTxTimer();
-        updateTransactionStatus();
-        hideLoading();
-        showNotification('success', '事务已开始');
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `开始事务失败: ${e.message || e}`);
-    }
-}
-
-function startTxTimer() {
-    if (txTimerInterval) clearInterval(txTimerInterval);
-    txTimerInterval = setInterval(() => {
-        if (!txStartTime) return;
-        const elapsed = Math.floor((Date.now() - txStartTime) / 1000);
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        document.getElementById('txTimer').textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
-    }, 1000);
-}
-
-function stopTxTimer() {
-    if (txTimerInterval) { clearInterval(txTimerInterval); txTimerInterval = null; }
-}
-
-async function executeInTx() {
-    if (!activeTxId) { showNotification('warning', '无活动事务'); return; }
-    const query = document.getElementById('txQuery').value.trim();
-    if (!query) { showNotification('warning', '请输入 SQL'); return; }
-    showLoading('执行中...');
-    try {
-        const result = await WailsAPI.executeInTransaction(activeTxId, query);
-        hideLoading();
-        const resultsEl = document.getElementById('txResults');
-        const div = document.createElement('div');
-        div.style.cssText = 'padding:6px 8px;background:var(--bg-primary);border-radius:var(--radius-md);margin-bottom:4px;font-family:var(--font-mono);font-size:12px;';
-        if (result.error) {
-            div.style.borderLeft = '3px solid var(--danger)';
-            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0,60))}...</span><br><span style="color:var(--danger);">${DomUtils.escapeHtml(result.error)}</span>`;
-        } else {
-            div.style.borderLeft = '3px solid var(--success)';
-            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0,60))}...</span><br>影响: ${result.rows_affected || 0} 行`;
-        }
-        resultsEl.insertBefore(div, resultsEl.firstChild);
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `执行失败: ${e.message || e}`);
-    }
-}
-
-async function commitTx() {
-    if (!activeTxId) return;
-    showLoading('提交事务中...');
-    try {
-        await WailsAPI.commitTransaction(activeTxId);
-        hideLoading();
-        showNotification('success', '事务已提交');
-        resetTxState();
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `提交失败: ${e.message || e}`);
-    }
-}
-
-async function rollbackTx() {
-    if (!activeTxId) return;
-    if (!confirm('确定要回滚事务吗？')) return;
-    showLoading('回滚事务中...');
-    try {
-        await WailsAPI.rollbackTransaction(activeTxId);
-        hideLoading();
-        showNotification('success', '事务已回滚');
-        resetTxState();
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `回滚失败: ${e.message || e}`);
-    }
-}
-
-function resetTxState() {
-    activeTxId = null;
-    txStartTime = null;
-    stopTxTimer();
-    document.getElementById('txNoActive').style.display = 'block';
-    document.getElementById('txActive').style.display = 'none';
-    document.getElementById('txResults').innerHTML = '';
-    updateTransactionStatus();
-}
