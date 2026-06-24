@@ -80,6 +80,10 @@ const WailsAPI = {
     naturalLanguageToSQL: (conn, db, text) => window.go.main.App.NaturalLanguageToSQL(conn, db, text),
     testAIConnection: () => window.go.main.App.TestAIConnection(),
     setAIConfig: (provider, key, url, model, enable) => window.go.main.App.SetAIConfig(provider, key, url, model, enable),
+
+    // Query Cancellation
+    cancelQuery: (queryID) => window.go.main.App.CancelQuery(queryID),
+    getActiveQueries: () => window.go.main.App.GetActiveQueries(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
@@ -862,6 +866,20 @@ async function contextAction(action) {
     case 'refresh_table':
       if (state.currentTable) {
         await loadTableData(state.currentTable.name, state.currentTable.database);
+      }
+      break;
+    case 'create_table':
+      createNewTab();
+      setEditorValue('CREATE TABLE new_table (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);');
+      showNotification('info', '已生成 CREATE TABLE 模板，请修改后执行');
+      break;
+    case 'drop_table':
+      if (contextMenuData && contextMenuData.tableName) {
+        if (confirm(`确定要删除表 ${contextMenuData.tableName} 吗？此操作不可撤销！`)) {
+          createNewTab();
+          setEditorValue(`DROP TABLE IF EXISTS ${contextMenuData.tableName};`);
+          showNotification('warning', '请确认后执行 DROP TABLE');
+        }
       }
       break;
   }
@@ -3024,8 +3042,8 @@ async function loadTableData(tableName, database) {
 			console.log('Result columns:', result?.columns);
 
 			if (result && result.error) {
-				showNotification('error', result.error);
-			} else if (result && result.rows) {
+			showNotification('error', result.error);
+		} else if (result && result.rows) {
 				const savedPage = pagination.currentPage || 1;
 				pagination.allData = result.rows || [];
 				pagination.columns = result.columns || [];
@@ -3035,6 +3053,17 @@ async function loadTableData(tableName, database) {
 					pagination.currentPage = pagination.totalPages;
 				} else {
 					pagination.currentPage = savedPage;
+				}
+
+				if (pagination.totalRows >= 10000) {
+					const banner = document.getElementById('largeResultBanner');
+					if (banner) {
+						banner.style.display = 'flex';
+						banner.querySelector('.banner-text').textContent = i18n.t('largeResultWarning');
+					}
+				} else {
+					const banner = document.getElementById('largeResultBanner');
+					if (banner) banner.style.display = 'none';
 				}
 
 				updatePaginationUI();

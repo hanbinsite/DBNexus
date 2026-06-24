@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
 
 	_ "github.com/lib/pq"
 )
@@ -12,6 +13,7 @@ import (
 type PostgreSQLDriver struct {
 	sqlDB  *sql.DB
 	config ConnectionConfig // 保存配置以便重新连接
+	mu     sync.Mutex       // 保护 UseDatabase 期间的连接切换
 }
 
 // NewPostgreSQLDriver creates a new PostgreSQLDriver
@@ -37,14 +39,12 @@ func (d *PostgreSQLDriver) Connect(config ConnectionConfig) error {
 // UseDatabase switches the current database context
 // PostgreSQL doesn't have a 'USE' command, so we need to reconnect to the new database
 func (d *PostgreSQLDriver) UseDatabase(ctx context.Context, database string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	// 如果已经是同一个数据库，无需切换
 	if d.config.Database == database {
 		return nil
-	}
-
-	// 关闭当前连接
-	if d.sqlDB != nil {
-		d.sqlDB.Close()
 	}
 
 	// 创建新的连接配置
@@ -55,19 +55,25 @@ func (d *PostgreSQLDriver) UseDatabase(ctx context.Context, database string) err
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		newConfig.Host, newConfig.Port, newConfig.Username, newConfig.Password, newConfig.Database, newConfig.SSLMode)
 
-	sqlDB, err := sql.Open("postgres", connStr)
+	newSqlDB, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %s: %w", database, err)
 	}
 
 	// 测试新连接
-	if err := sqlDB.PingContext(ctx); err != nil {
-		sqlDB.Close()
+	if err := newSqlDB.PingContext(ctx); err != nil {
+		newSqlDB.Close()
 		return fmt.Errorf("failed to ping database %s: %w", database, err)
 	}
 
-	d.sqlDB = sqlDB
+	// 先准备好新连接，再关闭旧连接
+	oldSqlDB := d.sqlDB
+	d.sqlDB = newSqlDB
 	d.config = newConfig
+
+	if oldSqlDB != nil {
+		oldSqlDB.Close()
+	}
 	return nil
 }
 

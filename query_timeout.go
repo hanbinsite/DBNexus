@@ -35,10 +35,14 @@ func (a *App) ExecuteQueryWithTimeout(config Connection, database string, query 
 	ctx, cancel := context.WithTimeout(a.ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
+	queryID := fmt.Sprintf("q_%d", time.Now().UnixNano())
+	registerQuery(queryID, query, cancel)
+	defer unregisterQuery(queryID)
+
 	dbConfig := a.connectionToDBConfig(config)
 	dbConfig.Database = database
 
-driver, err := a.getDriverForConfig(dbConfig)
+	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
 		return QueryResult{
 			Error:    fmt.Sprintf("连接失败: %v", err),
@@ -50,8 +54,9 @@ driver, err := a.getDriverForConfig(dbConfig)
 	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
 		fmt.Sprintf("执行查询 (单): %s", truncateQuery(query, 200)),
 		map[string]interface{}{
-			"database": database,
-			"timeout":  timeoutSeconds,
+			"database":  database,
+			"timeout":   timeoutSeconds,
+			"query_id":  queryID,
 		},
 	)
 
