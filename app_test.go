@@ -588,3 +588,87 @@ func TestDBTypesMapping(t *testing.T) {
 		t.Error("core database types should be supported")
 	}
 }
+
+func TestCollectInsertData(t *testing.T) {
+	app := &App{}
+
+	tests := []struct {
+		name      string
+		data      map[string]interface{}
+		dbType    string
+		wantCols  int
+		wantErr   bool
+	}{
+		{"normal columns", map[string]interface{}{"name": "test", "age": 25}, "mysql", 2, false},
+		{"mixed types", map[string]interface{}{"id": 1, "name": "test", "active": true}, "postgresql", 3, false},
+		{"sql injection key", map[string]interface{}{"name; DROP": "test"}, "mysql", 0, false},
+		{"single column", map[string]interface{}{"value": 3.14}, "mysql", 1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cols, vals, err := app.collectInsertData(EditRequest{Data: tt.data}, tt.dbType)
+			if tt.wantErr && err == nil {
+				t.Error("expected error but got nil")
+			}
+			if !tt.wantErr {
+				if len(cols) != tt.wantCols {
+					t.Errorf("expected %d columns, got %d", tt.wantCols, len(cols))
+				}
+				if len(vals) != tt.wantCols {
+					t.Errorf("expected %d values, got %d", tt.wantCols, len(vals))
+				}
+			}
+		})
+	}
+}
+
+func TestBatchEditRequestsGrouping(t *testing.T) {
+	singleReq := []EditRequest{
+		{Operation: "INSERT", Table: "users", Database: "test", Data: map[string]interface{}{"name": "a"}},
+	}
+	if len(singleReq) != 1 {
+		t.Error("single request should have 1 element")
+	}
+
+	mixed := []EditRequest{
+		{Operation: "INSERT", Table: "t", Database: "d", Data: map[string]interface{}{"x": 1}},
+		{Operation: "UPDATE", Table: "t", Database: "d", PrimaryKey: map[string]interface{}{"id": 1}, Data: map[string]interface{}{"x": 2}},
+		{Operation: "INSERT", Table: "t", Database: "d", Data: map[string]interface{}{"x": 3}},
+	}
+	if len(mixed) != 3 {
+		t.Error("mixed requests should have 3 elements")
+	}
+
+	insertCount := 0
+	for _, req := range mixed {
+		if req.Operation == "INSERT" {
+			insertCount++
+		}
+	}
+	if insertCount != 2 {
+		t.Errorf("expected 2 INSERTs in mixed requests, got %d", insertCount)
+	}
+}
+
+func TestFormatValueForSQL(t *testing.T) {
+	tests := []struct {
+		val      interface{}
+		expected string
+	}{
+		{"hello", "'hello'"},
+		{"it's", "'it''s'"},
+		{nil, "NULL"},
+		{true, "1"},
+		{false, "0"},
+		{42, "42"},
+		{3.14, "3.14"},
+	}
+
+	for _, tt := range tests {
+		result := formatValueForSQL(tt.val)
+		if result != tt.expected {
+			t.Errorf("formatValueForSQL(%v) = %q, want %q", tt.val, result, tt.expected)
+		}
+	}
+}

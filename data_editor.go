@@ -286,9 +286,28 @@ func (a *App) GetEditableColumns(config Connection, database string, table strin
 }
 
 func (a *App) BatchEdit(config Connection, requests []EditRequest) []EditResult {
-	var results []EditResult
+	if len(requests) == 0 {
+		return []EditResult{}
+	}
+
+	insertRequests := []EditRequest{}
+	otherRequests := []EditRequest{}
 
 	for _, req := range requests {
+		if req.Operation == "INSERT" {
+			insertRequests = append(insertRequests, req)
+		} else {
+			otherRequests = append(otherRequests, req)
+		}
+	}
+
+	var results []EditResult
+
+	if len(insertRequests) > 0 {
+		results = append(results, a.batchInsert(config, insertRequests))
+	}
+
+	for _, req := range otherRequests {
 		result := a.EditTableData(config, req)
 		results = append(results, result)
 		if !result.Success {
@@ -297,6 +316,85 @@ func (a *App) BatchEdit(config Connection, requests []EditRequest) []EditResult 
 	}
 
 	return results
+}
+
+func (a *App) batchInsert(config Connection, requests []EditRequest) EditResult {
+	if len(requests) == 0 {
+		return EditResult{}
+	}
+
+	dbConfig := a.connectionToDBConfig(config)
+	dbConfig.Database = requests[0].Database
+
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return EditResult{Success: false, Error: a.t(MsgConnectionError, a.getCurrentLang())}
+	}
+
+	if len(requests) == 1 {
+		return a.EditTableData(config, requests[0])
+	}
+
+	dbType := string(dbConfig.Type)
+
+	var allPlaceholders []string
+	var allValues []interface{}
+	var columns []string
+
+	for _, req := range requests {
+		cols, vals, err := a.collectInsertData(req, dbType)
+		if err != nil {
+			return EditResult{Success: false, Error: err.Error()}
+		}
+		if len(columns) == 0 {
+			columns = cols
+		}
+		placeholders := make([]string, len(cols))
+		for i := range cols {
+			placeholders[i] = "?"
+		}
+		allPlaceholders = append(allPlaceholders, fmt.Sprintf("(%s)", strings.Join(placeholders, ", ")))
+		allValues = append(allValues, vals...)
+	}
+
+	tableName := quoteIdentifier(requests[0].Table, dbType)
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s",
+		tableName,
+		strings.Join(columns, ", "),
+		strings.Join(allPlaceholders, ", "))
+
+	ctx := context.Background()
+	result, err := driver.Exec(ctx, query, allValues...)
+	if err != nil {
+		auditLogger := GetAuditLogger()
+		auditLogger.Log(AuditLevelError, AuditEventQuery,
+			fmt.Sprintf("批量插入失败: %v", err),
+			map[string]interface{}{
+				"table": requests[0].Table,
+				"count": len(requests),
+			},
+		)
+		return EditResult{Success: false, Error: fmt.Sprintf(a.t(MsgExecutionFailed, a.getCurrentLang()), err)}
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	return EditResult{Success: true, RowsAffected: rowsAffected}
+}
+
+func (a *App) collectInsertData(req EditRequest, dbType string) ([]string, []interface{}, error) {
+	var columns []string
+	var values []interface{}
+
+	for col, val := range req.Data {
+		safeCol := quoteIdentifier(col, dbType)
+		if safeCol == "\"invalid_identifier\"" || safeCol == "`invalid_identifier`" {
+			continue
+		}
+		columns = append(columns, safeCol)
+		values = append(values, val)
+	}
+
+	return columns, values, nil
 }
 
 func (a *App) GenerateInsertStatement(table string, data map[string]interface{}) string {
