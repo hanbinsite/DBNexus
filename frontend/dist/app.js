@@ -3364,6 +3364,54 @@ function showAIResult(title, content) {
     if (splitHandle) splitHandle.style.display = 'block';
 }
 
+function openNL2SQLDialog() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    document.getElementById('nl2sqlModal').classList.add('active');
+    document.getElementById('nl2sqlResult').style.display = 'none';
+    document.getElementById('nl2sqlInput').value = '';
+    document.getElementById('nl2sqlOutput').value = '';
+}
+
+function closeNL2SQLDialog() {
+    document.getElementById('nl2sqlModal').classList.remove('active');
+}
+
+async function executeNL2SQL() {
+    const input = document.getElementById('nl2sqlInput').value.trim();
+    if (!input) { showNotification('warning', '请输入自然语言描述'); return; }
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    const db = document.getElementById('queryDatabase')?.value || state.selectedDatabase || '';
+    showLoading('AI 正在生成 SQL...');
+    try {
+        const sql = await WailsAPI.naturalLanguageToSQL(state.activeConnection, db, input);
+        hideLoading();
+        document.getElementById('nl2sqlOutput').value = sql || '';
+        document.getElementById('nl2sqlResult').style.display = 'block';
+        showNotification('success', 'SQL 已生成');
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'AI 生成失败: ' + (e.message || e));
+    }
+}
+
+function copyNL2SQLResult() {
+    const output = document.getElementById('nl2sqlOutput').value;
+    if (!output) return;
+    navigator.clipboard.writeText(output).then(() => {
+        showNotification('success', '已复制到剪贴板');
+    }).catch(() => {
+        showNotification('error', '复制失败');
+    });
+}
+
+function applyNL2SQLResult() {
+    const sql = document.getElementById('nl2sqlOutput').value;
+    if (!sql) return;
+    setEditorValue(sql);
+    closeNL2SQLDialog();
+    showNotification('success', 'SQL 已插入编辑器');
+}
+
 function showSettingsSection(section) {
     document.querySelectorAll('.settings-section').forEach(s => {
         s.classList.remove('active');
@@ -4236,6 +4284,11 @@ window.saveAIConfig = saveAIConfig;
 window.testAIConnection = testAIConnection;
 window.aiExplainSQL = aiExplainSQL;
 window.aiOptimizeSQL = aiOptimizeSQL;
+window.openNL2SQLDialog = openNL2SQLDialog;
+window.closeNL2SQLDialog = closeNL2SQLDialog;
+window.executeNL2SQL = executeNL2SQL;
+window.copyNL2SQLResult = copyNL2SQLResult;
+window.applyNL2SQLResult = applyNL2SQLResult;
 
 // ==========================================================================
 // Language Settings

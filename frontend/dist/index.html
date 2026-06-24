@@ -65,6 +65,9 @@
                     <button class="toolbar-btn" title="AI优化建议" onclick="aiOptimizeSQL()">
                         <span>AI优化</span>
                     </button>
+                    <button class="toolbar-btn" title="自然语言转SQL" onclick="openNL2SQLDialog()">
+                        <span>AI生成SQL</span>
+                    </button>
                     <button class="toolbar-btn" data-i18n-title="refresh" onclick="refreshConnection()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -1038,6 +1041,32 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
                 <button class="btn btn-primary" onclick="executeImport()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NL2SQL Dialog -->
+    <div class="modal-overlay" id="nl2sqlModal">
+        <div class="modal-container" style="width: 600px;">
+            <div class="modal-header">
+                <h2>AI 自然语言转 SQL</h2>
+                <button class="modal-close" onclick="closeNL2SQLDialog()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:16px;">
+                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">用自然语言描述你想要的查询，AI 会生成对应的 SQL。</p>
+                <textarea id="nl2sqlInput" placeholder="例如：查询最近30天内订单金额大于1000的客户姓名和总金额" style="width:100%;height:80px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+                <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+                    <button class="btn btn-secondary" onclick="closeNL2SQLDialog()">取消</button>
+                    <button class="btn btn-primary" onclick="executeNL2SQL()">生成 SQL</button>
+                </div>
+                <div id="nl2sqlResult" style="margin-top:16px;display:none;">
+                    <label style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;display:block;">生成的 SQL：</label>
+                    <textarea id="nl2sqlOutput" style="width:100%;height:120px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px;font-size:13px;font-family:var(--font-mono);resize:vertical;box-sizing:border-box;" readonly></textarea>
+                    <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+                        <button class="btn btn-secondary" onclick="copyNL2SQLResult()">复制</button>
+                        <button class="btn btn-primary" onclick="applyNL2SQLResult()">插入编辑器</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
