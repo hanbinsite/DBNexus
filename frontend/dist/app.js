@@ -72,6 +72,14 @@ const WailsAPI = {
     // Connection Import/Export
     exportConnections: () => window.go.main.App.ExportConnections(),
     importConnections: (json) => window.go.main.App.ImportConnections(json),
+
+    // AI Features
+    explainSQL: (query) => window.go.main.App.ExplainSQL(query),
+    diagnoseQueryError: (conn, db, query, err) => window.go.main.App.DiagnoseQueryError(conn, db, query, err),
+    suggestOptimizations: (conn, db, query) => window.go.main.App.SuggestOptimizations(conn, db, query),
+    naturalLanguageToSQL: (conn, db, text) => window.go.main.App.NaturalLanguageToSQL(conn, db, text),
+    testAIConnection: () => window.go.main.App.TestAIConnection(),
+    setAIConfig: (provider, key, url, model, enable) => window.go.main.App.SetAIConfig(provider, key, url, model, enable),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
