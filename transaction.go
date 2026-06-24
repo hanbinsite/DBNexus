@@ -87,7 +87,7 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 
 	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
-		return "", fmt.Errorf("连接失败: %v", err)
+		return "", fmt.Errorf(a.t(MsgConnectionError, a.getCurrentLang()), err)
 	}
 
 	var sqlOpts *sql.TxOptions
@@ -113,7 +113,7 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 	cancel()
 
 	if err != nil {
-		return "", fmt.Errorf("开始事务失败: %v", err)
+		return "", fmt.Errorf(a.t(MsgTransactionStartFailed, a.getCurrentLang()), err)
 	}
 
 	txID := fmt.Sprintf("tx_%d", time.Now().UnixNano())
@@ -135,7 +135,7 @@ func (a *App) ExecuteInTransaction(txID string, query string) (int64, error) {
 	globalTxMutex.RUnlock()
 
 	if !exists {
-		return 0, fmt.Errorf("事务不存在: %s", txID)
+		return 0, fmt.Errorf(a.t(MsgTransactionNotFound, a.getCurrentLang()), txID)
 	}
 
 	result, err := tx.tx.ExecContext(tx.ctx, query)
@@ -152,14 +152,14 @@ func (a *App) CommitTransaction(txID string) error {
 
 	tx, exists := globalTransactions[txID]
 	if !exists {
-		return fmt.Errorf("事务不存在: %s", txID)
+		return fmt.Errorf(a.t(MsgTransactionNotFound, a.getCurrentLang()), txID)
 	}
 
 	err := tx.tx.Commit()
 	delete(globalTransactions, txID)
 
 	if err != nil {
-		return fmt.Errorf("提交事务失败: %v", err)
+		return fmt.Errorf(a.t(MsgTransactionCommitFailed, a.getCurrentLang()), err)
 	}
 
 	return nil
@@ -171,14 +171,14 @@ func (a *App) RollbackTransaction(txID string) error {
 
 	tx, exists := globalTransactions[txID]
 	if !exists {
-		return fmt.Errorf("事务不存在: %s", txID)
+		return fmt.Errorf(a.t(MsgTransactionNotFound, a.getCurrentLang()), txID)
 	}
 
 	err := tx.tx.Rollback()
 	delete(globalTransactions, txID)
 
 	if err != nil {
-		return fmt.Errorf("回滚事务失败: %v", err)
+		return fmt.Errorf(a.t(MsgTransactionRollbackFailed, a.getCurrentLang()), err)
 	}
 
 	return nil

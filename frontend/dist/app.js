@@ -2477,11 +2477,19 @@ function renderIndexes(indexes) {
 }
 
 function showCreateIndexDialog() {
-    showNotification('info', '请在 SQL 编辑器中执行 CREATE INDEX 语句来创建索引');
+    if (!state.currentTable) { showNotification('warning', '请先打开一个表'); return; }
+    const table = state.currentTable.name;
+    const template = `CREATE INDEX idx_${table}_column\nON \`${table}\` (column_name);`;
+    setEditorValue(template);
+    showNotification('info', '已生成 CREATE INDEX 模板，请修改列名后执行');
 }
 
 function editIndex(indexName) {
-    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE 语句来修改索引');
+    if (!state.currentTable) { showNotification('warning', '请先打开一个表'); return; }
+    const table = state.currentTable.name;
+    const template = `-- 删除旧索引\nDROP INDEX \`${indexName}\` ON \`${table}\`;\n\n-- 创建新索引\nCREATE INDEX ${indexName}\nON \`${table}\` (column_name);`;
+    setEditorValue(template);
+    showNotification('info', `已生成重建索引 ${indexName} 的 SQL 模板`);
 }
 
 function dropIndex(indexName) {
@@ -2662,11 +2670,19 @@ function renderFKVisualization(fks) {
 }
 
 function showAddForeignKeyDialog() {
-    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE ADD CONSTRAINT 语句来添加外键');
+    if (!state.currentTable) { showNotification('warning', '请先打开一个表'); return; }
+    const table = state.currentTable.name;
+    const template = `ALTER TABLE \`${table}\`\nADD CONSTRAINT fk_${table}_ref\nFOREIGN KEY (column_name)\nREFERENCES ref_table(ref_column)\nON DELETE CASCADE\nON UPDATE CASCADE;`;
+    setEditorValue(template);
+    showNotification('info', '已生成 ADD FOREIGN KEY 模板，请修改后执行');
 }
 
 function editForeignKey(fkName) {
-    showNotification('info', '请在 SQL 编辑器中执行 ALTER TABLE 语句来修改外键');
+    if (!state.currentTable) { showNotification('warning', '请先打开一个表'); return; }
+    const table = state.currentTable.name;
+    const template = `-- 删除旧外键\nALTER TABLE \`${table}\` DROP FOREIGN KEY \`${fkName}\`;\n\n-- 添加新外键\nALTER TABLE \`${table}\`\nADD CONSTRAINT ${fkName}\nFOREIGN KEY (column_name)\nREFERENCES ref_table(ref_column)\nON DELETE CASCADE\nON UPDATE CASCADE;`;
+    setEditorValue(template);
+    showNotification('info', `已生成重建外键 ${fkName} 的 SQL 模板`);
 }
 
 function dropForeignKey(fkName) {

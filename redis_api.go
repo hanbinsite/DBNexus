@@ -101,7 +101,7 @@ func (a *App) ExecuteRedisCommand(config Connection, cmd string, args ...interfa
 				"args":    args,
 			},
 		)
-		return nil, fmt.Errorf("危险命令拒绝: %s 不在允许列表内", cmd)
+		return nil, fmt.Errorf(a.t(MsgRedisDangerousCmd, a.getCurrentLang()), cmd)
 	}
 
 	ctx := context.Background()
@@ -161,12 +161,12 @@ func (a *App) getRedisDriver(config Connection) (*db.RedisDriver, error) {
 
 	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
-		return nil, fmt.Errorf("连接Redis失败: %v", err)
+		return nil, fmt.Errorf(a.t(MsgRedisNotConnected, a.getCurrentLang()), err)
 	}
 
 	redisDriver, ok := driver.(*db.RedisDriver)
 	if !ok {
-		return nil, fmt.Errorf("不是Redis连接")
+		return nil, fmt.Errorf("%s", a.t(MsgRedisNotRedisConn, a.getCurrentLang()))
 	}
 
 	return redisDriver, nil

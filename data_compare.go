@@ -340,7 +340,7 @@ func (a *App) ExportCompareResult(result CompareResult, format string) ([]byte, 
 	case "txt":
 		return []byte(a.GetCompareReport(result)), nil
 	default:
-		return nil, fmt.Errorf("不支持的格式: %s", format)
+		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
 }
 

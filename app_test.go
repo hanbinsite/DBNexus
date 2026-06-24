@@ -672,3 +672,81 @@ func TestFormatValueForSQL(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteAndReadFile(t *testing.T) {
+	app := &App{}
+
+	tmpDir := t.TempDir()
+	testPath := tmpDir + "/test_query.sql"
+	testContent := "SELECT * FROM users WHERE id = 1;"
+
+	err := app.WriteFile(testPath, testContent)
+	if err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	content, err := app.ReadFile(testPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	if content != testContent {
+		t.Errorf("ReadFile content = %q, want %q", content, testContent)
+	}
+}
+
+func TestReadFileNotExist(t *testing.T) {
+	app := &App{}
+
+	_, err := app.ReadFile("/nonexistent/path/file.sql")
+	if err == nil {
+		t.Error("expected error for non-existent file, got nil")
+	}
+}
+
+func TestI18nMessageKeys(t *testing.T) {
+	keys := []MessageKey{
+		MsgHostRequired, MsgUsernameRequired, MsgSQLiteFileRequired,
+		MsgConnectionFailed, MsgConnectionTimeout, MsgConnectionSuccess,
+		MsgPingFailed, MsgConnected, MsgQueryExecuting, MsgNoDbSelected,
+		MsgEnterQuery, MsgTableNameRequired, MsgDBNameRequired,
+		MsgOpTypeRequired, MsgInvalidTableName, MsgConnectionError,
+		MsgExecutionFailed, MsgTransactionStartFailed, MsgTransactionCommitFailed,
+		MsgTransactionRollbackFailed, MsgTransactionNotFound, MsgRedisDangerousCmd,
+		MsgRedisNotConnected, MsgRedisNotRedisConn, MsgDBSwitchFailed,
+		MsgViewQueryFailed, MsgQueryTimeout, MsgEncryptPasswordFailed,
+	}
+
+	for _, key := range keys {
+		zhMsg := messages["zh"][key]
+		enMsg := messages["en"][key]
+		if zhMsg == "" {
+			t.Errorf("missing zh translation for key %q", key)
+		}
+		if enMsg == "" {
+			t.Errorf("missing en translation for key %q", key)
+		}
+	}
+}
+
+func TestGetCurrentLangDefault(t *testing.T) {
+	app := &App{}
+	lang := app.getCurrentLang()
+	if lang != "zh" && lang != "en" {
+		t.Errorf("getCurrentLang returned %q, expected zh or en", lang)
+	}
+}
+
+func TestSetLanguageUpdatesRuntime(t *testing.T) {
+	app := &App{}
+
+	app.runtimeLang = "en"
+	if app.getCurrentLang() != "en" {
+		t.Error("getCurrentLang should return runtimeLang when set")
+	}
+
+	app.runtimeLang = "zh"
+	if app.getCurrentLang() != "zh" {
+		t.Error("getCurrentLang should return runtimeLang when set")
+	}
+}

@@ -40,7 +40,7 @@ func (a *App) GetTables(config Connection, database string) ([]TableInfo, error)
 	}
 
 	if err := driver.UseDatabase(a.ctx, database); err != nil {
-		return nil, fmt.Errorf("切换数据库 %s 失败: %v", database, err)
+		return nil, fmt.Errorf(a.t(MsgDBSwitchFailed, a.getCurrentLang()), database, err)
 	}
 
 	tables, err := driver.GetTables(a.ctx)
@@ -92,7 +92,7 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 
 	rows, err := driver.Query(a.ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("查询视图失败: %v", err)
+		return nil, fmt.Errorf(a.t(MsgViewQueryFailed, a.getCurrentLang()), err)
 	}
 	defer rows.Close()
 
