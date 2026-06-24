@@ -462,16 +462,74 @@
 - [x] 修复SEC-003 (MySQL SSL证书配置), SEC-005 (DESCRIBE sanitize ✅ 已修复 db/mysql.go:88), SEC-007 (导入路径遍历 ✅ 部分验证), SEC-008 (前端XSS ⚠️ 待修复)
 - [x] 查询超时控制（ExecuteQuery已委托WithTimeout，默认30s）
 - [x] SQL自动补全（列名补全已实现 autocomplete.go:317-346）
-- [ ] SQL格式化
+- [x] SQL格式化 (FormatSQL/BeautifySQL 已实现, 前端 Ctrl+Shift+F 调用)
 - [x] 数据行内编辑（EditRequest已使用PrimaryKey，WhereClause已删除）
 - [x] 操作日志完善（appendToFile增量写入）
+- [x] Redis命令白名单 (80+安全命令, 危险命令拒绝+审计)
+- [x] 前端模块化拆分 (app.js → 5 modules)
+- [x] 危险操作二次确认 (DDL CREATE/DROP/ALTER/TRUNCATE 确认拦截)
 - [ ] 连接分组管理
-- [ ] 前端模块化拆分（app.js → 多文件）
-- [ ] 单元测试覆盖率提升至>60%
+- [ ] 单元测试覆盖率提升至>60% (当前 36 tests / 56 sub-tests)
 
-**验收标准**: 单次查询超时自动终止；自动补全响应<200ms；数据编辑零数据丢失；XSS漏洞清零
+**P0 修复 (Sprint 1 — 致命问题)**:
+- [ ] F1: 数据编辑流程修复 (单元格双击编辑 + primaryKey 设置) — GAP-ANALYSIS.md §1.2
+- [ ] F2: Settings 持久化 (5字段保存 + Monaco动态应用)
+- [ ] F3: Tab内容持久化 (per-tab Monaco content 缓存)
+- [ ] F4: 视图/函数树加载 (loadViewsForDatabase / loadFunctionsForDatabase)
+- [ ] B1: App.connections mutex保护
+- [ ] B2: ReadFile/WriteFile 路径遍历修复
+- [ ] B3: MySQL SSL tls=preferred 无效修复
+- [ ] B4: SQLite GetFunctions 查询错误修复
+- [ ] B5: EXPLAIN parseExplainResult 空壳修复
+
+**P1 修复 (Sprint 2 — 功能补全)**:
+- [ ] F5: i18n 完整覆盖 (70%硬编码中文 → data-i18n)
+- [ ] F6-F7: 窗口拖拽 + resize handle 绑定
+- [ ] F8-F12: 空状态/右键创建表/Redis详情/对比下拉/大结果集警告
+- [ ] B6: Context传播修复 (data_editor/redis/transaction → a.ctx+WithTimeout)
+- [ ] B7: 审计日志补全 (MultiQuery/Begin/Commit/Rollback/Connect/Disconnect)
+- [ ] B8: PostgreSQL UseDatabase 重连竞态修复
+- [ ] B9: MySQL UseDatabase SQL注入修复
+- [ ] B13: 查询取消 API (CancelQuery)
+- [ ] B14: 查询历史 (~/.db-client/history.json)
+- [ ] B15: 已保存查询/书签
+- [ ] B16: 连接导入/导出
+
+**验收标准**: 单次查询超时自动终止；自动补全响应<200ms；数据编辑零数据丢失；XSS漏洞清零；Settings全部持久化；Tab切换不丢内容
+
+**完整差距分析**: 见 GAP-ANALYSIS.md
 
 **发布时间**: 2024 Q2
+
+---
+
+### v2.5 - AI 助手 (Phase 0 + Phase 1)
+
+**目标**: AI 基础设施 + 3个快速赢 AI 功能
+
+**计划交付**:
+
+Phase 0 基础设施:
+- [ ] AI LLM 客户端接口 (OpenAI-compatible + Ollama)
+- [ ] API key 加密存储 (复用 crypto.go AES-256-GCM)
+- [ ] Schema context builder (token 预算管理)
+- [ ] Prompt 模板系统
+- [ ] 前端 Settings "AI" section (provider/key/model/enable)
+- [ ] AI 调用审计日志 (AuditEventAIQuery)
+
+Phase 1 AI 功能:
+- [ ] A1: SQL 解释 (右键 → AI 解释, AnalyzeQuery fallback)
+- [ ] A2: 错误诊断 (查询失败 → "Ask AI" → 建议修复)
+- [ ] A3: SQL 优化建议 (EXPLAIN + 索引 + 统计 → AI 建议)
+
+**安全要求**:
+- API key AES-256-GCM 加密, 永不返回前端
+- 默认 Ollama 本地 LLM; 云端需用户确认
+- AI 生成 SQL 必须经 ExecuteQueryWithTimeout
+- AI 输出渲染用 textContent, 禁止 innerHTML
+- 防抖 1000ms+, 缓存, 限流
+
+**完整 AI 路线图**: 见 GAP-ANALYSIS.md §4
 
 ---
 
