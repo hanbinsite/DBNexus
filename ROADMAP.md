@@ -472,28 +472,28 @@
 - [ ] 单元测试覆盖率提升至>60% (当前 36 tests / 56 sub-tests)
 
 **P0 修复 (Sprint 1 — 致命问题)**:
-- [ ] F1: 数据编辑流程修复 (单元格双击编辑 + primaryKey 设置) — GAP-ANALYSIS.md §1.2
-- [ ] F2: Settings 持久化 (5字段保存 + Monaco动态应用)
-- [ ] F3: Tab内容持久化 (per-tab Monaco content 缓存)
-- [ ] F4: 视图/函数树加载 (loadViewsForDatabase / loadFunctionsForDatabase)
-- [ ] B1: App.connections mutex保护
-- [ ] B2: ReadFile/WriteFile 路径遍历修复
-- [ ] B3: MySQL SSL tls=preferred 无效修复
-- [ ] B4: SQLite GetFunctions 查询错误修复
-- [ ] B5: EXPLAIN parseExplainResult 空壳修复
+- [x] F1: 数据编辑流程修复 (单元格双击编辑 + primaryKey 设置) — GAP-ANALYSIS.md §1.2
+- [x] F2: Settings 持久化 (5字段保存 + Monaco动态应用)
+- [x] F3: Tab内容持久化 (per-tab Monaco content 缓存)
+- [x] F4: 视图/函数树加载 (loadViewsForDatabase / loadFunctionsForDatabase)
+- [x] B1: App.connections mutex保护
+- [x] B2: ReadFile/WriteFile 路径遍历修复
+- [x] B3: MySQL SSL tls=preferred 无效修复
+- [x] B4: SQLite GetFunctions 查询错误修复
+- [x] B5: EXPLAIN parseExplainResult 空壳修复
 
 **P1 修复 (Sprint 2 — 功能补全)**:
 - [ ] F5: i18n 完整覆盖 (70%硬编码中文 → data-i18n)
 - [ ] F6-F7: 窗口拖拽 + resize handle 绑定
 - [ ] F8-F12: 空状态/右键创建表/Redis详情/对比下拉/大结果集警告
-- [ ] B6: Context传播修复 (data_editor/redis/transaction → a.ctx+WithTimeout)
-- [ ] B7: 审计日志补全 (MultiQuery/Begin/Commit/Rollback/Connect/Disconnect)
+- [x] B6: Context传播修复 (data_editor/redis/transaction → a.ctx+WithTimeout)
+- [x] B7: 审计日志补全 (MultiQuery/Begin/Commit/Rollback/Connect/Disconnect)
 - [ ] B8: PostgreSQL UseDatabase 重连竞态修复
-- [ ] B9: MySQL UseDatabase SQL注入修复
+- [x] B9: MySQL UseDatabase SQL注入修复
 - [ ] B13: 查询取消 API (CancelQuery)
-- [ ] B14: 查询历史 (~/.db-client/history.json)
-- [ ] B15: 已保存查询/书签
-- [ ] B16: 连接导入/导出
+- [x] B14: 查询历史 (~/.db-client/history.json)
+- [x] B15: 已保存查询/书签
+- [x] B16: 连接导入/导出
 
 **验收标准**: 单次查询超时自动终止；自动补全响应<200ms；数据编辑零数据丢失；XSS漏洞清零；Settings全部持久化；Tab切换不丢内容
 
@@ -510,17 +510,17 @@
 **计划交付**:
 
 Phase 0 基础设施:
-- [ ] AI LLM 客户端接口 (OpenAI-compatible + Ollama)
-- [ ] API key 加密存储 (复用 crypto.go AES-256-GCM)
-- [ ] Schema context builder (token 预算管理)
-- [ ] Prompt 模板系统
-- [ ] 前端 Settings "AI" section (provider/key/model/enable)
-- [ ] AI 调用审计日志 (AuditEventAIQuery)
+- [x] AI LLM 客户端接口 (OpenAI-compatible + Ollama)
+- [x] API key 加密存储 (复用 crypto.go AES-256-GCM)
+- [x] Schema context builder (token 预算管理)
+- [x] Prompt 模板系统
+- [x] 前端 Settings "AI" section (provider/key/model/enable)
+- [x] AI 调用审计日志 (AuditEventAIQuery)
 
 Phase 1 AI 功能:
-- [ ] A1: SQL 解释 (右键 → AI 解释, AnalyzeQuery fallback)
-- [ ] A2: 错误诊断 (查询失败 → "Ask AI" → 建议修复)
-- [ ] A3: SQL 优化建议 (EXPLAIN + 索引 + 统计 → AI 建议)
+- [x] A1: SQL 解释 (右键 → AI 解释, AnalyzeQuery fallback)
+- [x] A2: 错误诊断 (查询失败 → "Ask AI" → 建议修复)
+- [x] A3: SQL 优化建议 (EXPLAIN + 索引 + 统计 → AI 建议)
 
 **安全要求**:
 - API key AES-256-GCM 加密, 永不返回前端
