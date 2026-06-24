@@ -1339,6 +1339,17 @@ function renderConnectionList() {
     const connectionList = document.getElementById('connectionList');
     connectionList.innerHTML = '';
     
+    if (!state.connections || state.connections.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'padding:24px 16px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.6;';
+        empty.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;margin-bottom:8px;opacity:0.4;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+        const p = document.createElement('p');
+        p.textContent = i18n.t('noConnections');
+        empty.appendChild(p);
+        connectionList.appendChild(empty);
+        return;
+    }
+    
     state.connections.forEach(conn => {
         addConnectionToList(conn);
     });

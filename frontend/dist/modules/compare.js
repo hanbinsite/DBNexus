@@ -4,6 +4,34 @@
 function openComparePanel() {
     if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
     document.getElementById('comparePanel').style.display = 'block';
+    populateCompareTableDropdowns();
+}
+
+async function populateCompareTableDropdowns() {
+    if (!state.activeConnection || !isWailsAvailable()) return;
+    const db = state.selectedDatabase || '';
+    if (!db) return;
+    try {
+        const tables = await WailsAPI.getTables(state.activeConnection, db);
+        const select1 = document.getElementById('compareTable1');
+        const select2 = document.getElementById('compareTable2');
+        if (!select1 || !select2) return;
+        const fillSelect = (sel, currentValue) => {
+            sel.innerHTML = '<option value="">选择表...</option>';
+            tables.forEach(t => {
+                const name = t.name || t.Name || String(t);
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (name === currentValue) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        };
+        fillSelect(select1, select1.value);
+        fillSelect(select2, select2.value);
+    } catch (e) {
+        console.warn('Failed to load tables for compare dropdowns:', e);
+    }
 }
 
 function closeComparePanel() {
