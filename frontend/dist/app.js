@@ -3173,6 +3173,92 @@ function applyEditorSettings(settings) {
     }
 }
 
+async function saveAIConfig() {
+    if (!isWailsAvailable()) { showNotification('warning', 'AI配置需要 Wails 环境'); return; }
+    const provider = document.getElementById('aiProvider')?.value || 'ollama';
+    const apiKey = document.getElementById('aiApiKey')?.value || '';
+    const baseURL = document.getElementById('aiBaseURL')?.value || '';
+    const model = document.getElementById('aiModel')?.value || 'llama3';
+    const enable = document.getElementById('aiEnable')?.checked || false;
+    try {
+        await WailsAPI.setAIConfig(provider, apiKey, baseURL, model, enable);
+        showNotification('success', 'AI 配置已保存');
+    } catch (e) {
+        showNotification('error', 'AI 配置保存失败: ' + (e.message || e));
+    }
+}
+
+async function testAIConnection() {
+    if (!isWailsAvailable()) { showNotification('warning', 'AI测试需要 Wails 环境'); return; }
+    await saveAIConfig();
+    showLoading('测试 AI 连接...');
+    try {
+        const result = await WailsAPI.testAIConnection();
+        hideLoading();
+        if (Array.isArray(result) ? result[0] : result.success) {
+            showNotification('success', 'AI 连接成功');
+        } else {
+            showNotification('error', 'AI 连接失败: ' + (Array.isArray(result) ? result[1] : result.message));
+        }
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'AI 连接失败: ' + (e.message || e));
+    }
+}
+
+async function aiExplainSQL() {
+    const query = getSelectedText() || getEditorValue().trim();
+    if (!query) { showNotification('warning', '请选择或输入 SQL'); return; }
+    showLoading('AI 正在解释 SQL...');
+    try {
+        const result = await WailsAPI.explainSQL(query);
+        hideLoading();
+        showAIResult('AI SQL解释', result);
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'AI解释失败: ' + (e.message || e));
+    }
+}
+
+async function aiOptimizeSQL() {
+    const query = getSelectedText() || getEditorValue().trim();
+    if (!query) { showNotification('warning', '请选择或输入 SQL'); return; }
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    const db = document.getElementById('queryDatabase')?.value || state.selectedDatabase || '';
+    showLoading('AI 正在分析优化建议...');
+    try {
+        const result = await WailsAPI.suggestOptimizations(state.activeConnection, db, query);
+        hideLoading();
+        showAIResult('AI 优化建议', result);
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'AI优化失败: ' + (e.message || e));
+    }
+}
+
+function showAIResult(title, content) {
+    const messagesTab = document.querySelector('[data-result-tab="messages"]');
+    if (messagesTab) messagesTab.click();
+    const output = document.getElementById('messagesOutput');
+    if (!output) { showNotification('info', content.substring(0, 200)); return; }
+    output.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'ai-result-card';
+    card.style.cssText = 'padding:16px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md);white-space:pre-wrap;line-height:1.6;';
+    const h = document.createElement('h3');
+    h.textContent = title;
+    h.style.marginTop = '0';
+    const pre = document.createElement('div');
+    pre.textContent = content;
+    card.appendChild(h);
+    card.appendChild(pre);
+    output.appendChild(card);
+    const resultsPanel = document.getElementById('resultsPanel');
+    const splitHandle = document.getElementById('splitHandle');
+    if (resultsPanel) resultsPanel.style.display = 'flex';
+    if (splitHandle) splitHandle.style.display = 'block';
+}
+
 function showSettingsSection(section) {
     document.querySelectorAll('.settings-section').forEach(s => {
         s.classList.remove('active');
@@ -4041,6 +4127,10 @@ window.executeInTx = executeInTx;
 window.commitTx = commitTx;
 window.rollbackTx = rollbackTx;
 window.clearFilter = clearFilter;
+window.saveAIConfig = saveAIConfig;
+window.testAIConnection = testAIConnection;
+window.aiExplainSQL = aiExplainSQL;
+window.aiOptimizeSQL = aiOptimizeSQL;
 
 // ==========================================================================
 // Language Settings

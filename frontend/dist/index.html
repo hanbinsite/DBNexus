@@ -59,6 +59,12 @@
                         </svg>
                         <span data-i18n="executeQuery">运行</span>
                     </button>
+                    <button class="toolbar-btn" title="AI解释SQL" onclick="aiExplainSQL()">
+                        <span>AI解释</span>
+                    </button>
+                    <button class="toolbar-btn" title="AI优化建议" onclick="aiOptimizeSQL()">
+                        <span>AI优化</span>
+                    </button>
                     <button class="toolbar-btn" data-i18n-title="refresh" onclick="refreshConnection()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -813,6 +819,14 @@
                         </svg>
                         <span data-i18n="appearance">外观</span>
                     </button>
+                    <button class="settings-nav-btn" data-section="ai">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a10 10 0 1 0 10 10"/>
+                            <path d="M12 6v6l4 2"/>
+                            <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                        <span>AI</span>
+                    </button>
                 </div>
                 <div class="settings-content">
                     <div class="settings-section active" data-section="general">
@@ -879,6 +893,38 @@
                                     <option value="dense">密集</option>
                                 </select>
                             </label>
+                        </div>
+                    </div>
+                    <div class="settings-section" data-section="ai">
+                        <h3>AI 助手</h3>
+                        <div class="settings-group">
+                            <label class="settings-label">
+                                <span>启用 AI</span>
+                                <input type="checkbox" id="aiEnable">
+                            </label>
+                            <label class="settings-label">
+                                <span>Provider</span>
+                                <select id="aiProvider">
+                                    <option value="ollama">Ollama (本地)</option>
+                                    <option value="openai">OpenAI Compatible</option>
+                                </select>
+                            </label>
+                            <label class="settings-label">
+                                <span>API Key</span>
+                                <input type="password" id="aiApiKey" placeholder="仅云端 Provider 需要">
+                            </label>
+                            <label class="settings-label">
+                                <span>Base URL</span>
+                                <input type="text" id="aiBaseURL" placeholder="http://localhost:11434 或自定义 OpenAI URL">
+                            </label>
+                            <label class="settings-label">
+                                <span>Model</span>
+                                <input type="text" id="aiModel" value="llama3" placeholder="llama3 / gpt-4o-mini">
+                            </label>
+                            <div style="display:flex;gap:8px;">
+                                <button class="btn btn-secondary" onclick="testAIConnection()">测试连接</button>
+                                <button class="btn btn-primary" onclick="saveAIConfig()">保存 AI 配置</button>
+                            </div>
                         </div>
                     </div>
                 </div>
