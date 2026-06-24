@@ -750,3 +750,34 @@ func TestSetLanguageUpdatesRuntime(t *testing.T) {
 		t.Error("getCurrentLang should return runtimeLang when set")
 	}
 }
+
+func TestAuditLogMethods(t *testing.T) {
+	app := &App{}
+
+	logs := app.GetAuditLogs(10, "", "")
+	if logs == nil {
+		t.Error("GetAuditLogs should return non-nil slice")
+	}
+
+	exportData, err := app.ExportAuditLogs("2000-01-01", "2099-12-31")
+	if err != nil {
+		t.Errorf("ExportAuditLogs failed: %v", err)
+	}
+	if exportData == nil {
+		t.Error("ExportAuditLogs should return non-nil data")
+	}
+}
+
+func TestClearOldAuditLogs(t *testing.T) {
+	app := &App{}
+	err := app.ClearOldAuditLogs(365)
+	if err != nil {
+		t.Errorf("ClearOldAuditLogs should not fail on empty/missing dir: %v", err)
+	}
+}
+
+func TestMaxActiveTransactions(t *testing.T) {
+	if MaxActiveTransactions != 100 {
+		t.Errorf("expected MaxActiveTransactions=100, got %d", MaxActiveTransactions)
+	}
+}

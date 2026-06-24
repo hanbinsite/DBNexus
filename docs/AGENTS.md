@@ -59,7 +59,7 @@ db-server/
 │   ├── 02-architecture.md   # System architecture, component diagrams
 │   ├── 03-architecture.md   # Directory tree
 │   ├── 03-data-models.md    # All Go struct definitions
-│   ├── 04-api-reference.md  # Full Wails API (69 Wails + 3 planned Audit = 72 total)
+│   ├── 04-api-reference.md  # Full Wails API (72 methods)
 │   ├── 05-ui-pages.md       # UI layout, panels, components
 │   ├── 06-security.md       # Encryption, injection, audit details
 │   ├── 07-development-guide.md # Build setup, testing, contributing
@@ -217,7 +217,7 @@ Three-step requirement: (1) implement `DatabaseDriver` interface in `db/`, (2) r
 | `docs/02-architecture.md` | System architecture diagrams, IPC flow, module boundaries, concurrency model |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions (Connection, QueryResult, EditRequest, etc.) with field docs |
-| `docs/04-api-reference.md` | Full Wails bindings API (69 implemented + 3 planned audit = 72 total) with signatures, params, error handling |
+| `docs/04-api-reference.md` | Full Wails bindings API (72 implemented) with signatures, params, error handling |
 | `docs/05-ui-pages.md` | UI layout, panels, components, modal list (8 modal + 2 panel), modular refactor plan |
 | `docs/06-security.md` | AES-256-GCM encryption, SQL injection defense, audit logging, known vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, CGO, contributing, design→implementation traceability |

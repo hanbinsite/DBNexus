@@ -38,7 +38,8 @@ type TransactionRequest struct {
 }
 
 const (
-	TransactionTimeout = 30 * time.Minute
+	TransactionTimeout  = 30 * time.Minute
+	MaxActiveTransactions = 100
 )
 
 type activeTransaction struct {
@@ -118,6 +119,10 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 
 	txID := fmt.Sprintf("tx_%d", time.Now().UnixNano())
 	globalTxMutex.Lock()
+	if len(globalTransactions) >= MaxActiveTransactions {
+		globalTxMutex.Unlock()
+		return "", fmt.Errorf("too many active transactions (max %d), please commit or rollback existing ones", MaxActiveTransactions)
+	}
 	globalTransactions[txID] = &activeTransaction{
 		tx:      tx,
 		driver:  driver,
@@ -138,8 +143,23 @@ func (a *App) ExecuteInTransaction(txID string, query string) (int64, error) {
 		return 0, fmt.Errorf(a.t(MsgTransactionNotFound, a.getCurrentLang()), txID)
 	}
 
+	auditLogger := GetAuditLogger()
+	auditLogger.Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("事务内执行: %s", truncateQuery(query, 200)),
+		map[string]interface{}{
+			"tx_id": txID,
+		},
+	)
+
 	result, err := tx.tx.ExecContext(tx.ctx, query)
 	if err != nil {
+		auditLogger.Log(AuditLevelError, AuditEventQueryError,
+			fmt.Sprintf("事务执行失败: %v", err),
+			map[string]interface{}{
+				"tx_id": txID,
+				"query": truncateQuery(query, 200),
+			},
+		)
 		return 0, err
 	}
 

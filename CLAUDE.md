@@ -145,7 +145,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 | `docs/02-architecture.md` | System architecture, IPC flow, module boundaries, data flow diagrams |
 | `docs/03-architecture.md` | Directory tree with line-number references |
 | `docs/03-data-models.md` | All Go struct definitions with field documentation |
-| `docs/04-api-reference.md` | Full Wails bindings API (69 implemented + 3 planned audit = 72 total) with signatures and error handling |
+| `docs/04-api-reference.md` | Full Wails bindings API (72 implemented) with signatures and error handling |
 | `docs/05-ui-pages.md` | UI layout, panels, components, 8 modal + 2 panel, modular refactor plan |
 | `docs/06-security.md` | Encryption, injection defense, audit, vulnerabilities |
 | `docs/07-development-guide.md` | Build setup, testing, contributing, design traceability |
@@ -176,7 +176,7 @@ Redis driver adds: `GetRedisKeyInfo`, `SetRedisKeyValue`, `DeleteRedisKey`, `Exe
 
 ## Wails Bindings
 
-All exported methods on `App` struct are available via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API (69 methods).
+All exported methods on `App` struct are available via `window.go.main.App.MethodName()`. See `frontend/wailsjs/go/main/App.d.ts` for full API (72 methods).
 
 ---
 

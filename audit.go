@@ -302,3 +302,18 @@ func (al *AuditLogger) IsEnabled() bool {
 	defer al.mu.RUnlock()
 	return al.enabled
 }
+
+func (a *App) GetAuditLogs(limit int, level string, eventType string) []AuditLog {
+	auditLogger := GetAuditLogger()
+	return auditLogger.GetLogs(limit, AuditLogLevel(level), AuditEventType(eventType))
+}
+
+func (a *App) ExportAuditLogs(startTime string, endTime string) ([]byte, error) {
+	auditLogger := GetAuditLogger()
+	return auditLogger.ExportLogs(startTime, endTime)
+}
+
+func (a *App) ClearOldAuditLogs(daysToKeep int) error {
+	auditLogger := GetAuditLogger()
+	return auditLogger.ClearOldLogs(daysToKeep)
+}

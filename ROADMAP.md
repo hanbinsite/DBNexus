@@ -254,7 +254,7 @@
 - [x] 过期事务清理函数（`cleanupStaleTransactions`，已通过 `BeginTransaction()` 自动调用）
 
 #### 已知缺陷（需修复）
-- [ ] `globalTransactions` map无大小限制
+- [x] `globalTransactions` map无大小限制 → 已修复: `MaxActiveTransactions=100` 上限
 - [ ] 事务使用 `context.Background()` 无超时
 
 #### 待开发
