@@ -41,7 +41,8 @@ func (d *MySQLDriver) Connect(config ConnectionConfig) error {
 }
 
 func (d *MySQLDriver) UseDatabase(ctx context.Context, database string) error {
-	_, err := d.Exec(ctx, fmt.Sprintf("USE `%s`", database))
+	safeDB := sanitizeIdentifier(database)
+	_, err := d.Exec(ctx, fmt.Sprintf("USE `%s`", safeDB))
 	return err
 }
 

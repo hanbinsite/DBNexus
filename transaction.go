@@ -126,10 +126,15 @@ func (a *App) BeginTransaction(config Connection, database string, options Trans
 	globalTransactions[txID] = &activeTransaction{
 		tx:      tx,
 		driver:  driver,
-		ctx:     context.Background(),
+		ctx:     a.ctx,
 		created: time.Now(),
 	}
 	globalTxMutex.Unlock()
+
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("开始事务: %s (DB: %s, 隔离级别: %s)", txID, database, options.Isolation),
+		map[string]interface{}{"tx_id": txID, "database": database},
+	)
 
 	return txID, nil
 }
@@ -182,6 +187,11 @@ func (a *App) CommitTransaction(txID string) error {
 		return fmt.Errorf(a.t(MsgTransactionCommitFailed, a.getCurrentLang()), err)
 	}
 
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("提交事务: %s", txID),
+		map[string]interface{}{"tx_id": txID},
+	)
+
 	return nil
 }
 
@@ -200,6 +210,11 @@ func (a *App) RollbackTransaction(txID string) error {
 	if err != nil {
 		return fmt.Errorf(a.t(MsgTransactionRollbackFailed, a.getCurrentLang()), err)
 	}
+
+	GetAuditLogger().Log(AuditLevelWarning, AuditEventQuery,
+		fmt.Sprintf("回滚事务: %s", txID),
+		map[string]interface{}{"tx_id": txID},
+	)
 
 	return nil
 }

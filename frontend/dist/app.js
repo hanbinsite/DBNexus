@@ -53,12 +53,25 @@ const WailsAPI = {
     windowMaximize: () => window.go.main.App.WindowMaximize(),
     windowClose: () => window.go.main.App.WindowClose(),
     windowIsMaximized: () => window.go.main.App.WindowIsMaximized(),
+    windowSetSize: (w, h) => window.go.main.App.WindowSetSize(w, h),
     
     // File Dialogs
     openFileDialog: (title, filters) => window.go.main.App.OpenFileDialog(title, filters),
     saveFileDialog: (title, defaultName) => window.go.main.App.SaveFileDialog(title, defaultName),
     readFile: (path) => window.go.main.App.ReadFile(path),
     writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
+
+    // Query History & Bookmarks
+    getQueryHistory: () => window.go.main.App.GetQueryHistory(),
+    addQueryHistory: (query, db) => window.go.main.App.AddQueryHistory(query, db),
+    clearQueryHistory: () => window.go.main.App.ClearQueryHistory(),
+    getBookmarks: () => window.go.main.App.GetBookmarks(),
+    addBookmark: (name, query, db) => window.go.main.App.AddBookmark(name, query, db),
+    deleteBookmark: (id) => window.go.main.App.DeleteBookmark(id),
+
+    // Connection Import/Export
+    exportConnections: () => window.go.main.App.ExportConnections(),
+    importConnections: (json) => window.go.main.App.ImportConnections(json),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),

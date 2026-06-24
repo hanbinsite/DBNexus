@@ -111,7 +111,8 @@ func (a *App) GetExplainPlan(config Connection, database string, query string) E
 		explainQuery = "EXPLAIN " + query
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+	defer cancel()
 	rows, err := driver.Query(ctx, explainQuery)
 	if err != nil {
 		return ExplainResult{

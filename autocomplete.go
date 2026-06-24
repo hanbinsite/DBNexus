@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 type AutoCompleteType string
@@ -208,7 +209,8 @@ var (
 )
 
 func (a *App) GetAutoCompleteSuggestions(config Connection, database string, query string, position int) AutoCompleteResult {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
+	defer cancel()
 
 	word, startPos, endPos := extractCurrentWord(query, position)
 	context := analyzeQueryContext(query, startPos)

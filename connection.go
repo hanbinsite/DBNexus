@@ -232,12 +232,23 @@ func (a *App) ConnectToDatabase(config Connection) (bool, string) {
 		return false, fmt.Sprintf("连接失败: %v", err)
 	}
 
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventConnect,
+		fmt.Sprintf("连接数据库: %s@%s:%d/%s", config.Username, config.Host, config.Port, config.Database),
+		map[string]interface{}{"host": config.Host, "port": config.Port, "type": config.Type},
+	)
+
 	return true, "Connected successfully"
 }
 
 func (a *App) DisconnectFromDatabase(config Connection) error {
 	key := a.pool.buildKey(a.connectionToDBConfig(config))
 	a.pool.remove(key)
+
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventDisconnect,
+		fmt.Sprintf("断开连接: %s@%s:%d", config.Username, config.Host, config.Port),
+		map[string]interface{}{"host": config.Host, "type": config.Type},
+	)
+
 	return nil
 }
 

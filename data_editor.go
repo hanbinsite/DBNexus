@@ -46,7 +46,8 @@ func (a *App) EditTableData(config Connection, req EditRequest) EditResult {
 	var result EditResult
 	var query string
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(a.ctx, 60*time.Second)
+	defer cancel()
 
 	switch req.Operation {
 	case EditOpInsert:
@@ -363,7 +364,7 @@ func (a *App) batchInsert(config Connection, requests []EditRequest) EditResult 
 		strings.Join(columns, ", "),
 		strings.Join(allPlaceholders, ", "))
 
-	ctx := context.Background()
+	ctx := a.ctx
 	result, err := driver.Exec(ctx, query, allValues...)
 	if err != nil {
 		auditLogger := GetAuditLogger()

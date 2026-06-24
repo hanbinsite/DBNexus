@@ -27,3 +27,7 @@ func (a *App) WindowClose() {
 func (a *App) WindowIsMaximized() bool {
 	return runtime.WindowIsMaximised(a.ctx)
 }
+
+func (a *App) WindowSetSize(w, h int) {
+	runtime.WindowSetSize(a.ctx, w, h)
+}
