@@ -139,11 +139,7 @@ func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, err
 			LIMIT 100
 		`
 	case "sqlite":
-		query = `
-			SELECT name 
-			FROM sqlite_master 
-			WHERE type='view' AND name LIKE 'func_%'
-		`
+		return []TableInfo{}, nil
 	default:
 		return []TableInfo{}, nil
 	}

@@ -140,19 +140,123 @@ func (a *App) GetExplainPlan(config Connection, database string, query string) E
 }
 
 func (a *App) parseExplainResult(dbType string, rows *sql.Rows) ExplainResult {
-	_ = rows
 	result := ExplainResult{
-		Success: true,
-		RootNode: &ExplainNode{
-			ID:      1,
-			Type:    "QUERY",
-			Details: make(map[string]string),
-		},
+		Success:     true,
+		RootNode:    &ExplainNode{ID: 1, Type: "QUERY", Details: make(map[string]string), Children: []*ExplainNode{}},
 		Warnings:    []string{},
 		Suggestions: []string{},
 	}
 
+	if rows == nil {
+		result.Success = false
+		result.Warnings = append(result.Warnings, "EXPLAIN 返回空结果")
+		return result
+	}
+
+	switch dbType {
+	case "mysql":
+		root, warnings := parseMySQLExplain(rows)
+		if root != nil {
+			result.RootNode = root
+		}
+		result.Warnings = warnings
+	case "postgresql", "polardb", "gaussdb":
+		root, warnings := parsePostgresExplain(rows)
+		if root != nil {
+			result.RootNode = root
+		}
+		result.Warnings = warnings
+	default:
+		result.Warnings = append(result.Warnings, "不支持的数据库类型 EXPLAIN 解析")
+	}
+
 	return result
+}
+
+func parseMySQLExplain(rows *sql.Rows) (*ExplainNode, []string) {
+	var warnings []string
+	var root *ExplainNode
+	nodeID := 1
+
+	for rows.Next() {
+		var id int
+		var selectType, table, type_ string
+		var possibleKeys, key_ sql.NullString
+		var keyLen, ref sql.NullString
+		var rows_ sql.NullInt64
+		var extra sql.NullString
+
+		err := rows.Scan(&id, &selectType, &table, &type_, &possibleKeys, &key_, &keyLen, &ref, &rows_, &extra)
+		if err != nil {
+			continue
+		}
+
+		node := &ExplainNode{
+			ID:      nodeID,
+			Type:    type_,
+			Details: map[string]string{
+				"select_type":   selectType,
+				"table":         table,
+				"type":          type_,
+				"possible_keys": possibleKeys.String,
+				"key":           key_.String,
+				"rows":          fmt.Sprintf("%d", rows_.Int64),
+				"extra":         extra.String,
+			},
+			Children: []*ExplainNode{},
+		}
+		nodeID++
+
+		if type_ == "ALL" {
+			warnings = append(warnings, fmt.Sprintf("表 %s: 全表扫描 (type=ALL)", table))
+		}
+		if extra.String != "" && strings.Contains(extra.String, "Using filesort") {
+			warnings = append(warnings, fmt.Sprintf("表 %s: 使用文件排序 (filesort)", table))
+		}
+		if extra.String != "" && strings.Contains(extra.String, "Using temporary") {
+			warnings = append(warnings, fmt.Sprintf("表 %s: 使用临时表", table))
+		}
+
+		if root == nil {
+			root = node
+		} else {
+			root.Children = append(root.Children, node)
+		}
+	}
+
+	if root == nil {
+		root = &ExplainNode{ID: 1, Type: "QUERY", Details: make(map[string]string), Children: []*ExplainNode{}}
+	}
+	return root, warnings
+}
+
+func parsePostgresExplain(rows *sql.Rows) (*ExplainNode, []string) {
+	var warnings []string
+	var fullText strings.Builder
+
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			continue
+		}
+		fullText.WriteString(line)
+		fullText.WriteString("\n")
+	}
+
+	root := &ExplainNode{ID: 1, Type: "QUERY", Details: make(map[string]string), Children: []*ExplainNode{}}
+	root.Details["plan"] = fullText.String()
+
+	if strings.Contains(fullText.String(), "Seq Scan") {
+		warnings = append(warnings, "检测到顺序扫描 (Seq Scan)")
+	}
+	if strings.Contains(fullText.String(), "Hash Join") {
+		warnings = append(warnings, "使用 Hash Join")
+	}
+	if strings.Contains(fullText.String(), "Sort") {
+		warnings = append(warnings, "需要排序操作 (Sort)")
+	}
+
+	return root, warnings
 }
 
 func (a *App) AnalyzeQuery(query string) QueryAnalysis {

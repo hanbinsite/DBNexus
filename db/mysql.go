@@ -22,12 +22,12 @@ func (d *MySQLDriver) Connect(config ConnectionConfig) error {
 
 	if config.SSLMode != "" {
 		switch config.SSLMode {
-		case "disabled":
+		case "disabled", "preferred":
 			connStr += "?tls=false"
-		case "preferred":
-			connStr += "?tls=preferred"
-		case "required", "verify-ca", "verify-full":
+		case "required":
 			connStr += "?tls=true"
+		case "verify-ca", "verify-full":
+			connStr += "?tls=skip-verify"
 		}
 	}
 

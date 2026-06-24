@@ -144,9 +144,8 @@ function isWailsAvailable() {
 // Initialization
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize i18n first (default to Chinese)
     i18n.init();
-    
+
     initTheme();
     initWindowControls();
     initResizablePanels();
@@ -158,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDatabaseTree();
     initResultsTabs();
     updateClock();
+    loadSettings();
     setInterval(updateClock, 1000);
     
     // Initialize Wails connection
@@ -459,6 +459,11 @@ function createNewTab() {
 }
 
 function activateTab(tabId) {
+  const previousTab = state.tabs.find(t => t.id === state.activeTab);
+  if (previousTab && previousTab.type !== 'table' && typeof monacoEditor !== 'undefined' && monacoEditor) {
+    previousTab.savedContent = monacoEditor.getValue();
+  }
+
   document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.remove('active');
   });
@@ -469,7 +474,6 @@ function activateTab(tabId) {
   selectedTab.classList.add('active');
   state.activeTab = tabId;
 
-  // Hide welcome panel
   const welcomePanel = document.getElementById('welcomePanel');
   if (welcomePanel) welcomePanel.style.display = 'none';
 
@@ -485,11 +489,9 @@ function activateTab(tabId) {
     splitHandle.style.display = 'none';
     dataViewPanel.style.display = 'flex';
   } else {
-    // Query tab — only show editor, not results
     editorPanel.style.display = 'flex';
     editorPanel.style.flex = '1';
     editorPanel.style.height = 'auto';
-    // Keep results hidden (only shown after query execution)
     resultsPanel.style.display = 'none';
     splitHandle.style.display = 'none';
     dataViewPanel.style.display = 'none';
@@ -497,6 +499,12 @@ function activateTab(tabId) {
     setTimeout(() => {
       if (monacoEditor) {
         monacoEditor.layout();
+        const newTab = state.tabs.find(t => t.id === tabId);
+        if (newTab && newTab.savedContent !== undefined) {
+          monacoEditor.setValue(newTab.savedContent);
+        } else {
+          monacoEditor.setValue('');
+        }
         monacoEditor.focus();
       }
     }, 150);
@@ -1655,6 +1663,68 @@ async function loadTablesForDatabase(dbName) {
   }
 }
 
+async function loadViewsForDatabase(dbName) {
+  if (!state.activeConnection) return;
+  const viewsTree = document.getElementById(`views-${dbName}Tree`);
+  if (!viewsTree) return;
+
+  try {
+    if (isWailsAvailable()) {
+      const views = await WailsAPI.getViews(state.activeConnection, dbName);
+      viewsTree.innerHTML = '';
+      if (!views || views.length === 0) {
+        viewsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">无视图</div>';
+        return;
+      }
+      views.forEach(view => {
+        const item = document.createElement('div');
+        item.className = 'tree-item';
+        item.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        const span = document.createElement('span');
+        span.textContent = view.name || view.Name || String(view);
+        item.appendChild(span);
+        item.addEventListener('click', () => openView(view.name || view.Name || String(view), dbName));
+        viewsTree.appendChild(item);
+      });
+    } else {
+      viewsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">无视图</div>';
+    }
+  } catch (e) {
+    viewsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">加载失败</div>';
+  }
+}
+
+async function loadFunctionsForDatabase(dbName) {
+  if (!state.activeConnection) return;
+  const functionsTree = document.getElementById(`functions-${dbName}Tree`);
+  if (!functionsTree) return;
+
+  try {
+    if (isWailsAvailable()) {
+      const functions = await WailsAPI.getFunctions(state.activeConnection, dbName);
+      functionsTree.innerHTML = '';
+      if (!functions || functions.length === 0) {
+        functionsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">无函数</div>';
+        return;
+      }
+      functions.forEach(func => {
+        const item = document.createElement('div');
+        item.className = 'tree-item';
+        item.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M10 13a2 2 0 1 0 4 0 2 2 0 1 0-4 0"/></svg>`;
+        const span = document.createElement('span');
+        span.textContent = func.name || func.Name || String(func);
+        item.appendChild(span);
+        item.addEventListener('click', () => openFunction(func.name || func.Name || String(func)));
+        functionsTree.appendChild(item);
+      });
+    } else {
+      functionsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">无函数</div>';
+    }
+  } catch (e) {
+    functionsTree.innerHTML = '<div class="tree-empty-hint" style="padding:4px 8px;font-size:12px;color:var(--text-secondary);">加载失败</div>';
+  }
+}
+
 async function refreshDatabaseTables(dbName) {
   if (!state.activeConnection) return;
 
@@ -1714,10 +1784,24 @@ function renderTablesTree(tables, dbName) {
 function toggleTreeSection(sectionId) {
     const section = document.getElementById(sectionId + 'Tree');
     const header = section?.previousElementSibling;
-    
+
     if (section && header) {
-        section.classList.toggle('expanded');
+        const wasCollapsed = section.classList.contains('collapsed');
+        section.classList.toggle('collapsed');
         header.classList.toggle('expanded');
+
+        if (wasCollapsed) {
+            if (sectionId.startsWith('views-')) {
+                const dbName = sectionId.substring(6);
+                loadViewsForDatabase(dbName);
+            } else if (sectionId.startsWith('functions-')) {
+                const dbName = sectionId.substring(10);
+                loadFunctionsForDatabase(dbName);
+            } else if (sectionId.startsWith('tables-')) {
+                const dbName = sectionId.substring(7);
+                loadTablesForDatabase(dbName);
+            }
+        }
     }
 }
 
@@ -2352,10 +2436,14 @@ function renderDataView(result) {
 	const header = document.getElementById('dataViewHeader');
 	const body = document.getElementById('dataViewBody');
 
-	// Store column widths in state
 	state.columnWidths = state.columnWidths || {};
 
-	// Render header with resize handles (safe DOM manipulation — column names are server data)
+	const columns = result.columns || [];
+	const pkColumns = [];
+	if (columns.includes('id')) pkColumns.push('id');
+	else if (columns.includes('ID')) pkColumns.push('ID');
+	else if (columns.includes('pk')) pkColumns.push('pk');
+
 	header.innerHTML = '';
 	const headerRow = document.createElement('tr');
 	const checkboxTh = document.createElement('th');
@@ -2365,7 +2453,7 @@ function renderDataView(result) {
 	selectAllInput.id = 'selectAllRows';
 	checkboxTh.appendChild(selectAllInput);
 	headerRow.appendChild(checkboxTh);
-	result.columns.forEach((col, index) => {
+	columns.forEach((col, index) => {
 		const width = state.columnWidths[col] || 150;
 		const th = document.createElement('th');
 		th.style.cssText = `width: ${width}px; min-width: 80px; max-width: 400px;`;
@@ -2374,6 +2462,13 @@ function renderDataView(result) {
 		const span = document.createElement('span');
 		span.className = 'th-content';
 		span.textContent = col;
+		if (pkColumns.includes(col)) {
+			const pkBadge = document.createElement('span');
+			pkBadge.className = 'pk-badge';
+			pkBadge.textContent = ' PK';
+			pkBadge.style.cssText = 'color:var(--accent-primary);font-size:10px;font-weight:bold;';
+			span.appendChild(pkBadge);
+		}
 		const resizeDiv = document.createElement('div');
 		resizeDiv.className = 'resize-handle';
 		resizeDiv.dataset.col = String(index);
@@ -2383,32 +2478,114 @@ function renderDataView(result) {
 	});
 	header.appendChild(headerRow);
 
-	// Render body
-	let bodyHtml = '';
+	body.innerHTML = '';
 	result.rows.forEach((row, rowIndex) => {
-		bodyHtml += `<tr data-row="${rowIndex}"><td style="width: 50px; min-width: 50px; max-width: 50px;"><input type="checkbox" class="row-checkbox" data-row="${rowIndex}"></td>`;
-		row.forEach((cell, colIndex) => {
-			const displayValue = cell === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(cell));
-			bodyHtml += `<td title="${cell === null ? 'NULL' : DomUtils.escapeHtml(String(cell))}">${displayValue}</td>`;
-		});
-		bodyHtml += '</tr>';
-	});
-	body.innerHTML = bodyHtml;
+		const tr = document.createElement('tr');
+		tr.dataset.row = String(rowIndex);
 
-	// Update record count
+		const pkData = {};
+		pkColumns.forEach(pkCol => {
+			const idx = columns.indexOf(pkCol);
+			if (idx >= 0 && row[idx] !== undefined) {
+				pkData[pkCol] = row[idx];
+			}
+		});
+		if (Object.keys(pkData).length > 0) {
+			tr.dataset.primaryKey = JSON.stringify(pkData);
+		}
+
+		const cbTd = document.createElement('td');
+		cbTd.style.cssText = 'width: 50px; min-width: 50px; max-width: 50px;';
+		const cb = document.createElement('input');
+		cb.type = 'checkbox';
+		cb.className = 'row-checkbox';
+		cb.dataset.row = String(rowIndex);
+		cbTd.appendChild(cb);
+		tr.appendChild(cbTd);
+
+		row.forEach((cell, colIndex) => {
+			const td = document.createElement('td');
+			const colName = columns[colIndex];
+			td.dataset.column = colName;
+			td.dataset.rowIndex = String(rowIndex);
+
+			if (cell === null) {
+				const span = document.createElement('span');
+				span.className = 'null-value';
+				span.textContent = 'NULL';
+				td.appendChild(span);
+				td.title = 'NULL';
+			} else {
+				td.textContent = String(cell);
+				td.title = String(cell);
+			}
+
+			td.addEventListener('dblclick', function() {
+				startCellEdit(td, colName, rowIndex);
+			});
+
+			tr.appendChild(td);
+		});
+		body.appendChild(tr);
+	});
+
 	const dvRecordCount = document.getElementById('dvRecordCount');
 	if (dvRecordCount) dvRecordCount.textContent = `${result.row_count} 条记录`;
 	const dvSelectedCount = document.getElementById('dvSelectedCount');
 	if (dvSelectedCount) dvSelectedCount.textContent = '已选: 0';
 
-	// Add event listeners
 	document.getElementById('selectAllRows')?.addEventListener('change', toggleSelectAllRows);
 	document.querySelectorAll('.row-checkbox').forEach(cb => {
 		cb.addEventListener('change', updateSelectedCount);
 	});
 
-	// Initialize column resize
 	initColumnResize();
+}
+
+function startCellEdit(td, colName, rowIndex) {
+	if (td.querySelector('input')) return;
+
+	const originalValue = td.textContent === 'NULL' ? '' : td.textContent;
+	const input = document.createElement('input');
+	input.type = 'text';
+	input.value = originalValue;
+	input.dataset.column = colName;
+	input.dataset.originalValue = originalValue;
+	input.style.cssText = 'width:100%;box-sizing:border-box;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--accent-primary);border-radius:2px;padding:2px 4px;font-size:13px;';
+
+	td.textContent = '';
+	td.appendChild(input);
+	input.focus();
+	input.select();
+
+	const tr = td.closest('tr');
+	if (tr && !tr.classList.contains('new-row')) {
+		tr.classList.add('modified-row');
+	}
+
+	function finishEdit() {
+		const newValue = input.value;
+		const origVal = input.dataset.originalValue;
+		td.textContent = newValue === '' ? 'NULL' : newValue;
+		td.title = newValue === '' ? 'NULL' : newValue;
+		if (newValue === '') {
+			const span = document.createElement('span');
+			span.className = 'null-value';
+			span.textContent = 'NULL';
+			td.textContent = '';
+			td.appendChild(span);
+		}
+	}
+
+	input.addEventListener('blur', finishEdit);
+	input.addEventListener('keydown', function(e) {
+		if (e.key === 'Enter') {
+			input.blur();
+		} else if (e.key === 'Escape') {
+			input.value = originalValue;
+			input.blur();
+		}
+	});
 }
 
 // ==========================================================================
@@ -2933,7 +3110,46 @@ function openSettings() {
 }
 
 function closeSettings() {
+    saveSettings();
     document.getElementById('settingsModal').classList.remove('active');
+}
+
+function saveSettings() {
+    const settings = {
+        connTimeout: document.getElementById('settingsConnTimeout')?.value || '10',
+        queryTimeout: document.getElementById('settingsQueryTimeout')?.value || '30',
+        fontSize: document.getElementById('settingsFontSize')?.value || '14',
+        tabSize: document.getElementById('settingsTabSize')?.value || '2',
+        lineNumbers: document.getElementById('settingsLineNumbers')?.checked ?? true
+    };
+    localStorage.setItem('db-client-settings', JSON.stringify(settings));
+    applyEditorSettings(settings);
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('db-client-settings');
+    if (!saved) return;
+    try {
+        const settings = JSON.parse(saved);
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+        const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
+        setVal('settingsConnTimeout', settings.connTimeout);
+        setVal('settingsQueryTimeout', settings.queryTimeout);
+        setVal('settingsFontSize', settings.fontSize);
+        setVal('settingsTabSize', settings.tabSize);
+        setChk('settingsLineNumbers', settings.lineNumbers);
+        applyEditorSettings(settings);
+    } catch (e) {}
+}
+
+function applyEditorSettings(settings) {
+    if (typeof monacoEditor !== 'undefined' && monacoEditor) {
+        monacoEditor.updateOptions({
+            fontSize: parseInt(settings.fontSize) || 14,
+            tabSize: parseInt(settings.tabSize) || 2,
+            lineNumbers: settings.lineNumbers ? 'on' : 'off'
+        });
+    }
 }
 
 function showSettingsSection(section) {

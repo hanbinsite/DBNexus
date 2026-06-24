@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"db-server/db"
 )
@@ -14,6 +15,7 @@ type App struct {
 	ctx           context.Context
 	driverManager *db.DriverManager
 	connections   []Connection
+	connectionsMu sync.RWMutex
 	configPath    string
 	pool          *connectionPool
 	runtimeLang   string

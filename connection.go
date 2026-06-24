@@ -20,6 +20,8 @@ func (a *App) GetSupportedDatabases() []map[string]string {
 }
 
 func (a *App) GetConnections() []Connection {
+	a.connectionsMu.RLock()
+	defer a.connectionsMu.RUnlock()
 	safe := make([]Connection, len(a.connections))
 	copy(safe, a.connections)
 	for i := range safe {
@@ -42,6 +44,9 @@ func (a *App) SaveConnection(conn Connection) error {
 	} else if !conn.SavePassword {
 		conn.Password = ""
 	}
+
+	a.connectionsMu.Lock()
+	defer a.connectionsMu.Unlock()
 
 	found := false
 	for i, c := range a.connections {
