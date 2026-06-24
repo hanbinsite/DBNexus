@@ -16,6 +16,7 @@ type App struct {
 	connections   []Connection
 	configPath    string
 	pool          *connectionPool
+	runtimeLang   string
 }
 
 func NewApp() *App {
@@ -32,6 +33,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.runtimeLang = a.GetLanguage()
 	initEncryptionKey()
 	a.loadConnections()
 
@@ -71,6 +73,8 @@ func (a *App) SetLanguage(lang string) error {
 		return fmt.Errorf("unsupported language: %s, only zh/en allowed", lang)
 	}
 
+	a.runtimeLang = lang
+
 	homeDir, _ := os.UserHomeDir()
 	configDir := filepath.Join(homeDir, ".db-client")
 	os.MkdirAll(configDir, 0755)
@@ -93,6 +97,9 @@ func (a *App) SetLanguage(lang string) error {
 }
 
 func (a *App) getCurrentLang() string {
+	if a.runtimeLang != "" {
+		return a.runtimeLang
+	}
 	return a.GetLanguage()
 }
 

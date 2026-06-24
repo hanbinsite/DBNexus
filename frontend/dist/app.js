@@ -54,6 +54,8 @@ const WailsAPI = {
     // File Dialogs
     openFileDialog: (title, filters) => window.go.main.App.OpenFileDialog(title, filters),
     saveFileDialog: (title, defaultName) => window.go.main.App.SaveFileDialog(title, defaultName),
+    readFile: (path) => window.go.main.App.ReadFile(path),
+    writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
     
     // Language
     getLanguage: () => window.go.main.App.GetLanguage(),
@@ -2791,11 +2793,16 @@ async function loadTableData(tableName, database) {
 			if (result && result.error) {
 				showNotification('error', result.error);
 			} else if (result && result.rows) {
+				const savedPage = pagination.currentPage || 1;
 				pagination.allData = result.rows || [];
 				pagination.columns = result.columns || [];
 				pagination.totalRows = result.row_count || 0;
 				pagination.totalPages = Math.ceil(pagination.totalRows / pagination.pageSize) || 1;
-				pagination.currentPage = 1;
+				if (savedPage > pagination.totalPages) {
+					pagination.currentPage = pagination.totalPages;
+				} else {
+					pagination.currentPage = savedPage;
+				}
 
 				updatePaginationUI();
 				renderCurrentPage();
@@ -3383,15 +3390,22 @@ function explainQuery() {
 
 async function saveQuery() {
   const query = getEditorValue();
-  
+  if (!query || !query.trim()) {
+    showNotification('warning', '查询内容为空');
+    return;
+  }
+
   if (isWailsAvailable()) {
-    const path = await WailsAPI.saveFileDialog('Save Query', 'query.sql');
+    const path = await WailsAPI.saveFileDialog('保存查询', 'query.sql');
     if (path) {
-      // In a real implementation, save to file
-      showNotification('success', 'Query saved!');
+      try {
+        await WailsAPI.writeFile(path, query);
+        showNotification('success', '查询已保存到: ' + path);
+      } catch (e) {
+        showNotification('error', '保存失败: ' + (e.message || e));
+      }
     }
   } else {
-    // Mock save - download as file
     const blob = new Blob([query], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3405,10 +3419,15 @@ async function saveQuery() {
 
 async function loadQuery() {
     if (isWailsAvailable()) {
-        const path = await WailsAPI.openFileDialog('Load Query', 'SQL files (*.sql)');
+        const path = await WailsAPI.openFileDialog('加载查询', 'SQL files (*.sql)');
         if (path) {
-            // In a real implementation, read from file
-            showNotification('success', 'Query loaded!');
+            try {
+                const content = await WailsAPI.readFile(path);
+                setEditorValue(content);
+                showNotification('success', '查询已加载: ' + path);
+            } catch (e) {
+                showNotification('error', '加载失败: ' + (e.message || e));
+            }
         }
     } else {
         const input = document.createElement('input');
@@ -3419,8 +3438,7 @@ async function loadQuery() {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    document.getElementById('queryEditor').value = event.target.result;
-                    updateLineNumbers();
+                    setEditorValue(event.target.result);
                     showNotification('success', 'Query loaded!');
                 };
                 reader.readAsText(file);

@@ -298,7 +298,83 @@ func (a *App) generateOptimizationSuggestions(result ExplainResult) []string {
 }
 
 func (a *App) GetSlowQueries(config Connection, database string, thresholdSeconds int) ([]map[string]interface{}, error) {
-	return []map[string]interface{}{}, nil
+	dbConfig := a.connectionToDBConfig(config)
+	dbConfig.Database = database
+
+	driver, err := a.getDriverForConfig(dbConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var query string
+	switch config.Type {
+	case "postgresql", "polardb", "gaussdb":
+		query = fmt.Sprintf(`
+			SELECT
+				queryid AS query_id,
+				left(query, 200) AS query_sql,
+				calls,
+				mean_exec_time AS avg_time_ms,
+				total_exec_time AS total_time_ms,
+				rows
+			FROM pg_stat_statements
+			WHERE mean_exec_time > %d
+			ORDER BY mean_exec_time DESC
+			LIMIT 50
+		`, thresholdSeconds*1000)
+	case "mysql":
+		query = fmt.Sprintf(`
+			SELECT
+				sql_text AS query_sql,
+				query_time AS avg_time_ms,
+				lock_time,
+				rows_sent,
+				rows_examined
+			FROM mysql.slow_log
+			WHERE query_time > %d
+			ORDER BY query_time DESC
+			LIMIT 50
+		`, thresholdSeconds)
+	default:
+		return []map[string]interface{}{}, nil
+	}
+
+	rows, err := driver.Query(a.ctx, query)
+	if err != nil {
+		return []map[string]interface{}{}, nil
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return []map[string]interface{}{}, nil
+	}
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+
+		row := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+
+	return results, nil
 }
 
 func (a *App) GetTableStatistics(config Connection, database string, table string) (map[string]interface{}, error) {
