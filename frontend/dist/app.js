@@ -146,6 +146,23 @@ const WailsAPI = {
     logout: () => window.go.main.App.Logout(),
     validateSession: (token) => window.go.main.App.ValidateSession(token),
     refreshSession: () => window.go.main.App.RefreshSession(),
+
+    // Advanced Features
+    queryWithFilter: (conn, db, table, filter) => window.go.main.App.QueryWithFilter(conn, db, table, filter),
+    validateSQLSyntax: (sql) => window.go.main.App.ValidateSQLSyntax(sql),
+    getSnippets: () => window.go.main.App.GetSnippets(),
+    getSnippetsByCategory: (cat) => window.go.main.App.GetSnippetsByCategory(cat),
+    getMySQLSlowQueries: (conn, limit) => window.go.main.App.GetMySQLSlowQueries(conn, limit),
+    executeSQLFile: (conn, db, path) => window.go.main.App.ExecuteSQLFile(conn, db, path),
+
+    // Connection Groups
+    getConnectionGroups: () => window.go.main.App.GetConnectionGroups(),
+    createConnectionGroup: (name, color) => window.go.main.App.CreateConnectionGroup(name, color),
+    deleteConnectionGroup: (id) => window.go.main.App.DeleteConnectionGroup(id),
+    renameConnectionGroup: (id, name) => window.go.main.App.RenameConnectionGroup(id, name),
+
+    // Visual Query Plan
+    getVisualQueryPlan: (conn, db, query) => window.go.main.App.GetVisualQueryPlan(conn, db, query),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
