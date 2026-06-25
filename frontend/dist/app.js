@@ -3625,11 +3625,166 @@ function initSettings() {
 
 function openSettings() {
     document.getElementById('settingsModal').classList.add('active');
+    loadRolesUI();
+    loadPluginsUI();
+    loadPluginHooksUI();
 }
 
 function closeSettings() {
     saveSettings();
     document.getElementById('settingsModal').classList.remove('active');
+}
+
+// ==================== F7: Role/Permission Management UI ====================
+
+async function loadRolesUI() {
+    const el = document.getElementById('rolesList');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const roles = await WailsAPI.getRoles();
+        el.innerHTML = '';
+        if (!roles || roles.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无角色</div>';
+            return;
+        }
+        roles.forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'perf-list-item';
+            const perms = (r.permissions || []).join(', ');
+            item.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>' + escapeHtml(r.name) + '</strong> <span style="color:var(--fg-muted);font-size:11px;">(' + perms + ')</span></div><button class="btn btn-danger btn-sm" onclick="deleteRoleUI(\'' + r.id + '\')">删除</button></div>' + (r.description ? '<div style="font-size:11px;color:var(--fg-muted);margin-top:4px;">' + escapeHtml(r.description) + '</div>' : '');
+            el.appendChild(item);
+        });
+        // Populate assign select
+        const assignSel = document.getElementById('roleAssignSelect');
+        if (assignSel) {
+            assignSel.innerHTML = '<option value="">选择角色...</option>';
+            roles.forEach(r => assignSel.appendChild(new Option(r.name, r.id)));
+        }
+        // Populate connection select
+        const connSel = document.getElementById('roleConnSelect');
+        if (connSel) {
+            connSel.innerHTML = '<option value="">选择连接...</option>';
+            state.connections.forEach(c => connSel.appendChild(new Option(c.name, c.id)));
+        }
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">加载失败</div>';
+    }
+}
+
+async function createRoleUI() {
+    const name = document.getElementById('newRoleName')?.value.trim();
+    if (!name) { showNotification('warning', '请输入角色名称'); return; }
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    try {
+        await WailsAPI.createRole(name, ['read'], '');
+        showNotification('success', '角色已创建');
+        document.getElementById('newRoleName').value = '';
+        loadRolesUI();
+    } catch (e) {
+        showNotification('error', '创建失败: ' + (e.message || e));
+    }
+}
+
+async function deleteRoleUI(roleId) {
+    if (!confirm('确定删除此角色？')) return;
+    try {
+        await WailsAPI.deleteRole(roleId);
+        showNotification('success', '角色已删除');
+        loadRolesUI();
+    } catch (e) {
+        showNotification('error', '删除失败: ' + (e.message || e));
+    }
+}
+
+async function assignRoleUI() {
+    const connID = document.getElementById('roleConnSelect')?.value;
+    const roleID = document.getElementById('roleAssignSelect')?.value;
+    if (!connID || !roleID) { showNotification('warning', '请选择连接和角色'); return; }
+    try {
+        await WailsAPI.assignRoleToConnection(connID, roleID);
+        showNotification('success', '角色已分配');
+    } catch (e) {
+        showNotification('error', '分配失败: ' + (e.message || e));
+    }
+}
+
+// ==================== F10: Plugin Management UI ====================
+
+async function loadPluginsUI() {
+    const el = document.getElementById('pluginsList');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const plugins = await WailsAPI.getPlugins();
+        el.innerHTML = '';
+        if (!plugins || plugins.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无插件</div>';
+            return;
+        }
+        plugins.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'perf-list-item';
+            const statusColor = p.enabled ? 'var(--accent-success)' : 'var(--fg-muted)';
+            item.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>' + escapeHtml(p.name) + '</strong> <span style="color:var(--fg-muted);font-size:11px;">v' + (p.version || '1.0') + ' (' + (p.type || '') + ')</span> <span style="color:' + statusColor + ';font-size:11px;">' + (p.enabled ? '启用' : '禁用') + '</span></div><div style="display:flex;gap:4px;"><button class="btn btn-secondary btn-sm" onclick="togglePluginUI(\'' + p.id + '\', ' + !p.enabled + ')">' + (p.enabled ? '禁用' : '启用') + '</button><button class="btn btn-danger btn-sm" onclick="removePluginUI(\'' + p.id + '\')">删除</button></div></div>' + (p.description ? '<div style="font-size:11px;color:var(--fg-muted);margin-top:4px;">' + escapeHtml(p.description) + '</div>' : '');
+            el.appendChild(item);
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">加载失败</div>';
+    }
+}
+
+async function registerPluginUI() {
+    const name = document.getElementById('newPluginName')?.value.trim();
+    const version = document.getElementById('newPluginVersion')?.value.trim() || '1.0';
+    const type = document.getElementById('newPluginType')?.value || 'query_hook';
+    if (!name) { showNotification('warning', '请输入插件名称'); return; }
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    try {
+        await WailsAPI.registerPlugin(name, version, '', type);
+        showNotification('success', '插件已注册');
+        document.getElementById('newPluginName').value = '';
+        loadPluginsUI();
+    } catch (e) {
+        showNotification('error', '注册失败: ' + (e.message || e));
+    }
+}
+
+async function togglePluginUI(pluginId, enabled) {
+    try {
+        await WailsAPI.togglePlugin(pluginId, enabled);
+        showNotification('success', enabled ? '插件已启用' : '插件已禁用');
+        loadPluginsUI();
+    } catch (e) {
+        showNotification('error', '操作失败: ' + (e.message || e));
+    }
+}
+
+async function removePluginUI(pluginId) {
+    if (!confirm('确定删除此插件？')) return;
+    try {
+        await WailsAPI.removePlugin(pluginId);
+        showNotification('success', '插件已删除');
+        loadPluginsUI();
+    } catch (e) {
+        showNotification('error', '删除失败: ' + (e.message || e));
+    }
+}
+
+async function loadPluginHooksUI() {
+    const el = document.getElementById('pluginHooksList');
+    if (!el) return;
+    el.innerHTML = '';
+    const hooks = ['before_query', 'after_query', 'before_export', 'after_import', 'before_edit', 'after_edit', 'data_transform', 'ui_render'];
+    hooks.forEach(h => {
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-index';
+        badge.style.cssText = 'padding:4px 10px;font-size:11px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-secondary);';
+        badge.textContent = h;
+        el.appendChild(badge);
+    });
 }
 
 function saveSettings() {
