@@ -746,6 +746,26 @@
                         </svg>
                         <span data-i18n="redis">Redis</span>
                     </button>
+                    <button class="db-type-btn" data-type="mongodb">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2C8 2 4 6 4 12s4 10 8 10 8-4 8-10S16 2 12 2z"/>
+                            <path d="M12 6v12"/>
+                        </svg>
+                        <span>MongoDB</span>
+                    </button>
+                    <button class="db-type-btn" data-type="elasticsearch">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3h18v18H3z"/>
+                            <path d="M7 7h10M7 12h10M7 17h6"/>
+                        </svg>
+                        <span>Elasticsearch</span>
+                    </button>
+                    <button class="db-type-btn" data-type="cloud">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                        </svg>
+                        <span>云数据库</span>
+                    </button>
                 </div>
                 <div class="connection-form">
                     <div class="form-row">
@@ -801,6 +821,30 @@
                                 <input type="text" id="sqlitePath" placeholder="选择 .db 文件" style="flex: 1;">
                                 <button type="button" class="btn btn-secondary" onclick="browseSQLiteFile()">浏览</button>
                             </div>
+                        </div>
+                    </div>
+                    <!-- 云数据库特有字段 -->
+                    <div class="form-row" id="cloudFields" style="display: none;">
+                        <div class="form-group">
+                            <label>云厂商</label>
+                            <select id="cloudProvider" onchange="onCloudProviderChange()">
+                                <option value="aws">Amazon Web Services</option>
+                                <option value="gcp">Google Cloud Platform</option>
+                                <option value="azure">Microsoft Azure</option>
+                                <option value="aliyun">阿里云</option>
+                                <option value="tencent">腾讯云</option>
+                                <option value="huawei">华为云</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>区域</label>
+                            <input type="text" id="cloudRegion" placeholder="us-east-1 / cn-hangzhou">
+                        </div>
+                    </div>
+                    <div class="form-row" id="cloudInstanceRow" style="display: none;">
+                        <div class="form-group">
+                            <label>实例 ID (可选)</label>
+                            <input type="text" id="cloudInstanceID" placeholder="db-xxxxx">
                         </div>
                     </div>
                     <div class="form-row checkbox-row">

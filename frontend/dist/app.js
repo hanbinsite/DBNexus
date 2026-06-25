@@ -1314,6 +1314,10 @@ function updateConnectionForm(type) {
     sqlitePathRow.style.display = 'none';
     hostRow.style.display = 'grid';
     dbRow.style.display = 'flex';
+    const cloudFields = document.getElementById('cloudFields');
+    const cloudInstanceRow = document.getElementById('cloudInstanceRow');
+    if (cloudFields) cloudFields.style.display = 'none';
+    if (cloudInstanceRow) cloudInstanceRow.style.display = 'none';
     
     // Reset connection name placeholder
     const typeNames = {
@@ -1322,7 +1326,10 @@ function updateConnectionForm(type) {
         polardb: 'PolarDB',
         gaussdb: 'GaussDB',
         sqlite: 'SQLite',
-        redis: 'Redis'
+        redis: 'Redis',
+        mongodb: 'MongoDB',
+        elasticsearch: 'Elasticsearch',
+        cloud: '云数据库'
     };
     
     switch (type) {
@@ -1378,6 +1385,56 @@ function updateConnectionForm(type) {
             databaseHint.textContent = 'Redis 数据库编号 (0-15)';
             dbNameLabel.textContent = '数据库编号';
             break;
+            
+        case 'mongodb':
+            portInput.value = '27017';
+            connUser.placeholder = '可选';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'MongoDB 连接';
+            databaseHint.textContent = 'MongoDB 数据库名 (可选)';
+            dbNameLabel.textContent = '数据库 (可选)';
+            break;
+            
+        case 'elasticsearch':
+            portInput.value = '9200';
+            connUser.placeholder = '可选';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'Elasticsearch 连接';
+            databaseHint.textContent = 'Elasticsearch 索引前缀 (可选)';
+            dbNameLabel.textContent = '索引 (可选)';
+            break;
+            
+        case 'cloud':
+            portInput.value = '5432';
+            connUser.placeholder = '数据库用户名';
+            connHost.placeholder = '数据库端点地址';
+            if (!connName.value) connName.placeholder = '云数据库连接';
+            databaseHint.textContent = '云数据库实例的数据库名';
+            dbNameLabel.textContent = '数据库';
+            if (cloudFields) cloudFields.style.display = 'flex';
+            if (cloudInstanceRow) cloudInstanceRow.style.display = 'flex';
+            break;
+    }
+}
+
+function onCloudProviderChange() {
+    const provider = document.getElementById('cloudProvider')?.value;
+    const portInput = document.getElementById('connPort');
+    const hostInput = document.getElementById('connHost');
+    if (!provider) return;
+    // Set default port based on provider's common DB types
+    const defaults = {
+        aws: { port: '5432', host: 'your-rds.amazonaws.com' },
+        gcp: { port: '5432', host: 'your-cloudsql.googleapis.com' },
+        azure: { port: '5432', host: 'your-server.postgres.database.azure.com' },
+        aliyun: { port: '5432', host: 'your-rds.rds.aliyuncs.com' },
+        tencent: { port: '5432', host: 'your-cdb.tencentcloudapi.com' },
+        huawei: { port: '5432', host: 'your-rds.huaweicloud.com' },
+    };
+    const d = defaults[provider];
+    if (d) {
+        if (portInput) portInput.value = d.port;
+        if (hostInput) hostInput.placeholder = d.host;
     }
 }
 
@@ -1464,11 +1521,12 @@ function showDetailedError(message) {
 function getConnectionFromForm() {
     const activeDbType = document.querySelector('.db-type-btn.active');
     const colorBtn = document.querySelector('.color-option.active');
+    const type = activeDbType ? activeDbType.dataset.type : 'postgresql';
     
-    return {
+    const conn = {
         id: document.getElementById('connName').dataset.id || '',
         name: document.getElementById('connName').value || 'New Connection',
-        type: activeDbType ? activeDbType.dataset.type : 'postgresql',
+        type: type,
         host: document.getElementById('connHost').value,
         port: parseInt(document.getElementById('connPort').value) || 5432,
         username: document.getElementById('connUser').value,
@@ -1486,6 +1544,25 @@ function getConnectionFromForm() {
         ssh_password: document.getElementById('connSSHPassword')?.value || '',
         ssh_key_path: document.getElementById('connSSHKeyPath')?.value || ''
     };
+    
+    // Cloud DB fields
+    if (type === 'cloud') {
+        conn.cloud_provider = document.getElementById('cloudProvider')?.value || '';
+        conn.cloud_region = document.getElementById('cloudRegion')?.value || '';
+        conn.cloud_instance_id = document.getElementById('cloudInstanceID')?.value || '';
+    }
+    
+    // SSL fields
+    if (document.getElementById('connSSLEnabled')?.checked) {
+        conn.ssl_enabled = true;
+        conn.ssl_skip_verify = document.getElementById('sslSkipVerify')?.checked || false;
+        conn.ssl_ca_path = document.getElementById('sslCAPath')?.value || '';
+        conn.ssl_cert_path = document.getElementById('sslCertPath')?.value || '';
+        conn.ssl_key_path = document.getElementById('sslKeyPath')?.value || '';
+        conn.ssl_min_version = document.getElementById('sslMinVersion')?.value || '1.2';
+    }
+    
+    return conn;
 }
 
 function toggleSSHFields() {
