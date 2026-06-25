@@ -542,8 +542,8 @@ Phase 1 AI 功能:
 - [x] 完整审计日志系统（查询/事务操作全覆盖 + 追加写入）
 - [x] Redis命令白名单
 - [x] SSH隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
-- [ ] 性能监控仪表盘
-- [ ] 敏感数据脱敏
+- [x] 性能监控仪表盘 (performance.go: GetPerformanceMetrics/GetSystemInfo/HealthCheck)
+- [x] 敏感数据脱敏 (data_masking.go: MaskConfig + maskQueryResult)
 - [x] 危险操作二次确认（DROP/TRUNCATE）
 - [ ] Terminal Noir设计系统落地（见D08-migration-plan阶段2）
 - [x] 团队协作基础（连接配置导入/导出）
