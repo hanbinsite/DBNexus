@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -349,13 +351,19 @@ func (a *App) exportCompareToJSON(result CompareResult) ([]byte, error) {
 }
 
 func (a *App) exportCompareToCSV(result CompareResult) ([]byte, error) {
-	var csv strings.Builder
+	var buf bytes.Buffer
+	w := csv.NewWriter(&buf)
 
-	csv.WriteString("RowKey,ColumnName,SourceValue,TargetValue\n")
+	w.Write([]string{"RowKey", "ColumnName", "SourceValue", "TargetValue"})
 	for _, diff := range result.Differences {
-		csv.WriteString(fmt.Sprintf("%v,%s,%v,%v\n",
-			diff.RowKey, diff.ColumnName, diff.SourceValue, diff.TargetValue))
+		w.Write([]string{
+			fmt.Sprintf("%v", diff.RowKey),
+			diff.ColumnName,
+			fmt.Sprintf("%v", diff.SourceValue),
+			fmt.Sprintf("%v", diff.TargetValue),
+		})
 	}
+	w.Flush()
 
-	return []byte(csv.String()), nil
+	return buf.Bytes(), nil
 }
