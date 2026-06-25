@@ -2702,7 +2702,110 @@ function renderDataView(result) {
 	header.appendChild(headerRow);
 
 	body.innerHTML = '';
-	result.rows.forEach((row, rowIndex) => {
+
+	// Virtual scrolling for large datasets (>500 rows)
+	const VIRTUAL_THRESHOLD = 500;
+	const VIRTUAL_ROW_HEIGHT = 32; // approximate row height in px
+	const allRows = result.rows;
+	const totalRows = allRows.length;
+
+	if (totalRows > VIRTUAL_THRESHOLD) {
+		// Create virtual scroll container
+		const scrollContainer = body.parentElement; // tbody's parent (table or scroll div)
+		const visibleHeight = (scrollContainer.clientHeight || 600);
+		const visibleRowCount = Math.ceil(visibleHeight / VIRTUAL_ROW_HEIGHT) + 10;
+		let scrollTop = scrollContainer.scrollTop || 0;
+		let firstVisible = Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT);
+		if (firstVisible < 0) firstVisible = 0;
+		let lastVisible = Math.min(firstVisible + visibleRowCount, totalRows);
+
+		// Spacer row at top
+		if (firstVisible > 0) {
+			const spacerTr = document.createElement('tr');
+			spacerTr.style.height = (firstVisible * VIRTUAL_ROW_HEIGHT) + 'px';
+			spacerTr.innerHTML = '<td colspan="' + (columns.length + 1) + '"></td>';
+			body.appendChild(spacerTr);
+		}
+
+		// Render visible rows
+		for (let rowIndex = firstVisible; rowIndex < lastVisible; rowIndex++) {
+			const row = allRows[rowIndex];
+			const tr = document.createElement('tr');
+			tr.dataset.row = String(rowIndex);
+			tr.style.height = VIRTUAL_ROW_HEIGHT + 'px';
+
+			const pkData = {};
+			pkColumns.forEach(pkCol => {
+				const idx = columns.indexOf(pkCol);
+				if (idx >= 0 && row[idx] !== undefined) {
+					pkData[pkCol] = row[idx];
+				}
+			});
+			if (Object.keys(pkData).length > 0) {
+				tr.dataset.primaryKey = JSON.stringify(pkData);
+			}
+
+			const cbTd = document.createElement('td');
+			cbTd.style.cssText = 'width: 50px; min-width: 50px; max-width: 50px;';
+			const cb = document.createElement('input');
+			cb.type = 'checkbox';
+			cb.className = 'row-checkbox';
+			cb.dataset.row = String(rowIndex);
+			cbTd.appendChild(cb);
+			tr.appendChild(cbTd);
+
+			row.forEach((cell, colIndex) => {
+				const td = document.createElement('td');
+				const colName = columns[colIndex];
+				td.dataset.column = colName;
+				td.dataset.rowIndex = String(rowIndex);
+
+				if (cell === null) {
+					const span = document.createElement('span');
+					span.className = 'null-value';
+					span.textContent = 'NULL';
+					td.appendChild(span);
+					td.title = 'NULL';
+				} else {
+					td.textContent = String(cell);
+					td.title = String(cell);
+				}
+
+				td.addEventListener('dblclick', function() {
+					startCellEdit(td, colName, rowIndex);
+				});
+
+				tr.appendChild(td);
+			});
+			body.appendChild(tr);
+		}
+
+		// Spacer row at bottom
+		if (lastVisible < totalRows) {
+			const bottomSpacer = document.createElement('tr');
+			bottomSpacer.style.height = ((totalRows - lastVisible) * VIRTUAL_ROW_HEIGHT) + 'px';
+			bottomSpacer.innerHTML = '<td colspan="' + (columns.length + 1) + '"></td>';
+			body.appendChild(bottomSpacer);
+		}
+
+		// Virtual scroll event handler (debounced)
+		if (!scrollContainer._virtualScrollHandler) {
+			let scrollTimer = null;
+			scrollContainer._virtualScrollHandler = function() {
+				if (scrollTimer) clearTimeout(scrollTimer);
+				scrollTimer = setTimeout(function() {
+					const newScrollTop = scrollContainer.scrollTop || 0;
+					const newFirst = Math.floor(newScrollTop / VIRTUAL_ROW_HEIGHT);
+					if (Math.abs(newFirst - firstVisible) > 5) {
+						renderDataView(result);
+					}
+				}, 100);
+			};
+			scrollContainer.addEventListener('scroll', scrollContainer._virtualScrollHandler);
+		}
+	} else {
+		// Normal rendering for small datasets
+		allRows.forEach((row, rowIndex) => {
 		const tr = document.createElement('tr');
 		tr.dataset.row = String(rowIndex);
 
@@ -2750,7 +2853,8 @@ function renderDataView(result) {
 			tr.appendChild(td);
 		});
 		body.appendChild(tr);
-	});
+		});
+	}
 
 	const dvRecordCount = document.getElementById('dvRecordCount');
 	if (dvRecordCount) dvRecordCount.textContent = `${result.row_count} 条记录`;
