@@ -350,20 +350,20 @@
 - [ ] 团队工作空间
 - [ ] 权限角色管理
 
-### 14. 数据迁移 (0%)
+### 14. 数据迁移 (33%)
 - [ ] 跨数据库迁移
 - [ ] 增量同步
-- [ ] 数据校验
+- [x] 数据校验 (sprint9.go: ValidateDataMigration 行数+结构校验)
 
 ### 15. 性能监控 (60%)
 - [x] 实时查询监控 (GetActiveQueries + CancelQuery)
 - [x] 慢查询分析 (GetSlowQueries: pg_stat_statements)
 - [x] 数据库性能仪表盘 (GetPerformanceMetrics + GetSystemInfo + HealthCheck)
 
-### 16. 自动化与调度 (60%)
+### 16. 自动化与调度 (80%)
 - [x] 定时查询执行 (scheduler.go: CreateScheduledTask interval-based)
 - [x] 任务调度器 (scheduler.go: time.AfterFunc 自动重调度+启停)
-- [ ] 任务失败通知
+- [x] 任务失败通知 (sprint9.go: emitTaskNotification + GetTaskNotifications channel)
 
 ### 17. 报表与可视化 (0%)
 - [ ] 查询结果图表化
