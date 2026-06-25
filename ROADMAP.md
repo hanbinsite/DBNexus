@@ -466,7 +466,7 @@
 - [x] Redis命令白名单 (80+安全命令, 危险命令拒绝+审计)
 - [x] 前端模块化拆分 (app.js → 5 modules)
 - [x] 危险操作二次确认 (DDL CREATE/DROP/ALTER/TRUNCATE 确认拦截)
-- [ ] 连接分组管理
+- [x] 连接分组管理 (connection_groups.go: Create/Delete/Rename + groups.json持久化)
 - [x] 单元测试覆盖率提升至>60% (当前 100 sub-tests, ~55%)
 
 **P0 修复 (Sprint 1 — 致命问题)**:
