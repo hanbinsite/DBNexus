@@ -92,7 +92,7 @@
 - [x] 智能提示（上下文相关）(sprint9.go: GetSmartSuggestions 根据光标位置返回表/列/关键字建议)
 - [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet, GetSnippets/GetSnippetsByCategory)
 - [ ] SQL 调试功能
-- [ ] 参数化查询支持
+- [x] 参数化查询支持 (sprint10.go: ExecuteParameterizedQuery :param_name → ?/$N)
 - [x] 大文件 SQL 导入执行 (advanced_features.go: ExecuteSQLFile 300s超时)
 - [x] 快捷键自定义 (Monaco editor actions 暴露到 window.*)
 - [x] 多光标编辑 (addCursorBelow + selectAllOccurrences)
@@ -156,8 +156,8 @@
 
 #### 待开发
 - [x] 事务性批量编辑 (batch_transactional.go: BatchEditTransactional 事务保护+自动回滚)
-- [ ] 行级锁编辑
-- [ ] 编辑冲突检测
+- [x] 行级锁编辑 (sprint10.go: EditWithRowLock SELECT FOR UPDATE/SHARE)
+- [x] 编辑冲突检测 (sprint10.go: CheckEditConflict FNV-1a hash 比对)
 
 ---
 
@@ -281,7 +281,7 @@
 
 #### 待开发
 - [x] 慢查询分析（pg_stat_statements/MySQL slow_log）(advanced_features.go: GetMySQLSlowQueries + query_analyzer.go: GetSlowQueries PG)
-- [ ] 查询性能历史追踪
+- [x] 查询性能历史追踪 (sprint10.go: GetQueryPerformanceHistory + GetSlowQueryHistory, ~/.db-client/query_history.json)
 - [x] 索引使用率分析 (connection_ext.go: GetIndexUsageStats PG/MySQL, 未使用索引标记)
 - [x] 查询计划可视化 (connection_groups.go: GetVisualQueryPlan EXPLAIN JSON → 树结构)
 
@@ -318,7 +318,7 @@
 - [x] 列名补全不支持限定名（如 `schema.table.column`）— **已修复**: GetQualifiedColumnSuggestions
 - [x] 限定名补全（schema.table.column）(batch_transactional.go: GetQualifiedColumnSuggestions)
 - [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet)
-- [ ] 多表JOIN列补全
+- [x] 多表JOIN列补全 (sprint10.go: GetJoinSuggestions FK关系+列名匹配+命名模式检测)
 
 ---
 
