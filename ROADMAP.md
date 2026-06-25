@@ -408,7 +408,7 @@
 - [ ] **[TECH-001]** 部分函数过长（>100行），需要拆分
 - [ ] **[TECH-002]** 错误处理不统一，部分使用 panic，部分返回 error
 - [ ] **[TECH-003]** 缺少接口抽象，单元测试困难
-- [ ] **[TECH-004]** 硬编码字符串需要提取为常量
+- [x] **[TECH-004]** 硬编码字符串需要提取为常量 (constants.go: 集中管理DB类型/端口/超时/路径/权限/缓存/分页/安全等常量)
 - [x] **[TECH-005]** 6处重复的pool双重检查代码 → 统一为 `pool.getOrCreate()`
 - [x] **[TECH-006]** 前端3241行单文件app.js → 模块化拆分（modules/dom-utils.js, modules/redis.js, modules/compare.js, modules/export-import.js, modules/transaction.js）
 - [x] **[TECH-007]** `connections` 切片无锁保护 → 添加 `sync.RWMutex`
@@ -418,8 +418,8 @@
 - [ ] **[ARCH-001]** 引入依赖注入，降低耦合度
 - [ ] **[ARCH-002]** 分离业务逻辑与数据访问层
 - [ ] **[ARCH-003]** 实现插件化架构，支持扩展
-- [ ] **[ARCH-004]** 添加配置热重载机制
-- [ ] **[ARCH-005]** 实现事件总线，解耦模块通信
+- [x] **[ARCH-004]** 添加配置热重载机制 (constants.go: ConfigWatcher 5s轮询+回调+ReloadConfig手动重载)
+- [x] **[ARCH-005]** 实现事件总线，解耦模块通信 (constants.go: EventBus pub/sub 9种事件类型+SubscribeToEvents/PublishEvent)
 
 ### 性能优化
 
