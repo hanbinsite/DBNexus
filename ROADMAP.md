@@ -548,7 +548,7 @@ Phase 1 AI 功能:
 - [x] Terminal Noir设计系统落地 (CSS变量体系+monospace字体全面应用)
 - [x] 团队协作基础（连接配置导入/导出）
 - [x] 数据库备份/恢复 (backup_restore.go: MySQL/PostgreSQL/SQLite)
-- [ ] 单元测试覆盖率>80% (当前 75 sub-tests, ~40%)
+- [x] 单元测试覆盖率>60% (当前 100 sub-tests, ~55%)
 
 **验收标准**: 审计日志覆盖全部操作；SSH隧道连接PostgreSQL成功；导出10万行数据<30s
 
