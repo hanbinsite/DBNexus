@@ -102,6 +102,12 @@ const WailsAPI = {
     createDatabaseUser: (conn, user, pass, host) => window.go.main.App.CreateDatabaseUser(conn, user, pass, host),
     dropDatabaseUser: (conn, user, host) => window.go.main.App.DropDatabaseUser(conn, user, host),
     grantPrivileges: (conn, user, db, privs, host) => window.go.main.App.GrantPrivileges(conn, user, db, privs, host),
+
+    // Performance Monitoring
+    getPerformanceMetrics: () => window.go.main.App.GetPerformanceMetrics(),
+    getConnectionPoolStats: () => window.go.main.App.GetConnectionPoolStats(),
+    getSystemInfo: () => window.go.main.App.GetSystemInfo(),
+    healthCheck: () => window.go.main.App.HealthCheck(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
