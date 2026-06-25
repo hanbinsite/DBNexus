@@ -224,6 +224,12 @@ const WailsAPI = {
     getTableStructureCached: (conn, db, table) => window.go.main.App.GetTableStructureCached(conn, db, table),
     invalidateTableStructureCache: (db, table) => window.go.main.App.InvalidateTableStructureCache(db, table),
     clearTableStructureCache: () => window.go.main.App.ClearTableStructureCache(),
+
+    // Sprint 12 — Config hot reload + Event bus
+    reloadConfig: () => window.go.main.App.ReloadConfig(),
+    enableConfigHotReload: () => window.go.main.App.EnableConfigHotReload(),
+    subscribeToEvents: (eventType) => window.go.main.App.SubscribeToEvents(eventType),
+    publishEvent: (eventType, data) => window.go.main.App.PublishEvent(eventType, data),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
