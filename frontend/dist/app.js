@@ -1494,6 +1494,42 @@ function toggleSSHFields() {
     if (fields) fields.style.display = enabled ? 'block' : 'none';
 }
 
+function toggleSSLFields() {
+    const enabled = document.getElementById('connSSLEnabled')?.checked;
+    const fields = document.getElementById('sslFields');
+    if (fields) fields.style.display = enabled ? 'block' : 'none';
+}
+
+async function browseSSLFile(inputId) {
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    try {
+        const result = await WailsAPI.openFileDialog();
+        if (result && document.getElementById(inputId)) {
+            document.getElementById(inputId).value = result;
+        }
+    } catch (e) {
+        showNotification('error', '选择文件失败: ' + (e.message || e));
+    }
+}
+
+async function testSSLConnection() {
+    if (!state.editingConnectionId) { showNotification('warning', '请先保存连接'); return; }
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    showLoading('测试 SSL 连接...');
+    try {
+        const result = await WailsAPI.testSSLConnection(state.editingConnectionId);
+        hideLoading();
+        if (Array.isArray(result) ? result[0] : result.success) {
+            showNotification('success', (Array.isArray(result) ? result[1] : result.message) || 'SSL 连接成功');
+        } else {
+            showNotification('error', 'SSL 连接失败: ' + (Array.isArray(result) ? result[1] : result.message));
+        }
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'SSL 测试失败: ' + (e.message || e));
+    }
+}
+
 async function saveConnection() {
     const connection = getConnectionFromForm();
     

@@ -809,6 +809,61 @@
                             </div>
                         </div>
                     </div>
+                    <!-- SSL/TLS 配置 -->
+                    <hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0;">
+                    <div class="form-row checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="connSSLEnabled" onchange="toggleSSLFields()">
+                            <span>SSL/TLS 加密连接</span>
+                        </label>
+                    </div>
+                    <div id="sslFields" style="display:none;">
+                        <div class="form-row checkbox-row">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="sslSkipVerify">
+                                <span>跳过证书验证 (自签名证书)</span>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">CA 证书路径 (可选)</label>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="sslCAPath" placeholder="~/.ssl/ca-cert.pem" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                                    <button type="button" class="btn btn-secondary" onclick="browseSSLFile('sslCAPath')">浏览</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">客户端证书路径 (可选)</label>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="sslCertPath" placeholder="~/.ssl/client-cert.pem" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                                    <button type="button" class="btn btn-secondary" onclick="browseSSLFile('sslCertPath')">浏览</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">客户端密钥路径 (可选)</label>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="sslKeyPath" placeholder="~/.ssl/client-key.pem" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                                    <button type="button" class="btn btn-secondary" onclick="browseSSLFile('sslKeyPath')">浏览</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">最低 TLS 版本</label>
+                                <select id="sslMinVersion" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                                    <option value="1.2">TLS 1.2</option>
+                                    <option value="1.3">TLS 1.3</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button type="button" class="btn btn-secondary" onclick="testSSLConnection()">测试 SSL 连接</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
