@@ -92,6 +92,16 @@ const WailsAPI = {
     // Backup / Restore
     backupDatabase: (conn, db, path) => window.go.main.App.BackupDatabase(conn, db, path),
     restoreDatabase: (conn, db, path) => window.go.main.App.RestoreDatabase(conn, db, path),
+
+    // Full-text Search
+    searchTableData: (conn, db, table, text, limit) => window.go.main.App.SearchTableData(conn, db, table, text, limit),
+    searchAllTables: (conn, db, text, limit) => window.go.main.App.SearchAllTables(conn, db, text, limit),
+
+    // User Management
+    getDatabaseUsers: (conn) => window.go.main.App.GetDatabaseUsers(conn),
+    createDatabaseUser: (conn, user, pass, host) => window.go.main.App.CreateDatabaseUser(conn, user, pass, host),
+    dropDatabaseUser: (conn, user, host) => window.go.main.App.DropDatabaseUser(conn, user, host),
+    grantPrivileges: (conn, user, db, privs, host) => window.go.main.App.GrantPrivileges(conn, user, db, privs, host),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
