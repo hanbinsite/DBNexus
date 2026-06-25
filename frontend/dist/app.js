@@ -176,6 +176,13 @@ const WailsAPI = {
     // Security Scan & Permissions
     runSecurityScan: () => window.go.main.App.RunSecurityScan(),
     setConnectionPermission: (id, readOnly) => window.go.main.App.SetConnectionPermission(id, readOnly),
+
+    // Batch Transactional Edit & Events
+    batchEditTransactional: (conn, db, reqs) => window.go.main.App.BatchEditTransactional(conn, db, reqs),
+    getTransactionEvents: () => window.go.main.App.GetTransactionEvents(),
+
+    // Qualified Column Suggestions
+    getQualifiedColumnSuggestions: (conn, db, schema, table) => window.go.main.App.GetQualifiedColumnSuggestions(conn, db, schema, table),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
