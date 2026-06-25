@@ -200,6 +200,14 @@ const WailsAPI = {
 
     // Fast Table Stats
     getTableStatsFast: (conn, db, table) => window.go.main.App.GetTableStatsFast(conn, db, table),
+
+    // Sprint 9
+    getExplainPlanSafe: (conn, db, query, analyze) => window.go.main.App.GetExplainPlanSafe(conn, db, query, analyze),
+    getTaskNotifications: () => window.go.main.App.GetTaskNotifications(),
+    validateDataMigration: (conn, srcDB, srcTable, tgtDB, tgtTable) => window.go.main.App.ValidateDataMigration(conn, srcDB, srcTable, tgtDB, tgtTable),
+    getExportProgress: () => window.go.main.App.GetExportProgress(),
+    getSmartSuggestions: (conn, db, query, cursorPos) => window.go.main.App.GetSmartSuggestions(conn, db, query, cursorPos),
+    compareTablesStreaming: (conn, db, t1, t2, keyCol, batchSize) => window.go.main.App.CompareTablesStreaming(conn, db, t1, t2, keyCol, batchSize),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
