@@ -275,6 +275,21 @@ const WailsAPI = {
     togglePlugin: (id, enabled) => window.go.main.App.TogglePlugin(id, enabled),
     removePlugin: (id) => window.go.main.App.RemovePlugin(id),
     getPluginHooks: () => window.go.main.App.GetPluginHooks(),
+
+    // Sprint 16 — NoSQL + Cloud DB + Report designer
+    getNoSQLConnections: () => window.go.main.App.GetNoSQLConnections(),
+    saveNoSQLConnection: (conn) => window.go.main.App.SaveNoSQLConnection(conn),
+    deleteNoSQLConnection: (id) => window.go.main.App.DeleteNoSQLConnection(id),
+    testNoSQLConnection: (conn) => window.go.main.App.TestNoSQLConnection(conn),
+    getCloudDBConnections: () => window.go.main.App.GetCloudDBConnections(),
+    saveCloudDBConnection: (conn) => window.go.main.App.SaveCloudDBConnection(conn),
+    deleteCloudDBConnection: (id) => window.go.main.App.DeleteCloudDBConnection(id),
+    testCloudDBConnection: (conn) => window.go.main.App.TestCloudDBConnection(conn),
+    getCloudDBProviders: () => window.go.main.App.GetCloudDBProviders(),
+    getReportTemplates: () => window.go.main.App.GetReportTemplates(),
+    saveReportTemplate: (tpl) => window.go.main.App.SaveReportTemplate(tpl),
+    deleteReportTemplate: (id) => window.go.main.App.DeleteReportTemplate(id),
+    executeReportTemplate: (conn, db, id, params) => window.go.main.App.ExecuteReportTemplate(conn, db, id, params),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
