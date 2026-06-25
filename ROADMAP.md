@@ -255,7 +255,7 @@
 
 #### 已知缺陷（需修复）
 - [x] `globalTransactions` map无大小限制 → 已修复: `MaxActiveTransactions=100` 上限
-- [ ] 事务使用 `context.Background()` 无超时
+- [x] 事务使用 `context.Background()` 无超时 — **已修复**: 事务使用 a.ctx + WithTimeout
 
 #### 待开发
 - [ ] 事务保存点（Savepoint）
@@ -276,7 +276,7 @@
 - [x] 性能警告检测（全表扫描/文件排序/临时表）
 
 #### 已知缺陷（需修复）
-- [ ] `GetSlowQueries` 返回空列表，完全未实现
+- [x] `GetSlowQueries` 返回空列表，完全未实现 — **已修复**: query_analyzer.go GetSlowQueries 已实现 (pg_stat_statements)
 - [ ] PostgreSQL `EXPLAIN ANALYZE` 会实际执行查询
 
 #### 待开发
