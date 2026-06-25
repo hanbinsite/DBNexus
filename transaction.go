@@ -282,3 +282,105 @@ func (a *App) ExecuteTransactionBatch(req TransactionRequest) TransactionResult 
 		Queries:      queries,
 	}
 }
+
+// S4-4: 事务保存点 (Savepoint)
+func (a *App) CreateSavepoint(txID string, savepointName string) error {
+	if savepointName == "" {
+		return fmt.Errorf("savepoint name is required")
+	}
+	safeName := sanitizeIdentifier(savepointName)
+
+	globalTxMutex.RLock()
+	txEntry, exists := globalTransactions[txID]
+	globalTxMutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("transaction not found: %s", txID)
+	}
+
+	_, err := txEntry.tx.ExecContext(txEntry.ctx, fmt.Sprintf("SAVEPOINT %s", safeName))
+	if err != nil {
+		return fmt.Errorf("create savepoint failed: %w", err)
+	}
+
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("创建保存点: %s (tx: %s)", savepointName, txID),
+		map[string]interface{}{"tx_id": txID, "savepoint": savepointName},
+	)
+
+	return nil
+}
+
+func (a *App) RollbackToSavepoint(txID string, savepointName string) error {
+	if savepointName == "" {
+		return fmt.Errorf("savepoint name is required")
+	}
+	safeName := sanitizeIdentifier(savepointName)
+
+	globalTxMutex.RLock()
+	txEntry, exists := globalTransactions[txID]
+	globalTxMutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("transaction not found: %s", txID)
+	}
+
+	_, err := txEntry.tx.ExecContext(txEntry.ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", safeName))
+	if err != nil {
+		return fmt.Errorf("rollback to savepoint failed: %w", err)
+	}
+
+	GetAuditLogger().Log(AuditLevelWarning, AuditEventQuery,
+		fmt.Sprintf("回滚到保存点: %s (tx: %s)", savepointName, txID),
+		map[string]interface{}{"tx_id": txID, "savepoint": savepointName},
+	)
+
+	return nil
+}
+
+func (a *App) ReleaseSavepoint(txID string, savepointName string) error {
+	if savepointName == "" {
+		return fmt.Errorf("savepoint name is required")
+	}
+	safeName := sanitizeIdentifier(savepointName)
+
+	globalTxMutex.RLock()
+	txEntry, exists := globalTransactions[txID]
+	globalTxMutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("transaction not found: %s", txID)
+	}
+
+	_, err := txEntry.tx.ExecContext(txEntry.ctx, fmt.Sprintf("RELEASE SAVEPOINT %s", safeName))
+	if err != nil {
+		return fmt.Errorf("release savepoint failed: %w", err)
+	}
+
+	return nil
+}
+
+// S4-5: 事务状态查询
+type TransactionStatus struct {
+	ID        string `json:"id"`
+	Created   string `json:"created"`
+	Duration  string `json:"duration"`
+	Isolation string `json:"isolation"`
+	ReadOnly  bool   `json:"read_only"`
+}
+
+func (a *App) GetActiveTransactions() []TransactionStatus {
+	globalTxMutex.RLock()
+	defer globalTxMutex.RUnlock()
+
+	result := []TransactionStatus{}
+	for txID, tx := range globalTransactions {
+		status := TransactionStatus{
+			ID:       txID,
+			Created:  tx.created.Format("2006-01-02 15:04:05"),
+			Duration: time.Since(tx.created).String(),
+		}
+		result = append(result, status)
+	}
+	return result
+}

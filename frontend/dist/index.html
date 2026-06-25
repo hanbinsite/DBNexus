@@ -139,6 +139,10 @@
                     </button>
                 </div>
                 
+                <div class="connection-search" style="padding:4px 8px;">
+                    <input type="text" id="connectionSearch" placeholder="搜索连接..." oninput="filterConnections(this.value)" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:4px 8px;font-size:12px;box-sizing:border-box;">
+                </div>
+                
                 <div class="connection-list" id="connectionList">
                     <!-- 连接列表将动态填充 -->
                 </div>

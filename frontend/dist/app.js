@@ -112,6 +112,16 @@ const WailsAPI = {
     // Data Masking
     setMaskConfig: (enabled, cols, ch, ks, ke) => window.go.main.App.SetMaskConfig(enabled, cols, ch, ks, ke),
     getMaskConfig: () => window.go.main.App.GetMaskConfig(),
+
+    // Schema Extensions
+    generateTableDDL: (conn, db, table) => window.go.main.App.GenerateTableDDL(conn, db, table),
+    getTableTriggers: (conn, db, table) => window.go.main.App.GetTableTriggers(conn, db, table),
+
+    // Transaction Savepoint & Status
+    createSavepoint: (txID, name) => window.go.main.App.CreateSavepoint(txID, name),
+    rollbackToSavepoint: (txID, name) => window.go.main.App.RollbackToSavepoint(txID, name),
+    releaseSavepoint: (txID, name) => window.go.main.App.ReleaseSavepoint(txID, name),
+    getActiveTransactions: () => window.go.main.App.GetActiveTransactions(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
@@ -1404,6 +1414,28 @@ function renderConnectionList() {
     
     state.connections.forEach(conn => {
         addConnectionToList(conn);
+    });
+}
+
+function filterConnections(searchText) {
+    const connectionList = document.getElementById('connectionList');
+    if (!connectionList) return;
+    const items = connectionList.querySelectorAll('.connection-item');
+    const lowerSearch = (searchText || '').toLowerCase().trim();
+    
+    items.forEach(item => {
+        if (!lowerSearch) {
+            item.style.display = '';
+            return;
+        }
+        const name = (item.querySelector('.connection-name')?.textContent || '').toLowerCase();
+        const type = (item.querySelector('.connection-type')?.textContent || '').toLowerCase();
+        const host = (item.dataset.host || '').toLowerCase();
+        if (name.includes(lowerSearch) || type.includes(lowerSearch) || host.includes(lowerSearch)) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
     });
 }
 
@@ -3684,6 +3716,66 @@ function setEditorValue(value) {
   }
 }
 
+function findInEditor() {
+  if (monacoEditor) {
+    monacoEditor.getAction('actions.find').run();
+  }
+}
+
+function replaceInEditor() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.startFindReplaceAction').run();
+  }
+}
+
+function findNext() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.nextMatchFindAction').run();
+  }
+}
+
+function findPrevious() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.previousMatchFindAction').run();
+  }
+}
+
+function toggleComment() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.commentLine').run();
+  }
+}
+
+function toggleBlockComment() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.blockComment').run();
+  }
+}
+
+function selectAllOccurrences() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.selectHighlights').run();
+  }
+}
+
+function addCursorBelow() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.insertCursorBelow').run();
+  }
+}
+
+function formatDocument() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.formatDocument').run();
+  }
+}
+
+function goToLine() {
+  if (monacoEditor) {
+    monacoEditor.getAction('editor.action.gotoLine').run();
+  }
+}
+
 function focusEditor() {
   if (monacoEditor) {
     monacoEditor.focus();
@@ -4282,6 +4374,16 @@ window.createNewTab = createNewTab;
 window.closeTab = closeTab;
 window.executeQuery = executeQuery;
 window.formatSQL = formatSQL;
+window.findInEditor = findInEditor;
+window.replaceInEditor = replaceInEditor;
+window.findNext = findNext;
+window.findPrevious = findPrevious;
+window.toggleComment = toggleComment;
+window.toggleBlockComment = toggleBlockComment;
+window.selectAllOccurrences = selectAllOccurrences;
+window.addCursorBelow = addCursorBelow;
+window.formatDocument = formatDocument;
+window.goToLine = goToLine;
 window.explainQuery = explainQuery;
 window.saveQuery = saveQuery;
 window.loadQuery = loadQuery;
@@ -4332,6 +4434,7 @@ window.executeInTx = executeInTx;
 window.commitTx = commitTx;
 window.rollbackTx = rollbackTx;
 window.clearFilter = clearFilter;
+window.filterConnections = filterConnections;
 window.saveAIConfig = saveAIConfig;
 window.testAIConnection = testAIConnection;
 window.aiExplainSQL = aiExplainSQL;
