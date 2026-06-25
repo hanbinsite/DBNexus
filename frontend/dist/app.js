@@ -3697,6 +3697,34 @@ async function aiOptimizeSQL() {
     }
 }
 
+async function aiDiagnoseError() {
+    const query = getSelectedText() || getEditorValue().trim();
+    if (!query) { showNotification('warning', '请选择或输入出错的 SQL'); return; }
+    // 获取最近一条错误信息
+    const messagesOutput = document.getElementById('messagesOutput');
+    let lastError = '';
+    if (messagesOutput) {
+        const errorItems = messagesOutput.querySelectorAll('.msg-item.msg-error .msg-error-text, .msg-item.msg-error .msg-text');
+        if (errorItems.length > 0) {
+            lastError = errorItems[errorItems.length - 1].textContent || '';
+        }
+    }
+    if (!lastError) {
+        showNotification('info', '未检测到最近错误。请先执行查询产生错误，再使用诊断。');
+        return;
+    }
+    showLoading('AI 正在诊断错误...');
+    try {
+        const prompt = 'SQL: ' + query + '\n\nError: ' + lastError;
+        const result = await WailsAPI.explainSQL(prompt);
+        hideLoading();
+        showAIResult('AI 错误诊断', result);
+    } catch (e) {
+        hideLoading();
+        showNotification('error', 'AI诊断失败: ' + (e.message || e));
+    }
+}
+
 function showAIResult(title, content) {
     const messagesTab = document.querySelector('[data-result-tab="messages"]');
     if (messagesTab) messagesTab.click();

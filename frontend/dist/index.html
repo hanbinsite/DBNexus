@@ -241,6 +241,31 @@
                               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                             </svg>
                           </button>
+                          <div class="editor-divider"></div>
+                          <!-- AI 功能按钮 -->
+                          <button class="editor-btn" onclick="aiOptimizeSQL()" title="AI 优化 SQL">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M12 2a10 10 0 1 0 10 10"/>
+                              <path d="M12 6v6l4 2"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="aiExplainSQL()" title="AI 解释 SQL">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="aiDiagnoseError()" title="AI 错误诊断">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                              <path d="M12 9v4M12 17h.01"/>
+                            </svg>
+                          </button>
+                          <button class="editor-btn" onclick="openNL2SQLDialog()" title="自然语言转 SQL">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                          </button>
                         </div>
                         <div class="editor-db-selector">
                           <label data-i18n="database">数据库:</label>
