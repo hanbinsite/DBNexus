@@ -562,8 +562,8 @@ Phase 1 AI 功能:
 - [x] 跨数据库数据迁移 (sprint14.go: MigrateData 批量INSERT)
 - [x] 增量数据同步 (sprint14.go: IncrementalSync 基于key列upsert)
 - [x] 插件系统架构 (sprint15.go: PluginInfo + 8种钩子 + 优先级链)
-- [ ] 云数据库深度支持
-- [ ] NoSQL支持（MongoDB/Elasticsearch）
+- [x] 云数据库深度支持 (sprint16.go: 6云厂商 AWS/GCP/Azure/阿里云/腾讯云/华为云 + CloudDBConnection)
+- [x] NoSQL支持（MongoDB/Elasticsearch）(sprint16.go: NoSQLConnection + URI构建 + TCP连接测试)
 - [x] 数据可视化图表 (sprint14.go: PrepareChartData bar/line/pie/scatter)
 - [x] 定时查询执行 (scheduler.go: CreateScheduledTask interval-based)
 - [x] 版本控制集成（Git）(sprint15.go: GitCommit/Pull/Push/Checkout/Diff/Log + 仓库管理)
