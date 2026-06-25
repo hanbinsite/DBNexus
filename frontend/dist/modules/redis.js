@@ -54,14 +54,29 @@ async function scanRedisKeys() {
 
 async function getRedisKeyDetail(key) {
     if (!isWailsAvailable()) return;
+    const detailEl = document.getElementById('redisKeyDetail');
+    const contentEl = document.getElementById('redisKeyDetailContent');
+    if (!detailEl || !contentEl) return;
+
+    detailEl.style.display = 'block';
+    contentEl.textContent = '加载中...';
+
     try {
         const info = await WailsAPI.getRedisKeyInfo(state.activeConnection, key);
-        const content = `类型: ${info.type}, TTL: ${info.ttl}s\n值: ${JSON.stringify(info.value, null, 2)}`;
-        showNotification('info', content.substring(0, 120));
+        const lines = [];
+        lines.push(`Key:   ${key}`);
+        lines.push(`Type:  ${info.type || 'unknown'}`);
+        lines.push(`TTL:   ${info.ttl !== undefined ? info.ttl + 's' : 'N/A'}`);
+        lines.push('');
+        lines.push('Value:');
+        const valStr = typeof info.value === 'string' ? info.value : JSON.stringify(info.value, null, 2);
+        lines.push(valStr);
+        contentEl.textContent = lines.join('\n');
+
         document.getElementById('redisNewKey').value = key;
         document.getElementById('redisNewValue').value = typeof info.value === 'string' ? info.value : JSON.stringify(info.value);
     } catch (e) {
-        showNotification('error', `获取失败: ${e.message}`);
+        contentEl.textContent = `获取失败: ${e.message || e}`;
     }
 }
 

@@ -1117,6 +1117,13 @@
                 </select>
             </div>
             <div id="redisInfoContent" style="font-size:12px;background:var(--bg-primary);padding:8px;border-radius:var(--radius-md);max-height:200px;overflow:auto;"></div>
+            <div id="redisKeyDetail" style="margin-top:12px;display:none;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:12px;font-weight:600;color:var(--text-primary);">Key 详情</span>
+                    <button class="modal-close" onclick="document.getElementById('redisKeyDetail').style.display='none'" style="font-size:14px;padding:0 4px;">&times;</button>
+                </div>
+                <div id="redisKeyDetailContent" style="font-size:12px;font-family:var(--font-mono);white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;line-height:1.6;"></div>
+            </div>
             <div id="redisKeyList" style="margin-top:12px;max-height:400px;overflow:auto;"></div>
         </div>
     </div>
