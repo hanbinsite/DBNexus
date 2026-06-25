@@ -3705,27 +3705,82 @@ function initEditor() {
         ],
 
         operators: [
-          '=', '>', '<', '<=', '>=', '<>', '!=', '+', '-', '*', '/', '||'
+          '=', '>', '<', '<=', '>=', '<>', '!=', '+', '-', '*', '/', '||', '::', '->', '->>', '#>', '#>>'
         ],
 
         symbols: /[=><!~&|\+\-\*\/\^]+/,
 
+        keywords: [
+          'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
+          'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'TRUNCATE', 'USE',
+          'INDEX', 'VIEW', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS', 'ON',
+          'GROUP', 'BY', 'ORDER', 'ASC', 'DESC', 'HAVING', 'LIMIT', 'OFFSET',
+          'UNION', 'ALL', 'AS', 'DISTINCT', 'EXISTS', 'NOT', 'IN', 'LIKE', 'ILIKE', 'BETWEEN',
+          'IS', 'NULL', 'TRUE', 'FALSE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+          'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'UNIQUE', 'CHECK', 'DEFAULT',
+          'AUTO_INCREMENT', 'IDENTITY', 'SERIAL', 'CONSTRAINT', 'CASCADE',
+          'BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'RELEASE', 'TRANSACTION',
+          'GRANT', 'REVOKE', 'PRIVILEGES', 'SCHEMA', 'DATABASE', 'IF', 'EXISTS',
+          'RETURNING', 'WITH', 'RECURSIVE', 'WINDOW', 'OVER', 'PARTITION', 'RANGE',
+          'ROWS', 'PRECEDING', 'FOLLOWING', 'UNBOUNDED', 'CURRENT', 'ROW',
+          'MATERIALIZED', 'EXPLAIN', 'ANALYZE', 'VACUUM', 'REINDEX', 'CLUSTER',
+          'CONFLICT', 'DO', 'NOTHING', 'RETURNING', 'UPSERT', 'ON',
+          'INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'SERIAL', 'BIGSERIAL',
+          'VARCHAR', 'CHAR', 'TEXT', 'CITEXT', 'UUID', 'JSON', 'JSONB', 'XML',
+          'DECIMAL', 'NUMERIC', 'FLOAT', 'DOUBLE', 'REAL', 'MONEY',
+          'DATE', 'TIME', 'TIMESTAMP', 'TIMESTAMPTZ', 'INTERVAL', 'DATETIME',
+          'BOOLEAN', 'BOOL', 'BYTEA', 'BLOB', 'BINARY', 'VARBINARY',
+          'ENGINE', 'CHARSET', 'COLLATE', 'COLLATION', 'TABLESPACE',
+          'PARTITION', 'PARTITIONED', 'DISTRIBUTED', 'SORTED', 'STORED', 'FORMAT'
+        ],
+
+        functions: [
+          'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'GREATEST', 'LEAST',
+          'NOW', 'CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME', 'EXTRACT', 'DATE_PART',
+          'DATE_TRUNC', 'TO_CHAR', 'TO_DATE', 'TO_TIMESTAMP', 'AGE', 'INTERVAL',
+          'LENGTH', 'CHAR_LENGTH', 'SUBSTRING', 'SUBSTR', 'POSITION', 'TRIM', 'LTRIM', 'RTRIM',
+          'UPPER', 'LOWER', 'INITCAP', 'REPLACE', 'SPLIT_PART', 'REGEXP_MATCHES', 'REGEXP_REPLACE',
+          'CONCAT', 'CONCAT_WS', 'FORMAT', 'LPAD', 'RPAD', 'LEFT', 'RIGHT', 'REPEAT',
+          'ROUND', 'CEIL', 'CEILING', 'FLOOR', 'ABS', 'POWER', 'SQRT', 'CBRT', 'EXP', 'LN', 'LOG',
+          'RANDOM', 'GENERATE_SERIES', 'GENERATE_UUID', 'UUID_GENERATE_V4',
+          'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LAG', 'LEAD', 'FIRST_VALUE', 'LAST_VALUE',
+          'NTH_VALUE', 'NTILE', 'CUME_DIST', 'PERCENT_RANK', 'PERCENTILE_CONT', 'PERCENTILE_DISC',
+          'ARRAY_AGG', 'STRING_AGG', 'BOOL_AND', 'BOOL_OR', 'EVERY', 'MEDIAN',
+          'JSON_AGG', 'JSONB_AGG', 'JSON_OBJECT', 'JSONB_OBJECT', 'JSON_EXTRACT_PATH',
+          'CAST', 'CONVERT', 'ENCODE', 'DECODE', 'DIGEST', 'HMAC',
+          'PG_SLEEP', 'PG_TERMINATE_BACKEND', 'PG_CANCEL_BACKEND',
+          'CURRENT_USER', 'CURRENT_SCHEMA', 'SESSION_USER', 'CURRENT_ROLE',
+          'VERSION', 'PG_VERSION', 'GET_LOCK', 'RELEASE_LOCK'
+        ],
+
         tokenizer: {
           root: [
-            [/@?[a-zA-Z_]\w*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+            [/@?[a-zA-Z_]\w*/, { cases: {
+              '@keywords': 'keyword',
+              '@functions': 'function',
+              '@default': 'identifier'
+            } }],
             [/'/, { token: 'string', next: '@string' }],
             [/"/, { token: 'string', next: '@stringDouble' }],
+            [/`/, { token: 'identifier.quote', next: '@backtick' }],
             [/--.*$/, 'comment'],
             [/\/\*/, 'comment', '@comment'],
-            [/\d+\.?\d*/, 'number'],
+            [/\$\d+/, 'predefined'],
+            [/\$\{[a-zA-Z_]\w*\}/, 'predefined'],
+            [/\d+\.?\d*[eE]?\d*/, 'number'],
+            [/0[xX][0-9a-fA-F]+/, 'number.hex'],
             [/[{}()\[\]]/, '@brackets'],
-            [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }]
+            [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }],
+            [/[;,.]/, 'delimiter']
           ],
           string: [
-            [/[^']+/, 'string'], [/''/, 'string'], [/'/, { token: 'string', next: '@pop' }]
+            [/[^']+/, 'string'], [/''/, 'string.escape'], [/'/, { token: 'string', next: '@pop' }]
           ],
           stringDouble: [
-            [/[^"]+/, 'string'], [/""/, 'string'], [/"/, { token: 'string', next: '@pop' }]
+            [/[^"]+/, 'string'], [/""/, 'string.escape'], [/"/, { token: 'string', next: '@pop' }]
+          ],
+          backtick: [
+            [/[^`]+/, 'identifier'], [/`/, { token: 'identifier.quote', next: '@pop' }]
           ],
           comment: [
             [/\*\//, 'comment', '@pop'], [/[^*]+/, 'comment'], [/\*/, 'comment']
