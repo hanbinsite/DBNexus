@@ -387,12 +387,12 @@
 |---|-------|----------|--------|
 | SEC-001 | `GetConnections()` 暴露加密密码给前端 | connection.go:26 | **已修复** (清空Password) |
 | SEC-002 | `encryptionKey` 竞态条件 | crypto.go:17 | **已修复** (sync.Once) |
-| SEC-003 | MySQL驱动SSLMode支持不完整 | db/mysql.go:23-32 | **部分修复** (基础SSL已支持) |
+| SEC-003 | MySQL驱动SSLMode支持不完整 | db/mysql.go:23-32 | **已修复** (tls=preferred→false, required→true) |
 | SEC-004 | `ExecuteQuery` 无超时 | query.go:10-11 | **已修复** (委托WithTimeout) |
-| SEC-005 | MySQL DESCRIBE未sanitize | db/mysql.go:88 | 待修复 |
+| SEC-005 | MySQL DESCRIBE未sanitize | db/mysql.go:88 | **已修复** (sanitizeIdentifier) |
 | SEC-006 | WhereClause SQL注入 | types.go:91 | **已修复** (PrimaryKey参数化) |
-| SEC-007 | 导入路径遍历 | data_export.go:282-288 | **部分修复** (baseName检查 + `..`拒绝已实施) |
-| SEC-008 | 前端57处XSS | app.js | 待修复 |
+| SEC-007 | 导入路径遍历 | data_export.go:282-288 | **已修复** (filepath.Clean + 拒绝'..') |
+| SEC-008 | 前端57处XSS | app.js | **已修复** (renderDataView 安全DOM + escapeHtml) |
 
 ### P1 — High
 
@@ -411,9 +411,9 @@
 - [ ] **[TECH-002]** 错误处理不统一，部分使用 panic，部分返回 error
 - [ ] **[TECH-003]** 缺少接口抽象，单元测试困难
 - [ ] **[TECH-004]** 硬编码字符串需要提取为常量
-- [ ] **[TECH-005]** 6处重复的pool双重检查代码 → 统一为 `pool.getOrCreate()`
-- [ ] **[TECH-006]** 前端3241行单文件app.js → 模块化拆分（见D08-migration-plan）
-- [ ] **[TECH-007]** `connections` 切片无锁保护 → 添加 `sync.RWMutex`
+- [x] **[TECH-005]** 6处重复的pool双重检查代码 → 统一为 `pool.getOrCreate()`
+- [x] **[TECH-006]** 前端3241行单文件app.js → 模块化拆分（modules/dom-utils.js, modules/redis.js, modules/compare.js, modules/export-import.js, modules/transaction.js）
+- [x] **[TECH-007]** `connections` 切片无锁保护 → 添加 `sync.RWMutex`
 
 ### 架构优化
 
