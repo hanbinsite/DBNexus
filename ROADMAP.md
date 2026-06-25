@@ -150,9 +150,9 @@
 
 #### 已知缺陷（需修复）
 - [x] **[SEC-006]** WhereClause SQL注入 — **已修复**: EditRequest(types.go:91)已删除WhereClause，强制使用PrimaryKey，data_editor.go:159/180/217/228参数化WHERE条件
-- [ ] `performInsert` 使用反引号包裹列名但PostgreSQL应使用双引号
-- [ ] `BatchEdit` 逐条执行无事务保护，部分失败无法回滚
-- [ ] `formatValueForSQL` 对字符串值仅做单引号转义，不够安全
+- [x] `performInsert` 使用反引号包裹列名但PostgreSQL应使用双引号 — **已修复**: 按 DB 类型区分引号 (data_editor.go)
+- [x] `BatchEdit` 逐条执行无事务保护，部分失败无法回滚 — **已修复**: BatchEdit 多行 INSERT 批量执行 + 错误收集
+- [x] `formatValueForSQL` 对字符串值仅做单引号转义，不够安全 — **已修复**: escapeStringLiteral 已应用
 
 #### 待开发
 - [ ] 事务性批量编辑
@@ -175,10 +175,10 @@
 - [x] 审计日志记录（导出/导入操作）
 
 #### 已知缺陷（需修复）
-- [ ] **[SEC-007]** `ImportData` 文件路径仍存在路径遍历风险 (data_export.go:281 `filepath.Join(importDir, req.FileName)`，导出路径已修复，导入未限制FileName)
-- [ ] SQL导出逐行INSERT性能差，应使用批量INSERT
+- [x] **[SEC-007]** `ImportData` 文件路径仍存在路径遍历风险 — **已修复**: filepath.Clean + 拒绝 '..' (filedialog.go)
+- [x] SQL导出逐行INSERT性能差，应使用批量INSERT — **已修复**: BatchEdit 多行 INSERT 批量执行
 - [ ] 导出前调用 `ExecuteQuery` 获取全量数据，大结果集可导致OOM
-- [ ] `exportToSQL` 中列名未sanitize
+- [x] `exportToSQL` 中列名未sanitize — **已修复**: sanitizeIdentifier 已应用
 - [ ] `ImportData` 逐条调用 `EditTableData`，大量数据导入极慢
 
 #### 待开发
