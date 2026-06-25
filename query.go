@@ -16,11 +16,20 @@ func (a *App) ExecuteMultiQuery(config Connection, database string, query string
 }
 
 func splitQueries(query string) []string {
+	return splitQueriesWithDialect(query, "mysql")
+}
+
+func splitQueriesWithDialect(query string, dialect string) []string {
 	var queries []string
 	var current strings.Builder
 	inSingleQuote := false
 	inDoubleQuote := false
 	escaped := false
+
+	// MySQL uses backslash as escape character inside strings.
+	// PostgreSQL standard SQL does NOT use backslash as escape (unless E'' prefix).
+	// SQLite follows PostgreSQL convention (no backslash escape in standard strings).
+	useBackslashEscape := dialect == "mysql"
 
 	for _, ch := range query {
 		if escaped {
@@ -29,13 +38,18 @@ func splitQueries(query string) []string {
 			continue
 		}
 
-		if ch == '\\' {
+		if useBackslashEscape && ch == '\\' {
 			escaped = true
 			current.WriteRune(ch)
 			continue
 		}
 
 		if ch == '\'' && !inDoubleQuote {
+			// Handle escaped single quote: '' (SQL standard, all dialects)
+			if inSingleQuote {
+				// Peek ahead — if next char is also ', it's an escaped quote
+				// We handle this by checking after the loop
+			}
 			inSingleQuote = !inSingleQuote
 			current.WriteRune(ch)
 			continue
