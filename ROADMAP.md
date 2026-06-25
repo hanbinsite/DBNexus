@@ -407,7 +407,7 @@
 
 - [x] **[TECH-001]** 部分函数过长（>100行），需要拆分 — **已部分修复**: AnalyzeFunctionComplexity 提供分析+建议, renderDataView 已拆分虚拟滚动路径
 - [x] **[TECH-002]** 错误处理不统一，部分使用 panic，部分返回 error — **已部分修复**: AppError 统一错误结构 + 8种标准错误码
-- [ ] **[TECH-003]** 缺少接口抽象，单元测试困难
+- [x] **[TECH-003]** 缺少接口抽象，单元测试困难 — **已部分修复**: QueryService/SchemaService/ConnectionService/AuditService 接口定义 + mockQueryService
 - [x] **[TECH-004]** 硬编码字符串需要提取为常量 (constants.go: 集中管理DB类型/端口/超时/路径/权限/缓存/分页/安全等常量)
 - [x] **[TECH-005]** 6处重复的pool双重检查代码 → 统一为 `pool.getOrCreate()`
 - [x] **[TECH-006]** 前端3241行单文件app.js → 模块化拆分（modules/dom-utils.js, modules/redis.js, modules/compare.js, modules/export-import.js, modules/transaction.js）
@@ -559,13 +559,13 @@ Phase 1 AI 功能:
 **目标**: 差异化竞争，扩展生态
 
 **计划交付**:
-- [ ] 跨数据库数据迁移
-- [ ] 增量数据同步
+- [x] 跨数据库数据迁移 (sprint14.go: MigrateData 批量INSERT)
+- [x] 增量数据同步 (sprint14.go: IncrementalSync 基于key列upsert)
 - [ ] 插件系统架构
 - [ ] 云数据库深度支持
 - [ ] NoSQL支持（MongoDB/Elasticsearch）
-- [ ] 数据可视化图表
-- [ ] 定时查询执行
+- [x] 数据可视化图表 (sprint14.go: PrepareChartData bar/line/pie/scatter)
+- [x] 定时查询执行 (scheduler.go: CreateScheduledTask interval-based)
 - [ ] 版本控制集成（Git）
 
 **验收标准**: 跨数据库迁移100万行数据<5min；插件加载<1s；报表导出PDF格式完整
