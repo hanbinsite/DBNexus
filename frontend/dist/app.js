@@ -230,6 +230,14 @@ const WailsAPI = {
     enableConfigHotReload: () => window.go.main.App.EnableConfigHotReload(),
     subscribeToEvents: (eventType) => window.go.main.App.SubscribeToEvents(eventType),
     publishEvent: (eventType, data) => window.go.main.App.PublishEvent(eventType, data),
+
+    // Sprint 13 — SSL/TLS + Report PDF
+    getSSLConfig: (connID) => window.go.main.App.GetSSLConfig(connID),
+    setSSLConfig: (connID, cfg) => window.go.main.App.SetSSLConfig(connID, cfg),
+    testSSLConnection: (connID) => window.go.main.App.TestSSLConnection(connID),
+    deleteSSLConfig: (connID) => window.go.main.App.DeleteSSLConfig(connID),
+    exportReportPDF: (conn, db, query, reportCfg, path) => window.go.main.App.ExportReportPDF(conn, db, query, reportCfg, path),
+    analyzeFunctionComplexity: () => window.go.main.App.AnalyzeFunctionComplexity(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
