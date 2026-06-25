@@ -224,7 +224,7 @@ func (a *App) ExecuteMultiQueryWithTimeout(config Connection, database string, q
 					row := make([]interface{}, len(columns))
 					for i, v := range values {
 						if v == nil {
-							row[i] = "NULL"
+							row[i] = nil
 						} else if b, ok := v.([]byte); ok {
 							row[i] = string(b)
 						} else {
