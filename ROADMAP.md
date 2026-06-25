@@ -183,7 +183,7 @@
 
 #### 待开发
 - [x] Excel导入 (stream_export.go: ImportFromExcel via excelize)
-- [ ] SQL脚本导入执行
+- [x] SQL脚本导入执行 (advanced_features.go: ExecuteSQLFile 读取.sql文件+多语句执行)
 - [x] 流式导出（大数据量）(stream_export.go: ExportDataStreaming CSV/JSON 5min timeout)
 - [ ] 导出进度回调
 
