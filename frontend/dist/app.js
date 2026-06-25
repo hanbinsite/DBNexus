@@ -108,6 +108,10 @@ const WailsAPI = {
     getConnectionPoolStats: () => window.go.main.App.GetConnectionPoolStats(),
     getSystemInfo: () => window.go.main.App.GetSystemInfo(),
     healthCheck: () => window.go.main.App.HealthCheck(),
+
+    // Data Masking
+    setMaskConfig: (enabled, cols, ch, ks, ke) => window.go.main.App.SetMaskConfig(enabled, cols, ch, ks, ke),
+    getMaskConfig: () => window.go.main.App.GetMaskConfig(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
