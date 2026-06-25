@@ -208,6 +208,15 @@ const WailsAPI = {
     getExportProgress: () => window.go.main.App.GetExportProgress(),
     getSmartSuggestions: (conn, db, query, cursorPos) => window.go.main.App.GetSmartSuggestions(conn, db, query, cursorPos),
     compareTablesStreaming: (conn, db, t1, t2, keyCol, batchSize) => window.go.main.App.CompareTablesStreaming(conn, db, t1, t2, keyCol, batchSize),
+
+    // Sprint 10
+    getQueryPerformanceHistory: (limit) => window.go.main.App.GetQueryPerformanceHistory(limit),
+    getSlowQueryHistory: (thresholdMs) => window.go.main.App.GetSlowQueryHistory(thresholdMs),
+    clearQueryPerformanceHistory: () => window.go.main.App.ClearQueryPerformanceHistory(),
+    getJoinSuggestions: (conn, db, t1, t2) => window.go.main.App.GetJoinSuggestions(conn, db, t1, t2),
+    executeParameterizedQuery: (conn, db, query, params) => window.go.main.App.ExecuteParameterizedQuery(conn, db, query, params),
+    editWithRowLock: (conn, db, table, pk, data, lockType) => window.go.main.App.EditWithRowLock(conn, db, table, pk, data, lockType),
+    checkEditConflict: (conn, db, table, pk, expectedHash) => window.go.main.App.CheckEditConflict(conn, db, table, pk, expectedHash),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
