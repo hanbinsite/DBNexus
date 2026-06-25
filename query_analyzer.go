@@ -179,6 +179,10 @@ func parseMySQLExplain(rows *sql.Rows) (*ExplainNode, []string) {
 	var root *ExplainNode
 	nodeID := 1
 
+	if rows == nil {
+		return &ExplainNode{ID: 1, Type: "QUERY", Details: make(map[string]string), Children: []*ExplainNode{}}, warnings
+	}
+
 	for rows.Next() {
 		var id int
 		var selectType, table, type_ string
@@ -234,6 +238,10 @@ func parseMySQLExplain(rows *sql.Rows) (*ExplainNode, []string) {
 func parsePostgresExplain(rows *sql.Rows) (*ExplainNode, []string) {
 	var warnings []string
 	var fullText strings.Builder
+
+	if rows == nil {
+		return &ExplainNode{ID: 1, Type: "QUERY", Details: make(map[string]string), Children: []*ExplainNode{}}, warnings
+	}
 
 	for rows.Next() {
 		var line string
@@ -387,6 +395,10 @@ func generateRecommendations(analysis QueryAnalysis, query string) []string {
 func (a *App) generateOptimizationSuggestions(result ExplainResult) []string {
 	var suggestions []string
 
+	for _, w := range result.Warnings {
+		suggestions = append(suggestions, w)
+	}
+
 	if result.TotalCost > 1000 {
 		suggestions = append(suggestions, "查询成本较高，建议添加适当的索引")
 	}
@@ -397,6 +409,10 @@ func (a *App) generateOptimizationSuggestions(result ExplainResult) []string {
 
 	if result.TotalTime > 1000 {
 		suggestions = append(suggestions, "执行时间较长，建议优化查询结构")
+	}
+
+	if len(suggestions) == 0 {
+		suggestions = append(suggestions, "未检测到明显性能问题")
 	}
 
 	return suggestions

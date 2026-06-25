@@ -781,3 +781,214 @@ func TestMaxActiveTransactions(t *testing.T) {
 		t.Errorf("expected MaxActiveTransactions=100, got %d", MaxActiveTransactions)
 	}
 }
+
+func TestQueryHistoryEmpty(t *testing.T) {
+	app := &App{}
+	history := app.GetQueryHistory()
+	if history == nil {
+		t.Error("GetQueryHistory should return non-nil slice")
+	}
+}
+
+func TestAddQueryHistory(t *testing.T) {
+	app := &App{}
+	app.AddQueryHistory("SELECT 1", "testdb")
+	history := app.GetQueryHistory()
+	found := false
+	for _, h := range history {
+		if h.Query == "SELECT 1" && h.Database == "testdb" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("AddQueryHistory did not persist query")
+	}
+}
+
+func TestClearQueryHistory(t *testing.T) {
+	app := &App{}
+	app.AddQueryHistory("SELECT 2", "testdb")
+	err := app.ClearQueryHistory()
+	if err != nil {
+		t.Errorf("ClearQueryHistory failed: %v", err)
+	}
+}
+
+func TestBookmarksEmpty(t *testing.T) {
+	app := &App{}
+	bookmarks := app.GetBookmarks()
+	if bookmarks == nil {
+		t.Error("GetBookmarks should return non-nil slice")
+	}
+}
+
+func TestAddAndDeleteBookmark(t *testing.T) {
+	app := &App{}
+	err := app.AddBookmark("test bookmark", "SELECT * FROM users", "testdb")
+	if err != nil {
+		t.Errorf("AddBookmark failed: %v", err)
+	}
+	bookmarks := app.GetBookmarks()
+	var id string
+	for _, b := range bookmarks {
+		if b.Name == "test bookmark" {
+			id = b.ID
+			break
+		}
+	}
+	if id == "" {
+		t.Fatal("bookmark not found after add")
+	}
+	err = app.DeleteBookmark(id)
+	if err != nil {
+		t.Errorf("DeleteBookmark failed: %v", err)
+	}
+}
+
+func TestExportConnectionsEmpty(t *testing.T) {
+	app := &App{}
+	app.connectionsMu.Lock()
+	app.connections = []Connection{}
+	app.connectionsMu.Unlock()
+	json, err := app.ExportConnections()
+	if err != nil {
+		t.Errorf("ExportConnections failed: %v", err)
+	}
+	if json != "[]" && json != "null" {
+		t.Errorf("ExportConnections expected [] or null, got %s", json)
+	}
+}
+
+func TestImportConnectionsInvalidJSON(t *testing.T) {
+	app := &App{}
+	err := app.ImportConnections("invalid json")
+	if err == nil {
+		t.Error("ImportConnections should fail on invalid JSON")
+	}
+}
+
+func TestCancelQueryNotFound(t *testing.T) {
+	app := &App{}
+	err := app.CancelQuery("nonexistent_query_id")
+	if err == nil {
+		t.Error("CancelQuery should fail for non-existent query")
+	}
+}
+
+func TestGetActiveQueriesEmpty(t *testing.T) {
+	app := &App{}
+	queries := app.GetActiveQueries()
+	if queries == nil {
+		t.Error("GetActiveQueries should return non-nil slice")
+	}
+}
+
+func TestAIConfigDefaults(t *testing.T) {
+	app := &App{}
+	config, err := app.getAIConfig()
+	if err != nil {
+		t.Errorf("getAIConfig failed: %v", err)
+	}
+	if config == nil {
+		t.Fatal("getAIConfig should return non-nil config")
+	}
+	if config.Provider == "" {
+		t.Error("default provider should not be empty")
+	}
+	if config.Model == "" {
+		t.Error("default model should not be empty")
+	}
+}
+
+func TestAIClientDisabled(t *testing.T) {
+	app := &App{}
+	_, err := app.getAIClient()
+	if err == nil {
+		t.Error("getAIClient should fail when AI is not enabled")
+	}
+}
+
+func TestSetAIConfig(t *testing.T) {
+	app := &App{}
+	err := app.SetAIConfig("ollama", "", "http://localhost:11434", "llama3", false)
+	if err != nil {
+		t.Errorf("SetAIConfig failed: %v", err)
+	}
+	config, _ := app.getAIConfig()
+	if config.Provider != "ollama" {
+		t.Errorf("expected provider=ollama, got %s", config.Provider)
+	}
+	if config.Model != "llama3" {
+		t.Errorf("expected model=llama3, got %s", config.Model)
+	}
+}
+
+func TestTruncateQuery(t *testing.T) {
+	short := "SELECT 1"
+	if truncateQuery(short, 200) != short {
+		t.Error("truncateQuery should return short queries unchanged")
+	}
+	long := strings.Repeat("A", 300)
+	result := truncateQuery(long, 200)
+	if len(result) > 203 {
+		t.Errorf("truncateQuery should limit to ~200 chars, got %d", len(result))
+	}
+}
+
+func TestSplitQueriesEmpty(t *testing.T) {
+	queries := splitQueries("")
+	if len(queries) != 0 {
+		t.Errorf("expected 0 queries for empty input, got %d", len(queries))
+	}
+}
+
+func TestSplitQueriesSingle(t *testing.T) {
+	queries := splitQueries("SELECT 1")
+	if len(queries) != 1 {
+		t.Errorf("expected 1 query, got %d", len(queries))
+	}
+}
+
+func TestParseMySQLExplainEmpty(t *testing.T) {
+	root, warnings := parseMySQLExplain(nil)
+	if root == nil {
+		t.Error("parseMySQLExplain should return non-nil root even for nil rows")
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings for nil rows, got %d", len(warnings))
+	}
+}
+
+func TestParsePostgresExplainEmpty(t *testing.T) {
+	root, warnings := parsePostgresExplain(nil)
+	if root == nil {
+		t.Error("parsePostgresExplain should return non-nil root even for nil rows")
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings for nil rows, got %d", len(warnings))
+	}
+}
+
+func TestGenerateOptimizationSuggestions(t *testing.T) {
+	app := &App{}
+	result := ExplainResult{
+		Success:  true,
+		Warnings: []string{"全表扫描", "使用临时表"},
+	}
+	suggestions := app.generateOptimizationSuggestions(result)
+	if len(suggestions) == 0 {
+		t.Error("generateOptimizationSuggestions should return suggestions for warnings")
+	}
+}
+
+func TestGetServerInfoSafe(t *testing.T) {
+	app := &App{}
+	info := app.GetServerInfo()
+	if info == nil {
+		t.Fatal("GetServerInfo should return non-nil map")
+	}
+	if info["version"] == nil || info["version"] == "" {
+		t.Error("GetServerInfo should include version")
+	}
+}

@@ -41,12 +41,12 @@ func (a *App) GetActiveQueries() []map[string]interface{} {
 	activeQueriesMu.Lock()
 	defer activeQueriesMu.Unlock()
 
-	var result []map[string]interface{}
+	result := []map[string]interface{}{}
 	for id, q := range activeQueries {
 		result = append(result, map[string]interface{}{
-			"id":        id,
-			"query":     truncateQuery(q.query, 100),
-			"duration":  time.Since(q.started).String(),
+			"id":       id,
+			"query":    truncateQuery(q.query, 100),
+			"duration": time.Since(q.started).String(),
 		})
 	}
 	return result
