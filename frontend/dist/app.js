@@ -217,6 +217,13 @@ const WailsAPI = {
     executeParameterizedQuery: (conn, db, query, params) => window.go.main.App.ExecuteParameterizedQuery(conn, db, query, params),
     editWithRowLock: (conn, db, table, pk, data, lockType) => window.go.main.App.EditWithRowLock(conn, db, table, pk, data, lockType),
     checkEditConflict: (conn, db, table, pk, expectedHash) => window.go.main.App.CheckEditConflict(conn, db, table, pk, expectedHash),
+
+    // Sprint 11
+    compareDatabases: (conn, srcDB, tgtDB) => window.go.main.App.CompareDatabases(conn, srcDB, tgtDB),
+    syncCompareResult: (conn, db, result, targetTable, direction) => window.go.main.App.SyncCompareResult(conn, db, result, targetTable, direction),
+    getTableStructureCached: (conn, db, table) => window.go.main.App.GetTableStructureCached(conn, db, table),
+    invalidateTableStructureCache: (db, table) => window.go.main.App.InvalidateTableStructureCache(db, table),
+    clearTableStructureCache: () => window.go.main.App.ClearTableStructureCache(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
