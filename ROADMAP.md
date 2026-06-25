@@ -315,11 +315,9 @@
 - [x] 列名补全（`getColumnSuggestions`, 遍历所有表获取列名）
 
 #### 已知缺陷（需修复）
-- [ ] 列名补全不支持限定名（如 `schema.table.column`）
-
-#### 待开发
-- [ ] 限定名补全（schema.table.column）
-- [ ] 代码片段（Snippet）库
+- [x] 列名补全不支持限定名（如 `schema.table.column`）— **已修复**: GetQualifiedColumnSuggestions
+- [x] 限定名补全（schema.table.column）(batch_transactional.go: GetQualifiedColumnSuggestions)
+- [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet)
 - [ ] 多表JOIN列补全
 
 ---
