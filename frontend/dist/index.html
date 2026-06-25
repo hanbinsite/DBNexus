@@ -68,6 +68,28 @@
                     <button class="toolbar-btn" title="自然语言转SQL" onclick="openNL2SQLDialog()">
                         <span>AI生成SQL</span>
                     </button>
+                    <div class="toolbar-divider"></div>
+                    <button class="toolbar-btn" title="性能监控" onclick="openPerfPanel()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                        <span>性能</span>
+                    </button>
+                    <button class="toolbar-btn" title="查询历史" onclick="openHistoryPanel()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                            <path d="M3 3v5h5M3.05 13A9 9 0 1 1 6 5.3L3 8"/>
+                            <path d="M12 7v5l4 2"/>
+                        </svg>
+                        <span>历史</span>
+                    </button>
+                    <button class="toolbar-btn" title="Git版本控制" onclick="openGitPanel()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                            <circle cx="18" cy="6" r="3"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <path d="M13 6h3M8.5 6H6v6M6 15v3"/>
+                        </svg>
+                        <span>Git</span>
+                    </button>
                     <button class="toolbar-btn" data-i18n-title="refresh" onclick="refreshConnection()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -1205,6 +1227,86 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeSqlPreviewModal()">关闭</button>
                 <button class="btn btn-primary" onclick="copySqlPreview()">复制</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Monitor Panel -->
+    <div class="side-panel" id="perfPanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>性能监控</h3>
+            <button class="modal-close" onclick="closePerfPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <!-- 系统信息 -->
+            <div class="perf-section">
+                <h4 class="perf-section-title">系统信息</h4>
+                <div id="perfSystemInfo" class="perf-info-grid"></div>
+            </div>
+            <!-- 连接池状态 -->
+            <div class="perf-section">
+                <h4 class="perf-section-title">连接池状态</h4>
+                <div id="perfPoolStatus" class="perf-info-grid"></div>
+            </div>
+            <!-- 慢查询列表 -->
+            <div class="perf-section">
+                <h4 class="perf-section-title">慢查询 Top 10</h4>
+                <button class="btn btn-secondary btn-sm" onclick="refreshSlowQueries()" style="margin-bottom:8px;">刷新</button>
+                <div id="perfSlowQueries" class="perf-list"></div>
+            </div>
+            <!-- 活跃查询 -->
+            <div class="perf-section">
+                <h4 class="perf-section-title">活跃查询</h4>
+                <div id="perfActiveQueries" class="perf-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query History Panel -->
+    <div class="side-panel" id="historyPanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>查询历史</h3>
+            <button class="modal-close" onclick="closeHistoryPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" id="historySearch" placeholder="搜索历史..." oninput="filterHistory(this.value)" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                <select id="historyFilter" onchange="filterHistory()" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    <option value="all">全部</option>
+                    <option value="slow">慢查询</option>
+                    <option value="error">错误</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="clearQueryHistory()">清空</button>
+            </div>
+            <div id="historyList" class="perf-list"></div>
+        </div>
+    </div>
+
+    <!-- Git Panel -->
+    <div class="side-panel" id="gitPanel" style="display:none;">
+        <div class="side-panel-header">
+            <h3>Git 版本控制</h3>
+            <button class="modal-close" onclick="closeGitPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <select id="gitRepoSelect" onchange="onGitRepoChange()" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    <option value="">选择仓库...</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="addGitRepoDialog()">添加</button>
+            </div>
+            <div id="gitRepoInfo" style="display:none;">
+                <div class="perf-info-grid" id="gitBranchInfo"></div>
+                <div style="display:flex;gap:8px;margin:12px 0;">
+                    <button class="btn btn-primary btn-sm" onclick="gitPullCurrent()">Pull</button>
+                    <button class="btn btn-primary btn-sm" onclick="gitPushCurrent()">Push</button>
+                    <button class="btn btn-secondary btn-sm" onclick="gitCommitDialog()">Commit</button>
+                    <button class="btn btn-secondary btn-sm" onclick="gitBranchDialog()">新建分支</button>
+                </div>
+                <h4 class="perf-section-title">文件变更</h4>
+                <div id="gitChanges" class="perf-list"></div>
+                <h4 class="perf-section-title" style="margin-top:16px;">提交历史</h4>
+                <div id="gitLog" class="perf-list"></div>
             </div>
         </div>
     </div>

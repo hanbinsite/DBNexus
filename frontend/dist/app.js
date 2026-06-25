@@ -5177,6 +5177,384 @@ function closeRedisPanel() {
     document.getElementById('redisPanel').style.display = 'none';
 }
 
+// ==================== F3: Performance Monitor Panel ====================
+
+function openPerfPanel() {
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    closeAllSidePanels();
+    document.getElementById('perfPanel').style.display = 'block';
+    refreshPerfPanel();
+}
+
+function closePerfPanel() {
+    document.getElementById('perfPanel').style.display = 'none';
+}
+
+async function refreshPerfPanel() {
+    refreshSystemInfo();
+    refreshPoolStatus();
+    refreshSlowQueries();
+    refreshActiveQueries();
+}
+
+async function refreshSystemInfo() {
+    const el = document.getElementById('perfSystemInfo');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const info = await WailsAPI.getSystemInfo();
+        el.innerHTML = '';
+        const items = [
+            ['CPU 使用率', info.cpuUsage + '%'],
+            ['内存使用率', info.memoryUsage + '%'],
+            ['磁盘使用率', info.diskUsage + '%'],
+            ['运行时间', info.uptime || '--'],
+            ['Go 版本', info.goVersion || '--'],
+            ['OS', info.os || '--'],
+        ];
+        items.forEach(([label, value]) => {
+            const item = document.createElement('div');
+            item.className = 'perf-info-item';
+            item.innerHTML = '<span class="perf-info-label">' + label + '</span><span class="perf-info-value">' + value + '</span>';
+            el.appendChild(item);
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">获取失败: ' + (e.message || e) + '</div>';
+    }
+}
+
+async function refreshPoolStatus() {
+    const el = document.getElementById('perfPoolStatus');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const stats = await WailsAPI.getPoolStats();
+        el.innerHTML = '';
+        const items = [
+            ['总连接数', stats.totalConnections || 0],
+            ['活跃连接', stats.activeConnections || 0],
+            ['空闲连接', stats.idleConnections || 0],
+            ['最大连接数', stats.maxConnections || 0],
+        ];
+        items.forEach(([label, value]) => {
+            const item = document.createElement('div');
+            item.className = 'perf-info-item';
+            item.innerHTML = '<span class="perf-info-label">' + label + '</span><span class="perf-info-value">' + value + '</span>';
+            el.appendChild(item);
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">获取失败</div>';
+    }
+}
+
+async function refreshSlowQueries() {
+    const el = document.getElementById('perfSlowQueries');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const queries = await WailsAPI.getSlowQueries(state.activeConnection, 10);
+        el.innerHTML = '';
+        if (!queries || queries.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无慢查询</div>';
+            return;
+        }
+        queries.forEach(q => {
+            const item = document.createElement('div');
+            item.className = 'perf-list-item';
+            item.innerHTML = '<div class="perf-list-query">' + escapeHtml(q.query || q.sql || '').substring(0, 80) + '</div><div class="perf-list-meta"><span>' + (q.duration || q.totalTime || '--') + '</span><span>' + (q.calls || 1) + ' 次</span></div>';
+            el.appendChild(item);
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">获取失败</div>';
+    }
+}
+
+async function refreshActiveQueries() {
+    const el = document.getElementById('perfActiveQueries');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) { el.innerHTML = '<div class="perf-empty">需要 Wails 环境</div>'; return; }
+        const queries = await WailsAPI.getActiveQueries(state.activeConnection);
+        el.innerHTML = '';
+        if (!queries || queries.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无活跃查询</div>';
+            return;
+        }
+        queries.forEach(q => {
+            const item = document.createElement('div');
+            item.className = 'perf-list-item';
+            item.innerHTML = '<div class="perf-list-query">' + escapeHtml(q.query || '').substring(0, 80) + '</div><div class="perf-list-meta"><span>' + (q.duration || '--') + '</span>' + (q.pid ? '<button class="btn btn-danger btn-sm" onclick="cancelQueryById(' + q.pid + ')" style="margin-left:8px;">取消</button>' : '') + '</div>';
+            el.appendChild(item);
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">获取失败</div>';
+    }
+}
+
+async function cancelQueryById(pid) {
+    if (!isWailsAvailable()) return;
+    try {
+        await WailsAPI.cancelQuery(state.activeConnection, pid);
+        showNotification('success', '查询已取消');
+        refreshActiveQueries();
+    } catch (e) {
+        showNotification('error', '取消失败: ' + (e.message || e));
+    }
+}
+
+// ==================== F4: Query History Panel ====================
+
+let queryHistoryData = [];
+
+function openHistoryPanel() {
+    closeAllSidePanels();
+    document.getElementById('historyPanel').style.display = 'block';
+    loadQueryHistory();
+}
+
+function closeHistoryPanel() {
+    document.getElementById('historyPanel').style.display = 'none';
+}
+
+async function loadQueryHistory() {
+    const el = document.getElementById('historyList');
+    if (!el) return;
+    el.innerHTML = '<div class="perf-loading">加载中...</div>';
+    try {
+        if (!isWailsAvailable()) {
+            // Use local history
+            queryHistoryData = state.queryHistory || [];
+            renderHistory();
+            return;
+        }
+        const result = await WailsAPI.getQueryHistory(100);
+        queryHistoryData = result || [];
+        renderHistory();
+    } catch (e) {
+        el.innerHTML = '<div class="perf-empty">加载失败</div>';
+    }
+}
+
+function renderHistory() {
+    const el = document.getElementById('historyList');
+    if (!el) return;
+    const search = (document.getElementById('historySearch')?.value || '').toLowerCase();
+    const filter = document.getElementById('historyFilter')?.value || 'all';
+
+    let filtered = queryHistoryData;
+    if (search) {
+        filtered = filtered.filter(h => (h.query || '').toLowerCase().includes(search));
+    }
+    if (filter === 'slow') {
+        filtered = filtered.filter(h => h.isSlow || (h.durationMs && h.durationMs > 1000));
+    } else if (filter === 'error') {
+        filtered = filtered.filter(h => h.error);
+    }
+
+    if (filtered.length === 0) {
+        el.innerHTML = '<div class="perf-empty">无历史记录</div>';
+        return;
+    }
+
+    el.innerHTML = '';
+    filtered.slice(0, 100).forEach(h => {
+        const item = document.createElement('div');
+        item.className = 'perf-list-item' + (h.error ? ' perf-list-error' : '');
+        const time = h.timestamp || h.time || '';
+        const dur = h.duration || (h.durationMs ? h.durationMs + 'ms' : '');
+        const queryPreview = escapeHtml((h.query || '').substring(0, 100));
+        item.innerHTML = '<div class="perf-list-query">' + queryPreview + '</div><div class="perf-list-meta"><span>' + time + '</span><span>' + dur + '</span>' + (h.error ? '<span style="color:var(--accent-danger)">错误</span>' : '') + '</div>';
+        item.onclick = () => { if (h.query) { setEditorValue(h.query); showNotification('info', '已加载到编辑器'); } };
+        el.appendChild(item);
+    });
+}
+
+function filterHistory() {
+    renderHistory();
+}
+
+function clearQueryHistory() {
+    if (!confirm('确定清空所有查询历史？')) return;
+    queryHistoryData = [];
+    state.queryHistory = [];
+    renderHistory();
+    showNotification('success', '历史已清空');
+}
+
+// ==================== F6: Git Panel ====================
+
+let currentGitRepo = '';
+
+function openGitPanel() {
+    closeAllSidePanels();
+    document.getElementById('gitPanel').style.display = 'block';
+    loadGitRepos();
+}
+
+function closeGitPanel() {
+    document.getElementById('gitPanel').style.display = 'none';
+}
+
+function closeAllSidePanels() {
+    document.querySelectorAll('.side-panel').forEach(p => p.style.display = 'none');
+}
+
+async function loadGitRepos() {
+    const select = document.getElementById('gitRepoSelect');
+    if (!select) return;
+    try {
+        if (!isWailsAvailable()) { select.innerHTML = '<option value="">需要 Wails 环境</option>'; return; }
+        const repos = await WailsAPI.getGitRepos();
+        select.innerHTML = '<option value="">选择仓库...</option>';
+        repos.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = r.split('/').pop() || r;
+            select.appendChild(opt);
+        });
+    } catch (e) {
+        select.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+async function onGitRepoChange() {
+    currentGitRepo = document.getElementById('gitRepoSelect').value;
+    const infoDiv = document.getElementById('gitRepoInfo');
+    if (!currentGitRepo) { infoDiv.style.display = 'none'; return; }
+    infoDiv.style.display = 'block';
+    refreshGitInfo();
+}
+
+async function refreshGitInfo() {
+    if (!currentGitRepo || !isWailsAvailable()) return;
+    // Branch info
+    try {
+        const info = await WailsAPI.getGitRepoInfo(currentGitRepo);
+        const el = document.getElementById('gitBranchInfo');
+        el.innerHTML = '';
+        const items = [
+            ['分支', info.branch || '--'],
+            ['状态', info.status || '--'],
+            ['远程', info.remote || '--'],
+            ['领先', info.aheadCount || 0],
+            ['落后', info.behindCount || 0],
+        ];
+        items.forEach(([label, value]) => {
+            const item = document.createElement('div');
+            item.className = 'perf-info-item';
+            item.innerHTML = '<span class="perf-info-label">' + label + '</span><span class="perf-info-value">' + value + '</span>';
+            el.appendChild(item);
+        });
+    } catch (e) {}
+
+    // Changes
+    try {
+        const changes = await WailsAPI.getGitChanges(currentGitRepo);
+        const el = document.getElementById('gitChanges');
+        el.innerHTML = '';
+        if (changes.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无变更</div>';
+        } else {
+            changes.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'perf-list-item';
+                const statusColor = c.status === 'added' ? 'var(--accent-success)' : c.status === 'deleted' ? 'var(--accent-danger)' : 'var(--accent-warning)';
+                item.innerHTML = '<span style="color:' + statusColor + ';font-weight:600;width:60px;flex-shrink:0;">' + c.status + '</span><span class="perf-list-query">' + escapeHtml(c.file) + '</span>';
+                el.appendChild(item);
+            });
+        }
+    } catch (e) {}
+
+    // Log
+    try {
+        const log = await WailsAPI.getGitLog(currentGitRepo, 20);
+        const el = document.getElementById('gitLog');
+        el.innerHTML = '';
+        if (log.length === 0) {
+            el.innerHTML = '<div class="perf-empty">无提交历史</div>';
+        } else {
+            log.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'perf-list-item';
+                item.innerHTML = '<div class="perf-list-query">' + escapeHtml(c.message).substring(0, 60) + '</div><div class="perf-list-meta"><span>' + c.hash.substring(0, 7) + '</span><span>' + c.author + '</span><span>' + c.date + '</span></div>';
+                el.appendChild(item);
+            });
+        }
+    } catch (e) {}
+}
+
+async function addGitRepoDialog() {
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    try {
+        const path = await WailsAPI.openFileDialog();
+        if (!path) return;
+        await WailsAPI.addGitRepo(path);
+        showNotification('success', '仓库已添加');
+        loadGitRepos();
+    } catch (e) {
+        showNotification('error', '添加失败: ' + (e.message || e));
+    }
+}
+
+async function gitPullCurrent() {
+    if (!currentGitRepo) return;
+    try {
+        const msg = await WailsAPI.gitPull(currentGitRepo);
+        showNotification('success', msg || 'Pull 成功');
+        refreshGitInfo();
+    } catch (e) {
+        showNotification('error', 'Pull 失败: ' + (e.message || e));
+    }
+}
+
+async function gitPushCurrent() {
+    if (!currentGitRepo) return;
+    try {
+        const msg = await WailsAPI.gitPush(currentGitRepo);
+        showNotification('success', msg || 'Push 成功');
+        refreshGitInfo();
+    } catch (e) {
+        showNotification('error', 'Push 失败: ' + (e.message || e));
+    }
+}
+
+async function gitCommitDialog() {
+    if (!currentGitRepo) { showNotification('warning', '请先选择仓库'); return; }
+    const message = prompt('请输入提交信息:');
+    if (!message) return;
+    try {
+        const msg = await WailsAPI.gitCommit(currentGitRepo, message);
+        showNotification('success', msg || '提交成功');
+        refreshGitInfo();
+    } catch (e) {
+        showNotification('error', '提交失败: ' + (e.message || e));
+    }
+}
+
+async function gitBranchDialog() {
+    if (!currentGitRepo) { showNotification('warning', '请先选择仓库'); return; }
+    const name = prompt('请输入新分支名称:');
+    if (!name) return;
+    try {
+        const msg = await WailsAPI.gitCreateBranch(currentGitRepo, name);
+        showNotification('success', msg || '分支已创建');
+        refreshGitInfo();
+    } catch (e) {
+        showNotification('error', '创建失败: ' + (e.message || e));
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 async function loadRedisDBSize() {
     try {
         const size = await WailsAPI.getRedisDBSize(state.activeConnection);
