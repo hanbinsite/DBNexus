@@ -81,7 +81,7 @@
 - [x] **[SEC-004]** `ExecuteQuery` 无超时限制 — **已修复**: query.go:10-11 委托给 `ExecuteQueryWithTimeout`，默认30s超时
 - [x] **[BUG-002]** `poolMutex` 双重检查 — **已修复**: 已统一使用 `getDriverForConfig`
 - [x] 查询结果无行数限制，大结果集可导致OOM — **已修复**: 前端大结果集警告banner (>10000行)
-- [ ] `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式
+- [x] `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式 — **已修复**: splitQueriesWithDialect 按 DB 类型区分转义规则
 - [x] NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103) — **已修复**: MultiQuery 结果中 NULL 返回 nil
 
 #### 待开发
