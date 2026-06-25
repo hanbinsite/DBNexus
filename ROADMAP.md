@@ -177,15 +177,15 @@
 #### 已知缺陷（需修复）
 - [x] **[SEC-007]** `ImportData` 文件路径仍存在路径遍历风险 — **已修复**: filepath.Clean + 拒绝 '..' (filedialog.go)
 - [x] SQL导出逐行INSERT性能差，应使用批量INSERT — **已修复**: BatchEdit 多行 INSERT 批量执行
-- [ ] 导出前调用 `ExecuteQuery` 获取全量数据，大结果集可导致OOM
+- [x] 导出前调用 `ExecuteQuery` 获取全量数据，大结果集可导致OOM — **已修复**: ExportDataStreaming 流式导出避免OOM
 - [x] `exportToSQL` 中列名未sanitize — **已修复**: sanitizeIdentifier 已应用
-- [ ] `ImportData` 逐条调用 `EditTableData`，大量数据导入极慢
+- [x] `ImportData` 逐条调用 `EditTableData`，大量数据导入极慢 — **已修复**: ImportFromExcel 批量INSERT + ExecuteSQLFile 多语句执行
 
 #### 待开发
 - [x] Excel导入 (stream_export.go: ImportFromExcel via excelize)
 - [x] SQL脚本导入执行 (advanced_features.go: ExecuteSQLFile 读取.sql文件+多语句执行)
 - [x] 流式导出（大数据量）(stream_export.go: ExportDataStreaming CSV/JSON 5min timeout)
-- [ ] 导出进度回调
+- [x] 导出进度回调 (sprint9.go: emitExportProgress + GetExportProgress channel)
 
 ---
 
