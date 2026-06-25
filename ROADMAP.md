@@ -91,7 +91,7 @@
 - [x] SQL 语法检查（实时）(advanced_features.go: ValidateSQLSyntax 括号/引号/关键字检查)
 - [x] 智能提示（上下文相关）(sprint9.go: GetSmartSuggestions 根据光标位置返回表/列/关键字建议)
 - [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet, GetSnippets/GetSnippetsByCategory)
-- [ ] SQL 调试功能
+- [x] SQL 调试功能 (sprint14.go: DebugSQL 分步执行+预览+错误追踪)
 - [x] 参数化查询支持 (sprint10.go: ExecuteParameterizedQuery :param_name → ?/$N)
 - [x] 大文件 SQL 导入执行 (advanced_features.go: ExecuteSQLFile 300s超时)
 - [x] 快捷键自定义 (Monaco editor actions 暴露到 window.*)
@@ -344,15 +344,15 @@
 
 ## P2 - 高级功能
 
-### 13. 团队协作 (40%)
+### 13. 团队协作 (80%)
 - [x] 连接配置共享（导入/导出 JSON 格式）
 - [x] 查询脚本共享 (scheduler.go: SaveSharedScript/GetSharedScripts/DeleteSharedScript + Export/Import)
-- [ ] 团队工作空间
-- [ ] 权限角色管理
+- [x] 团队工作空间 (sprint14.go: CreateWorkspace/DeleteWorkspace/GetWorkspaces)
+- [x] 权限角色管理 (sprint14.go: 4默认角色 + Create/Delete/Assign/CheckPermission)
 
-### 14. 数据迁移 (33%)
-- [ ] 跨数据库迁移
-- [ ] 增量同步
+### 14. 数据迁移 (100%)
+- [x] 跨数据库迁移 (sprint14.go: MigrateData 批量INSERT + per-table追踪)
+- [x] 增量同步 (sprint14.go: IncrementalSync 基于key列upsert)
 - [x] 数据校验 (sprint9.go: ValidateDataMigration 行数+结构校验)
 
 ### 15. 性能监控 (60%)
@@ -365,8 +365,8 @@
 - [x] 任务调度器 (scheduler.go: time.AfterFunc 自动重调度+启停)
 - [x] 任务失败通知 (sprint9.go: emitTaskNotification + GetTaskNotifications channel)
 
-### 17. 报表与可视化 (33%)
-- [ ] 查询结果图表化
+### 17. 报表与可视化 (67%)
+- [x] 查询结果图表化 (sprint14.go: PrepareChartData bar/line/pie/scatter + 10色板)
 - [ ] 自定义报表设计器
 - [x] 报表导出（PDF）(sprint13.go: ExportReportPDF HTML打印报表+样式+NULL处理)
 
