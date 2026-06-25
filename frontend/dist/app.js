@@ -253,6 +253,28 @@ const WailsAPI = {
     deleteWorkspace: (id) => window.go.main.App.DeleteWorkspace(id),
     migrateData: (config) => window.go.main.App.MigrateData(config),
     incrementalSync: (config) => window.go.main.App.IncrementalSync(config),
+
+    // Sprint 15 — Git integration + Plugin system
+    getGitRepos: () => window.go.main.App.GetGitRepos(),
+    addGitRepo: (path) => window.go.main.App.AddGitRepo(path),
+    removeGitRepo: (path) => window.go.main.App.RemoveGitRepo(path),
+    getGitRepoInfo: (path) => window.go.main.App.GetGitRepoInfo(path),
+    getGitLog: (path, limit) => window.go.main.App.GetGitLog(path, limit),
+    getGitChanges: (path) => window.go.main.App.GetGitChanges(path),
+    gitCommit: (path, msg) => window.go.main.App.GitCommit(path, msg),
+    gitPull: (path) => window.go.main.App.GitPull(path),
+    gitPush: (path) => window.go.main.App.GitPush(path),
+    gitCheckout: (path, branch) => window.go.main.App.GitCheckout(path, branch),
+    gitCreateBranch: (path, name) => window.go.main.App.GitCreateBranch(path, name),
+    gitDiff: (path, file) => window.go.main.App.GitDiff(path, file),
+    gitInitRepo: (path) => window.go.main.App.GitInitRepo(path),
+
+    // Plugin system
+    getPlugins: () => window.go.main.App.GetPlugins(),
+    registerPlugin: (name, ver, desc, type) => window.go.main.App.RegisterPlugin(name, ver, desc, type),
+    togglePlugin: (id, enabled) => window.go.main.App.TogglePlugin(id, enabled),
+    removePlugin: (id) => window.go.main.App.RemovePlugin(id),
+    getPluginHooks: () => window.go.main.App.GetPluginHooks(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
