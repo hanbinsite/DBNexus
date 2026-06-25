@@ -743,6 +743,43 @@
                             <span data-i18n="autoConnect">启动时自动连接</span>
                         </label>
                     </div>
+                    <hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0;">
+                    <div class="form-row checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="connSSHEnabled" onchange="toggleSSHFields()">
+                            <span>SSH 隧道</span>
+                        </label>
+                    </div>
+                    <div id="sshFields" style="display:none;">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label class="form-label">SSH 主机</label>
+                                <input type="text" id="connSSHHost" placeholder="ssh.example.com" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">SSH 端口</label>
+                                <input type="number" id="connSSHPort" value="22" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">SSH 用户名</label>
+                                <input type="text" id="connSSHUser" placeholder="root" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">SSH 密码 (可选)</label>
+                                <input type="password" id="connSSHPassword" placeholder="留空则使用密钥" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">SSH 密钥路径 (可选)</label>
+                                <input type="text" id="connSSHKeyPath" placeholder="~/.ssh/id_rsa" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">

@@ -84,6 +84,14 @@ const WailsAPI = {
     // Query Cancellation
     cancelQuery: (queryID) => window.go.main.App.CancelQuery(queryID),
     getActiveQueries: () => window.go.main.App.GetActiveQueries(),
+
+    // SSH Tunnel
+    closeSSHTunnel: (connID) => window.go.main.App.CloseSSHTunnel(connID),
+    getSSHTunnelPort: (connID) => window.go.main.App.GetSSHTunnelPort(connID),
+
+    // Backup / Restore
+    backupDatabase: (conn, db, path) => window.go.main.App.BackupDatabase(conn, db, path),
+    restoreDatabase: (conn, db, path) => window.go.main.App.RestoreDatabase(conn, db, path),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
@@ -983,6 +991,18 @@ function editConnection(connection) {
   document.getElementById('connDatabase').value = connection.database;
   document.getElementById('connSavePassword').checked = connection.save_password;
   document.getElementById('connAutoConnect').checked = connection.auto_connect;
+
+  // SSH fields
+  const sshEnabled = document.getElementById('connSSHEnabled');
+  const sshFields = document.getElementById('sshFields');
+  if (sshEnabled) sshEnabled.checked = connection.ssh_enabled || false;
+  if (sshFields) sshFields.style.display = (connection.ssh_enabled) ? 'block' : 'none';
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  setVal('connSSHHost', connection.ssh_host);
+  setVal('connSSHPort', connection.ssh_port || 22);
+  setVal('connSSHUser', connection.ssh_user);
+  setVal('connSSHPassword', connection.ssh_password);
+  setVal('connSSHKeyPath', connection.ssh_key_path);
   
   // Set database type
   const dbTypeBtn = document.querySelector(`.db-type-btn[data-type="${connection.type}"]`);
@@ -1260,8 +1280,20 @@ function getConnectionFromForm() {
         color: colorBtn ? colorBtn.dataset.color : '#6366f1',
         path: document.getElementById('sqlitePath') ? document.getElementById('sqlitePath').value : '',
         save_password: document.getElementById('connSavePassword').checked,
-        auto_connect: document.getElementById('connAutoConnect').checked
+        auto_connect: document.getElementById('connAutoConnect').checked,
+        ssh_enabled: document.getElementById('connSSHEnabled')?.checked || false,
+        ssh_host: document.getElementById('connSSHHost')?.value || '',
+        ssh_port: parseInt(document.getElementById('connSSHPort')?.value) || 22,
+        ssh_user: document.getElementById('connSSHUser')?.value || '',
+        ssh_password: document.getElementById('connSSHPassword')?.value || '',
+        ssh_key_path: document.getElementById('connSSHKeyPath')?.value || ''
     };
+}
+
+function toggleSSHFields() {
+    const enabled = document.getElementById('connSSHEnabled')?.checked;
+    const fields = document.getElementById('sshFields');
+    if (fields) fields.style.display = enabled ? 'block' : 'none';
 }
 
 async function saveConnection() {
