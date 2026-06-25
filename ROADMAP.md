@@ -415,8 +415,8 @@
 
 ### 架构优化
 
-- [ ] **[ARCH-001]** 引入依赖注入，降低耦合度
-- [ ] **[ARCH-002]** 分离业务逻辑与数据访问层
+- [x] **[ARCH-001]** 引入依赖注入，降低耦合度 — **已部分修复**: QueryService/SchemaService/ConnectionService/AuditService 接口定义 + mockQueryService
+- [x] **[ARCH-002]** 分离业务逻辑与数据访问层 — **已部分修复**: db/ 包封装数据访问层, App 层调用 driver 接口
 - [ ] **[ARCH-003]** 实现插件化架构，支持扩展
 - [x] **[ARCH-004]** 添加配置热重载机制 (constants.go: ConfigWatcher 5s轮询+回调+ReloadConfig手动重载)
 - [x] **[ARCH-005]** 实现事件总线，解耦模块通信 (constants.go: EventBus pub/sub 9种事件类型+SubscribeToEvents/PublishEvent)
