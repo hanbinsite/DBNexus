@@ -337,7 +337,7 @@
 #### 已知缺陷（需修复）
 - [x] `getRedisDriver` 类型断言可panic — **已修复**: 使用 ok pattern 安全断言 (redis_api.go:166)
 - [x] Redis内部类型断言 `value.([]string)` 等可panic — **已修复**: go-redis SDK 返回类型安全结果
-- [ ] 数据库数量硬编码16
+- [x] 数据库数量硬编码16 — **已修复**: CONFIG GET databases 动态获取 (db/redis.go:134)
 - [x] `ExecuteRedisCommand` 允许执行任意命令，无安全限制 — **已实现**: 命令白名单
 
 ---

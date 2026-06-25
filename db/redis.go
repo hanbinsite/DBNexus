@@ -132,8 +132,24 @@ func (d *RedisDriver) GetTableStructure(ctx context.Context, keyName string) ([]
 }
 
 func (d *RedisDriver) GetDatabases(ctx context.Context) ([]string, error) {
-	databases := make([]string, 16)
-	for i := 0; i < 16; i++ {
+	// Try to get actual database count from Redis CONFIG
+	var dbCount int = 16 // default fallback
+
+	if d.client != nil {
+		result, err := d.client.ConfigGet(ctx, "databases").Result()
+		if err == nil && len(result) > 0 {
+			if val, ok := result["databases"]; ok {
+				if n, err := fmt.Sscanf(fmt.Sprintf("%v", val), "%d", &dbCount); err == nil && n == 1 {
+					if dbCount <= 0 || dbCount > 256 {
+						dbCount = 16
+					}
+				}
+			}
+		}
+	}
+
+	databases := make([]string, dbCount)
+	for i := 0; i < dbCount; i++ {
 		databases[i] = fmt.Sprintf("db%d", i)
 	}
 	return databases, nil
