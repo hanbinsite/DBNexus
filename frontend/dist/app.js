@@ -122,6 +122,30 @@ const WailsAPI = {
     rollbackToSavepoint: (txID, name) => window.go.main.App.RollbackToSavepoint(txID, name),
     releaseSavepoint: (txID, name) => window.go.main.App.ReleaseSavepoint(txID, name),
     getActiveTransactions: () => window.go.main.App.GetActiveTransactions(),
+
+    // Blob Preview
+    previewBlobData: (conn, db, table, col, pkCol, pkVal) => window.go.main.App.PreviewBlobData(conn, db, table, col, pkCol, pkVal),
+    formatCellValue: (val, fmt) => window.go.main.App.FormatCellValue(val, fmt),
+
+    // Structure Compare
+    compareTableStructures: (conn, db, t1, t2) => window.go.main.App.CompareTableStructures(conn, db, t1, t2),
+
+    // Streaming Export & Excel Import
+    exportDataStreaming: (conn, db, query, fmt, path) => window.go.main.App.ExportDataStreaming(conn, db, query, fmt, path),
+    importFromExcel: (conn, db, table, path, hasHeader) => window.go.main.App.ImportFromExcel(conn, db, table, path, hasHeader),
+
+    // Query Cache
+    clearQueryCache: () => window.go.main.App.ClearQueryCache(),
+    getQueryCacheSize: () => window.go.main.App.GetQueryCacheSize(),
+
+    // Auth
+    getAuthConfig: () => window.go.main.App.GetAuthConfig(),
+    setAuthPassword: (pass, timeout) => window.go.main.App.SetAuthPassword(pass, timeout),
+    disableAuth: () => window.go.main.App.DisableAuth(),
+    login: (pass) => window.go.main.App.Login(pass),
+    logout: () => window.go.main.App.Logout(),
+    validateSession: (token) => window.go.main.App.ValidateSession(token),
+    refreshSession: () => window.go.main.App.RefreshSession(),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
