@@ -89,7 +89,7 @@
 - [x] 查询取消功能 (query_cancel.go: CancelQuery + GetActiveQueries)
 - [x] 查询结果缓存 (schema_ext2.go: QueryCache LRU 50条 + ClearQueryCache/GetQueryCacheSize)
 - [x] SQL 语法检查（实时）(advanced_features.go: ValidateSQLSyntax 括号/引号/关键字检查)
-- [ ] 智能提示（上下文相关）
+- [x] 智能提示（上下文相关）(sprint9.go: GetSmartSuggestions 根据光标位置返回表/列/关键字建议)
 - [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet, GetSnippets/GetSnippetsByCategory)
 - [ ] SQL 调试功能
 - [ ] 参数化查询支持
@@ -202,14 +202,14 @@
 
 #### 已知缺陷（需修复）
 - [x] **[BUG-010]** `CompareTables` 中目标表查询使用了 `sourceQuery` 而非目标表名 (data_compare.go:95) — **已修复**
-- [ ] 全量数据加载到内存，大表对比可导致OOM
+- [x] 全量数据加载到内存，大表对比可导致OOM — **已修复**: CompareTablesStreaming 分批对比避免OOM
 - [x] `compareValues` 使用 `fmt.Sprintf` 转字符串比较，浮点数不精确 — **已修复**: compareValuesPrecise 使用数值比较+1e-9容差
 - [x] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况 — **已修复**: 使用 encoding/csv writer 自动转义
 
 #### 待开发
 - [x] 结构对比 (schema_ext2.go: CompareTableStructures 列差异/类型不匹配/nullable差异)
 - [ ] 数据库级别全量对比
-- [ ] 流式对比（大数据量）
+- [x] 流式对比（大数据量）(sprint9.go: CompareTablesStreaming 分批1000行)
 - [ ] 对比结果同步
 
 ---
@@ -277,7 +277,7 @@
 
 #### 已知缺陷（需修复）
 - [x] `GetSlowQueries` 返回空列表，完全未实现 — **已修复**: query_analyzer.go GetSlowQueries 已实现 (pg_stat_statements)
-- [ ] PostgreSQL `EXPLAIN ANALYZE` 会实际执行查询
+- [x] PostgreSQL `EXPLAIN ANALYZE` 会实际执行查询 — **已修复**: GetExplainPlanSafe 对非SELECT语句拒绝ANALYZE
 
 #### 待开发
 - [x] 慢查询分析（pg_stat_statements/MySQL slow_log）(advanced_features.go: GetMySQLSlowQueries + query_analyzer.go: GetSlowQueries PG)
