@@ -155,7 +155,7 @@
 - [x] `formatValueForSQL` 对字符串值仅做单引号转义，不够安全 — **已修复**: escapeStringLiteral 已应用
 
 #### 待开发
-- [ ] 事务性批量编辑
+- [x] 事务性批量编辑 (batch_transactional.go: BatchEditTransactional 事务保护+自动回滚)
 - [ ] 行级锁编辑
 - [ ] 编辑冲突检测
 
@@ -260,7 +260,7 @@
 #### 待开发
 - [x] 事务保存点（Savepoint）(CreateSavepoint/RollbackToSavepoint/ReleaseSavepoint)
 - [x] 事务状态查询 (GetActiveTransactions: ID/created/duration)
-- [ ] 事务事件通知
+- [x] 事务事件通知 (batch_transactional.go: emitTransactionEvent + GetTransactionEvents channel)
 
 ---
 
