@@ -87,7 +87,7 @@
 #### 待开发
 - [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
 - [x] 查询取消功能 (query_cancel.go: CancelQuery + GetActiveQueries)
-- [x] 查询结果缓存
+- [x] 查询结果缓存 (schema_ext2.go: QueryCache LRU 50条 + ClearQueryCache/GetQueryCacheSize)
 - [ ] SQL 语法检查（实时）
 - [ ] 智能提示（上下文相关）
 - [ ] 代码片段（Snippet）库
@@ -124,10 +124,10 @@
 
 #### 待开发
 - [x] 数据过滤与搜索 (search.go: SearchTableData + SearchAllTables)
-- [ ] 虚拟滚动（大数据集优化）
+- [x] 虚拟滚动（大数据集优化）(renderDataView >500行虚拟滚动+spacer rows)
 - [ ] 高级筛选（多条件组合）
-- [ ] BLOB/CLOB 数据预览
-- [ ] JSON/XML 格式化显示
+- [x] BLOB/CLOB 数据预览 (blob_preview.go: PreviewBlobData 图片/文本/hex)
+- [x] JSON/XML 格式化显示 (schema_ext2.go: FormatCellValue JSON/XML/base64/hex)
 - [x] 触发器查询 (schema_ext.go: GetTableTriggers MySQL/PG)
 - [ ] 分区表信息
 - [x] 表DDL生成 (schema_ext.go: GenerateTableDDL MySQL/PG/SQLite)
@@ -182,9 +182,9 @@
 - [ ] `ImportData` 逐条调用 `EditTableData`，大量数据导入极慢
 
 #### 待开发
-- [ ] Excel导入
+- [x] Excel导入 (stream_export.go: ImportFromExcel via excelize)
 - [ ] SQL脚本导入执行
-- [ ] 流式导出（大数据量）
+- [x] 流式导出（大数据量）(stream_export.go: ExportDataStreaming CSV/JSON 5min timeout)
 - [ ] 导出进度回调
 
 ---
@@ -207,7 +207,7 @@
 - [x] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况 — **已修复**: 使用 encoding/csv writer 自动转义
 
 #### 待开发
-- [ ] 结构对比
+- [x] 结构对比 (schema_ext2.go: CompareTableStructures 列差异/类型不匹配/nullable差异)
 - [ ] 数据库级别全量对比
 - [ ] 流式对比（大数据量）
 - [ ] 对比结果同步
@@ -238,7 +238,7 @@
 - [x] 前端XSS防护（替换innerHTML为textContent/createElement）— **已修复**: renderDataView 安全DOM
 - [x] 危险操作二次确认（DROP/TRUNCATE）— **已实现**: contextAction drop_table 确认
 - [x] 敏感数据脱敏 — **已实现**: data_masking.go MaskConfig + maskQueryResult
-- [ ] 登录认证（密码/PIN）
+- [x] 登录认证（密码/PIN）(auth.go: SHA-256+salt, session token, 可配置超时)
 - [ ] 安全配置扫描
 
 ---
