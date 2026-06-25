@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -14,7 +13,7 @@ func (a *App) GetRedisKeyInfo(config Connection, key string) (*db.RedisKeyInfo, 
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	return driver.GetRedisKeyInfo(ctx, key)
 }
 
@@ -24,7 +23,7 @@ func (a *App) SetRedisKeyValue(config Connection, key string, value interface{},
 		return err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	err = driver.SetRedisKeyValue(ctx, key, value, ttl)
 	if err != nil {
 		return err
@@ -47,7 +46,7 @@ func (a *App) DeleteRedisKey(config Connection, keys ...string) error {
 		return err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	if err := driver.DeleteRedisKey(ctx, keys...); err != nil {
 		return err
 	}
@@ -104,7 +103,7 @@ func (a *App) ExecuteRedisCommand(config Connection, cmd string, args ...interfa
 		return nil, fmt.Errorf(a.t(MsgRedisDangerousCmd, a.getCurrentLang()), cmd)
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	result, err := driver.ExecuteRedisCommand(ctx, cmd, args...)
 	if err != nil {
 		return nil, err
@@ -127,7 +126,7 @@ func (a *App) GetRedisInfo(config Connection, section string) (string, error) {
 		return "", err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	return driver.GetRedisInfo(ctx, section)
 }
 
@@ -137,7 +136,7 @@ func (a *App) GetRedisDBSize(config Connection) (int64, error) {
 		return 0, err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	return driver.GetRedisDBSize(ctx)
 }
 
@@ -147,7 +146,7 @@ func (a *App) ScanRedisKeys(config Connection, pattern string, cursor uint64, co
 		return nil, 0, err
 	}
 
-	ctx := context.Background()
+	ctx := a.ctx
 	return driver.ScanRedisKeys(ctx, pattern, cursor, count)
 }
 
