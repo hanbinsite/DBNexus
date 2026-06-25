@@ -340,14 +340,14 @@
 - [ ] `getRedisDriver` 类型断言可panic
 - [ ] Redis内部类型断言 `value.([]string)` 等可panic
 - [ ] 数据库数量硬编码16
-- [ ] `ExecuteRedisCommand` 允许执行任意命令，无安全限制
+- [x] `ExecuteRedisCommand` 允许执行任意命令，无安全限制 — **已实现**: 命令白名单
 
 ---
 
 ## P2 - 高级功能
 
-### 13. 团队协作 (0%)
-- [ ] 连接配置共享
+### 13. 团队协作 (20%)
+- [x] 连接配置共享（导入/导出 JSON 格式）
 - [ ] 查询脚本共享
 - [ ] 团队工作空间
 - [ ] 权限角色管理
@@ -357,10 +357,10 @@
 - [ ] 增量同步
 - [ ] 数据校验
 
-### 15. 性能监控 (0%)
-- [ ] 实时查询监控
-- [ ] 慢查询分析
-- [ ] 数据库性能仪表盘
+### 15. 性能监控 (60%)
+- [x] 实时查询监控 (GetActiveQueries + CancelQuery)
+- [x] 慢查询分析 (GetSlowQueries: pg_stat_statements)
+- [x] 数据库性能仪表盘 (GetPerformanceMetrics + GetSystemInfo + HealthCheck)
 
 ### 16. 自动化与调度 (0%)
 - [ ] 定时查询执行
