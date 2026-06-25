@@ -57,7 +57,7 @@
 - [x] 连接标签与搜索 (前端搜索框 + filterConnections 实时过滤)
 - [x] 连接导入/导出（支持 JSON 格式）
 - [x] SSH 隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
-- [ ] SSL/TLS 证书配置
+- [x] SSL/TLS 证书配置 (sprint13.go: GetSSLConfig/SetSSLConfig/TestSSLConnection, CA+客户端证书+TLS版本)
 - [x] 连接权限管理（只读/读写）(connection_ext.go: SetConnectionPermission)
 - [x] 连接使用统计 (connection_ext.go: GetConnectionUsage/GetAllConnectionUsage)
 - [x] 连接模板库 (connection_ext.go: 8个默认模板 GetConnectionTemplates)
@@ -365,10 +365,10 @@
 - [x] 任务调度器 (scheduler.go: time.AfterFunc 自动重调度+启停)
 - [x] 任务失败通知 (sprint9.go: emitTaskNotification + GetTaskNotifications channel)
 
-### 17. 报表与可视化 (0%)
+### 17. 报表与可视化 (33%)
 - [ ] 查询结果图表化
 - [ ] 自定义报表设计器
-- [ ] 报表导出（PDF）
+- [x] 报表导出（PDF）(sprint13.go: ExportReportPDF HTML打印报表+样式+NULL处理)
 
 ### 18. 扩展功能 (0%)
 - [ ] 插件系统
