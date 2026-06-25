@@ -4376,10 +4376,11 @@ function renderMultiQueryResults(data) {
 
 window.switchResultsView = function(view) {
   document.querySelectorAll('.results-container .rv-tab').forEach(t => t.classList.toggle('active', t.dataset.rv === view));
-  ['summary', 'messages', 'results'].forEach(v => {
+  ['summary', 'messages', 'results', 'chart'].forEach(v => {
     const el = document.getElementById('rv-' + v);
     if (el) el.style.display = v === view ? 'block' : 'none';
   });
+  if (view === 'chart') renderChart();
 };
 
 window.switchResultTab = function(idx) {
@@ -4388,9 +4389,137 @@ window.switchResultTab = function(idx) {
 };
 
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ==================== F5: Chart Visualization ====================
+
+let lastQueryResult = null;
+
+function setChartResult(result) {
+    lastQueryResult = result;
+    const chartBtn = document.getElementById('chartTabBtn');
+    if (chartBtn && result && result.columns && result.columns.length >= 2 && result.rows && result.rows.length > 0) {
+        chartBtn.style.display = '';
+        // Populate column selectors
+        const labelSel = document.getElementById('chartLabelCol');
+        const valueSel = document.getElementById('chartValueCol');
+        if (labelSel && valueSel) {
+            labelSel.innerHTML = '';
+            valueSel.innerHTML = '';
+            result.columns.forEach((col, i) => {
+                labelSel.appendChild(new Option(col, i));
+                valueSel.appendChild(new Option(col, i));
+            });
+            if (result.columns.length >= 2) {
+                labelSel.value = '0';
+                valueSel.value = '1';
+            }
+        }
+    } else if (chartBtn) {
+        chartBtn.style.display = 'none';
+    }
+}
+
+function renderChart() {
+    const canvas = document.getElementById('chartCanvas');
+    if (!canvas || !lastQueryResult || !lastQueryResult.columns) return;
+    const ctx = canvas.getContext('2d');
+    const type = document.getElementById('chartType')?.value || 'bar';
+    const labelIdx = parseInt(document.getElementById('chartLabelCol')?.value || '0');
+    const valueIdx = parseInt(document.getElementById('chartValueCol')?.value || '1');
+
+    const rows = lastQueryResult.rows || [];
+    if (rows.length === 0) return;
+
+    const labels = rows.map(r => r[labelIdx] != null ? String(r[labelIdx]).substring(0, 20) : '');
+    const values = rows.map(r => {
+        const v = r[valueIdx];
+        if (v == null) return 0;
+        const f = parseFloat(v);
+        return isNaN(f) ? 0 : f;
+    });
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height;
+    const padding = 40;
+    const chartW = w - padding * 2;
+    const chartH = h - padding * 2;
+    const maxVal = Math.max(...values, 1);
+    const colors = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'];
+
+    if (type === 'bar') {
+        const barW = chartW / values.length * 0.7;
+        const gap = chartW / values.length * 0.3;
+        ctx.fillStyle = '#e6edf3';
+        ctx.font = '11px sans-serif';
+        // Y axis labels
+        for (let i = 0; i <= 4; i++) {
+            const y = padding + chartH - (chartH / 4) * i;
+            const val = (maxVal / 4 * i).toFixed(0);
+            ctx.fillText(val, 5, y + 3);
+            ctx.strokeStyle = '#30363d';
+            ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(w - padding, y); ctx.stroke();
+        }
+        values.forEach((v, i) => {
+            const x = padding + i * (barW + gap) + gap / 2;
+            const barH = (v / maxVal) * chartH;
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fillRect(x, padding + chartH - barH, barW, barH);
+            // Label
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '10px sans-serif';
+            const label = labels[i].substring(0, 8);
+            ctx.fillText(label, x + barW / 2 - label.length * 3, padding + chartH + 15);
+        });
+    } else if (type === 'line') {
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        values.forEach((v, i) => {
+            const x = padding + (chartW / (values.length - 1 || 1)) * i;
+            const y = padding + chartH - (v / maxVal) * chartH;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        // Points
+        values.forEach((v, i) => {
+            const x = padding + (chartW / (values.length - 1 || 1)) * i;
+            const y = padding + chartH - (v / maxVal) * chartH;
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '10px sans-serif';
+            ctx.fillText(labels[i].substring(0, 8), x - 12, padding + chartH + 15);
+        });
+    } else if (type === 'pie') {
+        const total = values.reduce((a, b) => a + b, 0) || 1;
+        let angle = -Math.PI / 2;
+        const cx = w / 2, cy = h / 2, r = Math.min(chartW, chartH) / 2;
+        values.forEach((v, i) => {
+            const slice = (v / total) * Math.PI * 2;
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r, angle, angle + slice);
+            ctx.closePath();
+            ctx.fill();
+            angle += slice;
+        });
+        // Legend
+        ctx.font = '11px sans-serif';
+        values.forEach((v, i) => {
+            const ly = padding + i * 18;
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fillRect(padding, ly, 12, 12);
+            ctx.fillStyle = '#e6edf3';
+            ctx.fillText(labels[i].substring(0, 15) + ' (' + v + ')', padding + 18, ly + 10);
+        });
+    }
 }
 
 function getSelectedText() {

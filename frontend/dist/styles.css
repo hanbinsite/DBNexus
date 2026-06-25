@@ -3181,3 +3181,36 @@ body {
     color: var(--fg-muted);
     font-size: 12px;
 }
+
+/* ==========================================================================
+   Chart Visualization
+   ========================================================================== */
+.chart-container {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.chart-controls select {
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--fg-primary);
+    font-size: 12px;
+}
+
+#chartCanvas {
+    max-width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}

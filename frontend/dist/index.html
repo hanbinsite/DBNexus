@@ -312,6 +312,7 @@
                             <button class="rv-tab active" data-rv="messages" onclick="switchResultsView('messages')">消息</button>
                             <button class="rv-tab" data-rv="summary" onclick="switchResultsView('summary')">摘要</button>
                             <button class="rv-tab" data-rv="results" onclick="switchResultsView('results')" style="display:none;">结果</button>
+                            <button class="rv-tab" data-rv="chart" onclick="switchResultsView('chart')" style="display:none;" id="chartTabBtn">图表</button>
                         </div>
                         <div class="results-view-panel" id="rv-messages" style="display:block;">
                             <div class="messages-container">
@@ -320,6 +321,24 @@
                         </div>
                         <div class="results-view-panel" id="rv-summary" style="display:none;"></div>
                         <div class="results-view-panel" id="rv-results" style="display:none;"></div>
+                        <div class="results-view-panel" id="rv-chart" style="display:none;">
+                            <div class="chart-container">
+                                <div class="chart-controls">
+                                    <select id="chartType" onchange="renderChart()">
+                                        <option value="bar">柱状图</option>
+                                        <option value="line">折线图</option>
+                                        <option value="pie">饼图</option>
+                                    </select>
+                                    <select id="chartLabelCol" onchange="renderChart()">
+                                        <option value="">标签列...</option>
+                                    </select>
+                                    <select id="chartValueCol" onchange="renderChart()">
+                                        <option value="">数值列...</option>
+                                    </select>
+                                </div>
+                                <canvas id="chartCanvas" width="600" height="300"></canvas>
+                            </div>
+                        </div>
                         <div class="results-info">
                             <span class="result-count" id="resultCount"></span>
                             <span class="result-time" id="resultTime"></span>
