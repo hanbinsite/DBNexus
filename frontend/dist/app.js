@@ -238,6 +238,21 @@ const WailsAPI = {
     deleteSSLConfig: (connID) => window.go.main.App.DeleteSSLConfig(connID),
     exportReportPDF: (conn, db, query, reportCfg, path) => window.go.main.App.ExportReportPDF(conn, db, query, reportCfg, path),
     analyzeFunctionComplexity: () => window.go.main.App.AnalyzeFunctionComplexity(),
+
+    // Sprint 14 — SQL debug, roles, chart data, workspace, migration, sync
+    debugSQL: (conn, db, query) => window.go.main.App.DebugSQL(conn, db, query),
+    getRoles: () => window.go.main.App.GetRoles(),
+    createRole: (name, perms, desc) => window.go.main.App.CreateRole(name, perms, desc),
+    deleteRole: (id) => window.go.main.App.DeleteRole(id),
+    assignRoleToConnection: (connID, roleID) => window.go.main.App.AssignRoleToConnection(connID, roleID),
+    getConnectionRole: (connID) => window.go.main.App.GetConnectionRole(connID),
+    checkPermission: (connID, perm) => window.go.main.App.CheckPermission(connID, perm),
+    prepareChartData: (conn, db, query, type, labelCol, valCol) => window.go.main.App.PrepareChartData(conn, db, query, type, labelCol, valCol),
+    getWorkspaces: () => window.go.main.App.GetWorkspaces(),
+    createWorkspace: (name) => window.go.main.App.CreateWorkspace(name),
+    deleteWorkspace: (id) => window.go.main.App.DeleteWorkspace(id),
+    migrateData: (config) => window.go.main.App.MigrateData(config),
+    incrementalSync: (config) => window.go.main.App.IncrementalSync(config),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
