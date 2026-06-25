@@ -58,9 +58,9 @@
 - [x] 连接导入/导出（支持 JSON 格式）
 - [x] SSH 隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
 - [ ] SSL/TLS 证书配置
-- [ ] 连接权限管理（只读/读写）
-- [ ] 连接使用统计
-- [ ] 连接模板库
+- [x] 连接权限管理（只读/读写）(connection_ext.go: SetConnectionPermission)
+- [x] 连接使用统计 (connection_ext.go: GetConnectionUsage/GetAllConnectionUsage)
+- [x] 连接模板库 (connection_ext.go: 8个默认模板 GetConnectionTemplates)
 
 ---
 
@@ -129,7 +129,7 @@
 - [x] BLOB/CLOB 数据预览 (blob_preview.go: PreviewBlobData 图片/文本/hex)
 - [x] JSON/XML 格式化显示 (schema_ext2.go: FormatCellValue JSON/XML/base64/hex)
 - [x] 触发器查询 (schema_ext.go: GetTableTriggers MySQL/PG)
-- [ ] 分区表信息
+- [x] 分区表信息 (connection_ext.go: GetTablePartitions MySQL/PG)
 - [x] 表DDL生成 (schema_ext.go: GenerateTableDDL MySQL/PG/SQLite)
 
 ---
@@ -239,7 +239,7 @@
 - [x] 危险操作二次确认（DROP/TRUNCATE）— **已实现**: contextAction drop_table 确认
 - [x] 敏感数据脱敏 — **已实现**: data_masking.go MaskConfig + maskQueryResult
 - [x] 登录认证（密码/PIN）(auth.go: SHA-256+salt, session token, 可配置超时)
-- [ ] 安全配置扫描
+- [x] 安全配置扫描 (connection_ext.go: RunSecurityScan 7项检查, 0-100评分)
 
 ---
 
@@ -282,7 +282,7 @@
 #### 待开发
 - [x] 慢查询分析（pg_stat_statements/MySQL slow_log）(advanced_features.go: GetMySQLSlowQueries + query_analyzer.go: GetSlowQueries PG)
 - [ ] 查询性能历史追踪
-- [ ] 索引使用率分析
+- [x] 索引使用率分析 (connection_ext.go: GetIndexUsageStats PG/MySQL, 未使用索引标记)
 - [x] 查询计划可视化 (connection_groups.go: GetVisualQueryPlan EXPLAIN JSON → 树结构)
 
 ---
