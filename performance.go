@@ -109,8 +109,11 @@ func (a *App) GetSystemInfo() map[string]interface{} {
 var appStartTime = time.Now()
 
 func (a *App) HealthCheck() map[string]interface{} {
-	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
-	defer cancel()
+	if a.ctx != nil {
+		ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+		defer cancel()
+		_ = ctx
+	}
 
 	result := map[string]interface{}{
 		"status":    "healthy",
@@ -164,7 +167,6 @@ func (a *App) HealthCheck() map[string]interface{} {
 		}
 	}
 
-	_ = ctx
 	result["checks"] = checks
 
 	return result

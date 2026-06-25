@@ -14,6 +14,10 @@ type DBUser struct {
 }
 
 func (a *App) GetDatabaseUsers(config Connection) ([]DBUser, error) {
+	if a.pool == nil {
+		return []DBUser{}, nil
+	}
+
 	dbConfig := a.connectionToDBConfig(config)
 	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {

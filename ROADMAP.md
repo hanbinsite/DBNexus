@@ -545,7 +545,7 @@ Phase 1 AI 功能:
 - [x] 性能监控仪表盘 (performance.go: GetPerformanceMetrics/GetSystemInfo/HealthCheck)
 - [x] 敏感数据脱敏 (data_masking.go: MaskConfig + maskQueryResult)
 - [x] 危险操作二次确认（DROP/TRUNCATE）
-- [ ] Terminal Noir设计系统落地（见D08-migration-plan阶段2）
+- [x] Terminal Noir设计系统落地 (CSS变量体系+monospace字体全面应用)
 - [x] 团队协作基础（连接配置导入/导出）
 - [x] 数据库备份/恢复 (backup_restore.go: MySQL/PostgreSQL/SQLite)
 - [ ] 单元测试覆盖率>80% (当前 75 sub-tests, ~40%)

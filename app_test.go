@@ -992,3 +992,262 @@ func TestGetServerInfoSafe(t *testing.T) {
 		t.Error("GetServerInfo should include version")
 	}
 }
+
+func TestMaskValueShort(t *testing.T) {
+	result := maskValue("ab", defaultMaskConfig)
+	if result == "ab" {
+		t.Error("maskValue should mask short strings")
+	}
+}
+
+func TestMaskValueLong(t *testing.T) {
+	result := maskValue("password123", defaultMaskConfig)
+	if result == "password123" {
+		t.Error("maskValue should mask long strings")
+	}
+	if !strings.HasPrefix(result, "pa") {
+		t.Error("maskValue should keep first 2 chars")
+	}
+	if !strings.HasSuffix(result, "23") {
+		t.Error("maskValue should keep last 2 chars")
+	}
+}
+
+func TestMaskValueEmpty(t *testing.T) {
+	result := maskValue("", defaultMaskConfig)
+	if result != "" {
+		t.Error("maskValue should return empty for empty input")
+	}
+}
+
+func TestShouldMaskColumn(t *testing.T) {
+	defaultMaskConfig.Enabled = true
+	if !shouldMaskColumn("user_password", defaultMaskConfig) {
+		t.Error("shouldMaskColumn should match 'password' in column name")
+	}
+	if !shouldMaskColumn("api_key", defaultMaskConfig) {
+		t.Error("shouldMaskColumn should match 'api_key'")
+	}
+	if shouldMaskColumn("username", defaultMaskConfig) {
+		t.Error("shouldMaskColumn should not match 'username'")
+	}
+	defaultMaskConfig.Enabled = false
+	if shouldMaskColumn("password", defaultMaskConfig) {
+		t.Error("shouldMaskColumn should return false when disabled")
+	}
+}
+
+func TestMaskQueryResultDisabled(t *testing.T) {
+	result := &QueryResult{
+		Columns: []string{"id", "password"},
+		Rows:    [][]interface{}{{1, "secret123"}},
+	}
+	maskQueryResult(result, defaultMaskConfig)
+	if result.Rows[0][1] != "secret123" {
+		t.Error("maskQueryResult should not mask when disabled")
+	}
+}
+
+func TestMaskQueryResultEnabled(t *testing.T) {
+	config := defaultMaskConfig
+	config.Enabled = true
+	result := &QueryResult{
+		Columns: []string{"id", "password"},
+		Rows:    [][]interface{}{{1, "secret123"}},
+	}
+	maskQueryResult(result, config)
+	if result.Rows[0][1] == "secret123" {
+		t.Error("maskQueryResult should mask password column when enabled")
+	}
+}
+
+func TestSetMaskConfig(t *testing.T) {
+	app := &App{}
+	err := app.SetMaskConfig(true, "password,email", "#", 1, 1)
+	if err != nil {
+		t.Errorf("SetMaskConfig failed: %v", err)
+	}
+	config := app.GetMaskConfig()
+	if !config.Enabled {
+		t.Error("SetMaskConfig should enable masking")
+	}
+	if len(config.MaskColumns) != 2 {
+		t.Errorf("expected 2 mask columns, got %d", len(config.MaskColumns))
+	}
+	if config.MaskChar != "#" {
+		t.Errorf("expected mask char '#', got %s", config.MaskChar)
+	}
+}
+
+func TestGetPerformanceMetrics(t *testing.T) {
+	app := &App{}
+	metrics := app.GetPerformanceMetrics()
+	if metrics.GoRoutines <= 0 {
+		t.Error("GoRoutines should be positive")
+	}
+	if metrics.Timestamp == "" {
+		t.Error("Timestamp should not be empty")
+	}
+}
+
+func TestGetConnectionPoolStats(t *testing.T) {
+	app := &App{}
+	stats := app.GetConnectionPoolStats()
+	if stats == nil {
+		t.Fatal("GetConnectionPoolStats should return non-nil map")
+	}
+	if stats["max_pool_size"] == nil {
+		t.Error("GetConnectionPoolStats should include max_pool_size")
+	}
+}
+
+func TestGetSystemInfo(t *testing.T) {
+	app := &App{}
+	info := app.GetSystemInfo()
+	if info == nil {
+		t.Fatal("GetSystemInfo should return non-nil map")
+	}
+	if info["go_version"] == nil || info["go_version"] == "" {
+		t.Error("GetSystemInfo should include go_version")
+	}
+	if info["os"] == nil {
+		t.Error("GetSystemInfo should include os")
+	}
+}
+
+func TestHealthCheck(t *testing.T) {
+	app := &App{}
+	result := app.HealthCheck()
+	if result == nil {
+		t.Fatal("HealthCheck should return non-nil map")
+	}
+	if result["status"] != "healthy" {
+		t.Errorf("expected status=healthy, got %v", result["status"])
+	}
+}
+
+func TestSearchTableDataEmptyArgs(t *testing.T) {
+	app := &App{}
+	_, err := app.SearchTableData(Connection{}, "", "", "", 0)
+	if err == nil {
+		t.Error("SearchTableData should fail with empty arguments")
+	}
+}
+
+func TestGetDatabaseUsersNoConnection(t *testing.T) {
+	app := &App{}
+	users, err := app.GetDatabaseUsers(Connection{Type: "sqlite"})
+	if err != nil {
+		t.Errorf("GetDatabaseUsers should not error for sqlite: %v", err)
+	}
+	if users == nil {
+		t.Error("GetDatabaseUsers should return non-nil for sqlite")
+	}
+}
+
+func TestCreateDatabaseUserEmptyArgs(t *testing.T) {
+	app := &App{}
+	err := app.CreateDatabaseUser(Connection{}, "", "pass", "%")
+	if err == nil {
+		t.Error("CreateDatabaseUser should fail with empty username")
+	}
+	err = app.CreateDatabaseUser(Connection{}, "user", "", "%")
+	if err == nil {
+		t.Error("CreateDatabaseUser should fail with empty password")
+	}
+}
+
+func TestDropDatabaseUserEmpty(t *testing.T) {
+	app := &App{}
+	err := app.DropDatabaseUser(Connection{}, "", "%")
+	if err == nil {
+		t.Error("DropDatabaseUser should fail with empty username")
+	}
+}
+
+func TestGrantPrivilegesEmpty(t *testing.T) {
+	app := &App{}
+	err := app.GrantPrivileges(Connection{}, "", "db", "ALL", "%")
+	if err == nil {
+		t.Error("GrantPrivileges should fail with empty username")
+	}
+	err = app.GrantPrivileges(Connection{}, "user", "db", "", "%")
+	if err == nil {
+		t.Error("GrantPrivileges should fail with empty privileges")
+	}
+}
+
+func TestBackupDatabaseUnsupported(t *testing.T) {
+	app := &App{}
+	_, err := app.BackupDatabase(Connection{Type: "redis"}, "test", "")
+	if err == nil {
+		t.Error("BackupDatabase should fail for redis")
+	}
+}
+
+func TestRestoreDatabaseUnsupported(t *testing.T) {
+	app := &App{}
+	err := app.RestoreDatabase(Connection{Type: "redis"}, "test", "/tmp/backup")
+	if err == nil {
+		t.Error("RestoreDatabase should fail for redis")
+	}
+}
+
+func TestCloseSSHTunnelNonExistent(t *testing.T) {
+	app := &App{}
+	app.CloseSSHTunnel("nonexistent_id")
+}
+
+func TestGetSSHTunnelPortNonExistent(t *testing.T) {
+	app := &App{}
+	port := app.GetSSHTunnelPort("nonexistent_id")
+	if port != 0 {
+		t.Errorf("expected port 0 for non-existent tunnel, got %d", port)
+	}
+}
+
+func TestGetSupportedFeaturesUnknownType(t *testing.T) {
+	app := &App{}
+	features := app.GetSupportedFeatures("unknown_db_type")
+	if features == nil {
+		t.Error("GetSupportedFeatures should return non-nil for unknown type")
+	}
+}
+
+func TestCalculateComplexitySimple(t *testing.T) {
+	analysis := QueryAnalysis{
+		JoinCount:    0,
+		HasSubquery:  false,
+		HasAggregate: false,
+	}
+	result := strings.ToLower(calculateComplexity(analysis))
+	if result != "simple" && result != "low" {
+		t.Errorf("expected simple/low complexity, got %s", result)
+	}
+}
+
+func TestCalculateComplexityHigh(t *testing.T) {
+	analysis := QueryAnalysis{
+		JoinCount:    5,
+		HasSubquery:  true,
+		HasAggregate: true,
+	}
+	result := strings.ToLower(calculateComplexity(analysis))
+	if result != "high" && result != "very high" {
+		t.Errorf("expected high/very high complexity, got %s", result)
+	}
+}
+
+func TestCountKeywordNone(t *testing.T) {
+	count := countKeyword("SELECT 1", "JOIN")
+	if count != 0 {
+		t.Errorf("expected 0 JOINs, got %d", count)
+	}
+}
+
+func TestEscapeStringLiteralNoQuotes(t *testing.T) {
+	result := escapeStringLiteral("hello world")
+	if result != "hello world" {
+		t.Errorf("expected hello world, got %s", result)
+	}
+}
