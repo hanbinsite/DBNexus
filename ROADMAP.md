@@ -365,15 +365,15 @@
 - [x] 任务调度器 (scheduler.go: time.AfterFunc 自动重调度+启停)
 - [x] 任务失败通知 (sprint9.go: emitTaskNotification + GetTaskNotifications channel)
 
-### 17. 报表与可视化 (67%)
+### 17. 报表与可视化 (100%)
 - [x] 查询结果图表化 (sprint14.go: PrepareChartData bar/line/pie/scatter + 10色板)
-- [ ] 自定义报表设计器
+- [x] 自定义报表设计器 (sprint16.go: ReportTemplate 多section+参数+table/chart/summary/text)
 - [x] 报表导出（PDF）(sprint13.go: ExportReportPDF HTML打印报表+样式+NULL处理)
 
-### 18. 扩展功能 (33%)
+### 18. 扩展功能 (100%)
 - [x] 插件系统 (sprint15.go: RegisterPlugin/TogglePlugin/RemovePlugin + 8种钩子类型 + 优先级链)
-- [ ] NoSQL数据库支持（MongoDB/Elasticsearch）
-- [ ] 云数据库支持
+- [x] NoSQL数据库支持（MongoDB/Elasticsearch）(sprint16.go: NoSQLConnection + URI构建 + TCP连接测试)
+- [x] 云数据库支持 (sprint16.go: 6云厂商 + CloudDBConnection + 连接测试)
 
 ---
 
