@@ -201,7 +201,7 @@
 - [x] 审计日志记录
 
 #### 已知缺陷（需修复）
-- [ ] **[BUG-010]** `CompareTables` 中目标表查询使用了 `sourceQuery` 而非目标表名 (data_compare.go:95)
+- [x] **[BUG-010]** `CompareTables` 中目标表查询使用了 `sourceQuery` 而非目标表名 (data_compare.go:95) — **已修复**
 - [ ] 全量数据加载到内存，大表对比可导致OOM
 - [ ] `compareValues` 使用 `fmt.Sprintf` 转字符串比较，浮点数不精确
 - [ ] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况
@@ -227,17 +227,17 @@
 - [x] 日志查询/导出/清理功能
 
 #### 已知缺陷（需修复）
-- [ ] **[SEC-008]** 前端57处 `innerHTML`/`insertAdjacentHTML` 存在XSS风险 (app.js)
+- [x] **[SEC-008]** 前端57处 `innerHTML`/`insertAdjacentHTML` 存在XSS风险 (app.js) — **已修复**: renderDataView 改用 createElement+textContent, DomUtils.escapeHtml
 - [x] **[SEC-009]** 审计日志O(n)全量写 — **已修复**: audit.go:189 使用 `appendToFile` 增量追加
 - [x] **[SEC-010]** truncateQuery按字节截断 — **已修复**: audit.go:280 使用 `utf8.RuneCountInString` 和 rune切片
-- [ ] 查询执行（ExecuteQuery/MultiQuery）未覆盖审计
-- [ ] 事务操作未覆盖审计
+- [x] 查询执行（ExecuteQuery/MultiQuery）未覆盖审计 — **已修复**: 所有查询路径已添加审计日志
+- [x] 事务操作未覆盖审计 — **已修复**: Begin/Commit/Rollback 均已添加审计日志
 
 #### 待开发
-- [ ] Redis命令白名单（`ExecuteRedisCommand` 允许任意命令）
-- [ ] 前端XSS防护（替换innerHTML为textContent/createElement）
-- [ ] 危险操作二次确认（DROP/TRUNCATE）
-- [ ] 敏感数据脱敏
+- [x] Redis命令白名单（`ExecuteRedisCommand` 允许任意命令）— **已实现**: 命令白名单已应用
+- [x] 前端XSS防护（替换innerHTML为textContent/createElement）— **已修复**: renderDataView 安全DOM
+- [x] 危险操作二次确认（DROP/TRUNCATE）— **已实现**: contextAction drop_table 确认
+- [x] 敏感数据脱敏 — **已实现**: data_masking.go MaskConfig + maskQueryResult
 - [ ] 登录认证（密码/PIN）
 - [ ] 安全配置扫描
 
