@@ -119,7 +119,7 @@
 
 #### 已知缺陷（需修复）
 - [x] **[SEC-005]** MySQL `DESCRIBE` 命令中表名未sanitize (db/mysql.go:87) — **已修复**: sanitizeIdentifier 已应用
-- [ ] `GetTableStats` 的 `COUNT(*)` 在大表上性能极差
+- [x] `GetTableStats` 的 `COUNT(*)` 在大表上性能极差 — **已修复**: GetTableStatsFast 使用 information_schema/pg_class 近似值
 - [x] `GetFunctions` 对SQLite使用了错误的查询条件 — **已修复**: SQLite 返回空列表 (无存储函数)
 
 #### 待开发
@@ -203,7 +203,7 @@
 #### 已知缺陷（需修复）
 - [x] **[BUG-010]** `CompareTables` 中目标表查询使用了 `sourceQuery` 而非目标表名 (data_compare.go:95) — **已修复**
 - [ ] 全量数据加载到内存，大表对比可导致OOM
-- [ ] `compareValues` 使用 `fmt.Sprintf` 转字符串比较，浮点数不精确
+- [x] `compareValues` 使用 `fmt.Sprintf` 转字符串比较，浮点数不精确 — **已修复**: compareValuesPrecise 使用数值比较+1e-9容差
 - [x] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况 — **已修复**: 使用 encoding/csv writer 自动转义
 
 #### 待开发
@@ -344,9 +344,9 @@
 
 ## P2 - 高级功能
 
-### 13. 团队协作 (20%)
+### 13. 团队协作 (40%)
 - [x] 连接配置共享（导入/导出 JSON 格式）
-- [ ] 查询脚本共享
+- [x] 查询脚本共享 (scheduler.go: SaveSharedScript/GetSharedScripts/DeleteSharedScript + Export/Import)
 - [ ] 团队工作空间
 - [ ] 权限角色管理
 
@@ -360,9 +360,9 @@
 - [x] 慢查询分析 (GetSlowQueries: pg_stat_statements)
 - [x] 数据库性能仪表盘 (GetPerformanceMetrics + GetSystemInfo + HealthCheck)
 
-### 16. 自动化与调度 (0%)
-- [ ] 定时查询执行
-- [ ] 任务调度器
+### 16. 自动化与调度 (60%)
+- [x] 定时查询执行 (scheduler.go: CreateScheduledTask interval-based)
+- [x] 任务调度器 (scheduler.go: time.AfterFunc 自动重调度+启停)
 - [ ] 任务失败通知
 
 ### 17. 报表与可视化 (0%)
