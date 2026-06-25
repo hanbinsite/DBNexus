@@ -423,11 +423,11 @@
 
 ### 性能优化
 
-- [ ] **[PERF-001]** 查询结果实现流式处理，避免内存溢出
+- [x] **[PERF-001]** 查询结果实现流式处理，避免内存溢出 (sprint11.go: ExecuteQueryStreaming 分批+回调)
 - [x] **[PERF-002]** 添加查询结果缓存机制 (schema_ext2.go: QueryCache LRU 50条)
 - [x] **[PERF-003]** 优化大数据集的渲染性能（虚拟滚动）(renderDataView >500行虚拟滚动)
-- [ ] **[PERF-004]** 实现懒加载（表结构、数据）
-- [x] **[PERF-005]** 减少不必要的数据库查询（缓存）(QueryCache + GetTableStatsFast 近似值)
+- [x] **[PERF-004]** 实现懒加载（表结构、数据）(sprint11.go: TableStructureCache 5min TTL)
+- [x] **[PERF-005]** 减少不必要的数据库查询（缓存）(QueryCache + GetTableStatsFast + TableStructureCache)
 
 ---
 
