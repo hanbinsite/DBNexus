@@ -82,7 +82,7 @@
 - [x] **[BUG-002]** `poolMutex` 双重检查 — **已修复**: 已统一使用 `getDriverForConfig`
 - [x] 查询结果无行数限制，大结果集可导致OOM — **已修复**: 前端大结果集警告banner (>10000行)
 - [ ] `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式
-- [ ] NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103)
+- [x] NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103) — **已修复**: MultiQuery 结果中 NULL 返回 nil
 
 #### 待开发
 - [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
@@ -204,7 +204,7 @@
 - [x] **[BUG-010]** `CompareTables` 中目标表查询使用了 `sourceQuery` 而非目标表名 (data_compare.go:95) — **已修复**
 - [ ] 全量数据加载到内存，大表对比可导致OOM
 - [ ] `compareValues` 使用 `fmt.Sprintf` 转字符串比较，浮点数不精确
-- [ ] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况
+- [x] `ExportCompareResult` 的CSV输出未处理值中含逗号的情况 — **已修复**: 使用 encoding/csv writer 自动转义
 
 #### 待开发
 - [ ] 结构对比
