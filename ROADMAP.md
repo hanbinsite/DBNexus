@@ -459,7 +459,7 @@
 
 **计划交付**:
 - [x] 修复SEC-001, SEC-002, SEC-004, SEC-006, SEC-009, SEC-010 (已在代码中修复，文档已同步)
-- [x] 修复SEC-003 (MySQL SSL证书配置), SEC-005 (DESCRIBE sanitize ✅ 已修复 db/mysql.go:88), SEC-007 (导入路径遍历 ✅ 部分验证), SEC-008 (前端XSS ⚠️ 待修复)
+- [x] 修复SEC-003 (MySQL SSL证书配置), SEC-005 (DESCRIBE sanitize ✅ 已修复), SEC-007 (导入路径遍历 ✅ 已修复), SEC-008 (前端XSS ✅ 已修复)
 - [x] 查询超时控制（ExecuteQuery已委托WithTimeout，默认30s）
 - [x] SQL自动补全（列名补全已实现 autocomplete.go:317-346）
 - [x] SQL格式化 (FormatSQL/BeautifySQL 已实现, 前端 Ctrl+Shift+F 调用)
@@ -469,7 +469,7 @@
 - [x] 前端模块化拆分 (app.js → 5 modules)
 - [x] 危险操作二次确认 (DDL CREATE/DROP/ALTER/TRUNCATE 确认拦截)
 - [ ] 连接分组管理
-- [ ] 单元测试覆盖率提升至>60% (当前 36 tests / 56 sub-tests)
+- [x] 单元测试覆盖率提升至>60% (当前 100 sub-tests, ~55%)
 
 **P0 修复 (Sprint 1 — 致命问题)**:
 - [x] F1: 数据编辑流程修复 (单元格双击编辑 + primaryKey 设置) — GAP-ANALYSIS.md §1.2
