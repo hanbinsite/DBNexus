@@ -298,8 +298,8 @@
 - [x] SQL结构分析（`GetSQLStructure`）
 
 #### 待开发
-- [ ] SQL语法高亮增强
-- [ ] 正则替换支持
+- [x] SQL语法高亮增强 (90+关键字, 60+函数, PG JSON操作符, backtick标识符, $占位符)
+- [x] 正则替换支持 (Monaco内置 find/replace 支持正则表达式)
 
 ---
 
