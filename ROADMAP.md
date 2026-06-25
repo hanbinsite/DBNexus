@@ -370,8 +370,8 @@
 - [ ] 自定义报表设计器
 - [x] 报表导出（PDF）(sprint13.go: ExportReportPDF HTML打印报表+样式+NULL处理)
 
-### 18. 扩展功能 (0%)
-- [ ] 插件系统
+### 18. 扩展功能 (33%)
+- [x] 插件系统 (sprint15.go: RegisterPlugin/TogglePlugin/RemovePlugin + 8种钩子类型 + 优先级链)
 - [ ] NoSQL数据库支持（MongoDB/Elasticsearch）
 - [ ] 云数据库支持
 
@@ -417,7 +417,7 @@
 
 - [x] **[ARCH-001]** 引入依赖注入，降低耦合度 — **已部分修复**: QueryService/SchemaService/ConnectionService/AuditService 接口定义 + mockQueryService
 - [x] **[ARCH-002]** 分离业务逻辑与数据访问层 — **已部分修复**: db/ 包封装数据访问层, App 层调用 driver 接口
-- [ ] **[ARCH-003]** 实现插件化架构，支持扩展
+- [x] **[ARCH-003]** 实现插件化架构，支持扩展 (sprint15.go: PluginInfo + 8种钩子类型 + 优先级链 + RegisterHook/ExecuteHooks)
 - [x] **[ARCH-004]** 添加配置热重载机制 (constants.go: ConfigWatcher 5s轮询+回调+ReloadConfig手动重载)
 - [x] **[ARCH-005]** 实现事件总线，解耦模块通信 (constants.go: EventBus pub/sub 9种事件类型+SubscribeToEvents/PublishEvent)
 
@@ -561,12 +561,12 @@ Phase 1 AI 功能:
 **计划交付**:
 - [x] 跨数据库数据迁移 (sprint14.go: MigrateData 批量INSERT)
 - [x] 增量数据同步 (sprint14.go: IncrementalSync 基于key列upsert)
-- [ ] 插件系统架构
+- [x] 插件系统架构 (sprint15.go: PluginInfo + 8种钩子 + 优先级链)
 - [ ] 云数据库深度支持
 - [ ] NoSQL支持（MongoDB/Elasticsearch）
 - [x] 数据可视化图表 (sprint14.go: PrepareChartData bar/line/pie/scatter)
 - [x] 定时查询执行 (scheduler.go: CreateScheduledTask interval-based)
-- [ ] 版本控制集成（Git）
+- [x] 版本控制集成（Git）(sprint15.go: GitCommit/Pull/Push/Checkout/Diff/Log + 仓库管理)
 
 **验收标准**: 跨数据库迁移100万行数据<5min；插件加载<1s；报表导出PDF格式完整
 
