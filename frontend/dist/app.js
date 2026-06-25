@@ -183,6 +183,23 @@ const WailsAPI = {
 
     // Qualified Column Suggestions
     getQualifiedColumnSuggestions: (conn, db, schema, table) => window.go.main.App.GetQualifiedColumnSuggestions(conn, db, schema, table),
+
+    // Shared Scripts
+    saveSharedScript: (name, sql, db, tags) => window.go.main.App.SaveSharedScript(name, sql, db, tags),
+    getSharedScripts: () => window.go.main.App.GetSharedScripts(),
+    deleteSharedScript: (id) => window.go.main.App.DeleteSharedScript(id),
+    exportSharedScripts: (path) => window.go.main.App.ExportSharedScripts(path),
+    importSharedScripts: (path) => window.go.main.App.ImportSharedScripts(path),
+
+    // Scheduled Tasks
+    createScheduledTask: (name, conn, db, query, interval) => window.go.main.App.CreateScheduledTask(name, conn, db, query, interval),
+    getScheduledTasks: () => window.go.main.App.GetScheduledTasks(),
+    deleteScheduledTask: (id) => window.go.main.App.DeleteScheduledTask(id),
+    toggleScheduledTask: (id, enabled) => window.go.main.App.ToggleScheduledTask(id, enabled),
+    runTaskNow: (id) => window.go.main.App.RunTaskNow(id),
+
+    // Fast Table Stats
+    getTableStatsFast: (conn, db, table) => window.go.main.App.GetTableStatsFast(conn, db, table),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
