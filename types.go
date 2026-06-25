@@ -1,19 +1,27 @@
 package main
 
 type Connection struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-	Host         string `json:"host"`
-	Port         int    `json:"port"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	Database     string `json:"database"`
-	SSLMode      string `json:"ssl_mode,omitempty"`
-	Color        string `json:"color"`
-	SavePassword bool   `json:"save_password"`
-	AutoConnect  bool   `json:"auto_connect"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	Database      string `json:"database"`
+	SSLMode       string `json:"ssl_mode,omitempty"`
+	Color         string `json:"color"`
+	SavePassword  bool   `json:"save_password"`
+	AutoConnect   bool   `json:"auto_connect"`
 	LastConnected string `json:"last_connected,omitempty"`
+
+	// SSH Tunnel
+	SSHEnabled  bool   `json:"ssh_enabled,omitempty"`
+	SSHHost     string `json:"ssh_host,omitempty"`
+	SSHPort     int    `json:"ssh_port,omitempty"`
+	SSHUser     string `json:"ssh_user,omitempty"`
+	SSHPassword string `json:"ssh_password,omitempty"`
+	SSHKeyPath  string `json:"ssh_key_path,omitempty"`
 }
 
 type QueryResult struct {
