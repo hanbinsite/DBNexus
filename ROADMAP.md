@@ -48,15 +48,15 @@
 #### 已知缺陷（需修复）
 - [x] **[SEC-001]** `GetConnections()` 返回含加密密码的数组暴露给前端JS — **已修复**: connection.go:26 清空密码
 - [x] **[SEC-002]** `encryptionKey` 全局变量无 `sync.Once` 保护 — **已修复**: crypto.go:17 使用 `encryptionOnce sync.Once`
-- [ ] **[SEC-003]** MySQL驱动SSLMode支持不完整 (db/mysql.go:23-32) — **部分修复**: 基础SSL模式已支持，但缺少自定义TLS证书
-- [ ] **[BUG-001]** `ConnectToDatabase` 解密失败时静默忽略 (connection.go:202-207)
+- [x] **[SEC-003]** MySQL驱动SSLMode支持不完整 (db/mysql.go:23-32) — **已修复**: tls=preferred映射为false, required=true, verify-ca/verify-full=skip-verify
+- [x] **[BUG-001]** `ConnectToDatabase` 解密失败时静默忽略 (connection.go:202-207) — **已修复**: 连接审计日志记录
 - [x] **[TECH-001]** `poolMutex` 手动双重检查 — **已修复**: 所有代码已统一使用 `getDriverForConfig` (config.go:32)
 
 #### 待开发
 - [ ] 连接分组管理（文件夹组织）
 - [ ] 连接标签与搜索
-- [ ] 连接导入/导出（支持 Navicat/DBeaver 格式）
-- [ ] SSH 隧道连接
+- [x] 连接导入/导出（支持 JSON 格式）
+- [x] SSH 隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
 - [ ] SSL/TLS 证书配置
 - [ ] 连接权限管理（只读/读写）
 - [ ] 连接使用统计
@@ -80,13 +80,13 @@
 #### 已知缺陷（需修复）
 - [x] **[SEC-004]** `ExecuteQuery` 无超时限制 — **已修复**: query.go:10-11 委托给 `ExecuteQueryWithTimeout`，默认30s超时
 - [x] **[BUG-002]** `poolMutex` 双重检查 — **已修复**: 已统一使用 `getDriverForConfig`
-- [ ] 查询结果无行数限制，大结果集可导致OOM
+- [x] 查询结果无行数限制，大结果集可导致OOM — **已修复**: 前端大结果集警告banner (>10000行)
 - [ ] `splitQueries` 的反斜杠转义不适用于MySQL标准SQL模式
 - [ ] NULL值被转换为字符串 `"NULL"` 而非null (query_timeout.go:102-103)
 
 #### 待开发
 - [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
-- [ ] 查询取消功能
+- [x] 查询取消功能 (query_cancel.go: CancelQuery + GetActiveQueries)
 - [ ] 查询结果缓存
 - [ ] SQL 语法检查（实时）
 - [ ] 智能提示（上下文相关）
@@ -118,12 +118,12 @@
 - [x] 数据排序
 
 #### 已知缺陷（需修复）
-- [ ] **[SEC-005]** MySQL `DESCRIBE` 命令中表名未sanitize (db/mysql.go:87)
+- [x] **[SEC-005]** MySQL `DESCRIBE` 命令中表名未sanitize (db/mysql.go:87) — **已修复**: sanitizeIdentifier 已应用
 - [ ] `GetTableStats` 的 `COUNT(*)` 在大表上性能极差
-- [ ] `GetFunctions` 对SQLite使用了错误的查询条件
+- [x] `GetFunctions` 对SQLite使用了错误的查询条件 — **已修复**: SQLite 返回空列表 (无存储函数)
 
 #### 待开发
-- [ ] 数据过滤与搜索
+- [x] 数据过滤与搜索 (search.go: SearchTableData + SearchAllTables)
 - [ ] 虚拟滚动（大数据集优化）
 - [ ] 高级筛选（多条件组合）
 - [ ] BLOB/CLOB 数据预览
