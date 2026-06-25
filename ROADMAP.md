@@ -53,7 +53,7 @@
 - [x] **[TECH-001]** `poolMutex` 手动双重检查 — **已修复**: 所有代码已统一使用 `getDriverForConfig` (config.go:32)
 
 #### 待开发
-- [ ] 连接分组管理（文件夹组织）
+- [x] 连接分组管理（文件夹组织）(connection_groups.go: Create/Delete/Rename + groups.json)
 - [x] 连接标签与搜索 (前端搜索框 + filterConnections 实时过滤)
 - [x] 连接导入/导出（支持 JSON 格式）
 - [x] SSH 隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
@@ -88,12 +88,12 @@
 - [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
 - [x] 查询取消功能 (query_cancel.go: CancelQuery + GetActiveQueries)
 - [x] 查询结果缓存 (schema_ext2.go: QueryCache LRU 50条 + ClearQueryCache/GetQueryCacheSize)
-- [ ] SQL 语法检查（实时）
+- [x] SQL 语法检查（实时）(advanced_features.go: ValidateSQLSyntax 括号/引号/关键字检查)
 - [ ] 智能提示（上下文相关）
-- [ ] 代码片段（Snippet）库
+- [x] 代码片段（Snippet）库 (advanced_features.go: 20个默认snippet, GetSnippets/GetSnippetsByCategory)
 - [ ] SQL 调试功能
 - [ ] 参数化查询支持
-- [ ] 大文件 SQL 导入执行
+- [x] 大文件 SQL 导入执行 (advanced_features.go: ExecuteSQLFile 300s超时)
 - [x] 快捷键自定义 (Monaco editor actions 暴露到 window.*)
 - [x] 多光标编辑 (addCursorBelow + selectAllOccurrences)
 - [x] 查找替换（正则支持）(findInEditor + replaceInEditor + Monaco内置)
@@ -125,7 +125,7 @@
 #### 待开发
 - [x] 数据过滤与搜索 (search.go: SearchTableData + SearchAllTables)
 - [x] 虚拟滚动（大数据集优化）(renderDataView >500行虚拟滚动+spacer rows)
-- [ ] 高级筛选（多条件组合）
+- [x] 高级筛选（多条件组合）(advanced_features.go: QueryWithFilter AND/OR + 多操作符)
 - [x] BLOB/CLOB 数据预览 (blob_preview.go: PreviewBlobData 图片/文本/hex)
 - [x] JSON/XML 格式化显示 (schema_ext2.go: FormatCellValue JSON/XML/base64/hex)
 - [x] 触发器查询 (schema_ext.go: GetTableTriggers MySQL/PG)
@@ -280,10 +280,10 @@
 - [ ] PostgreSQL `EXPLAIN ANALYZE` 会实际执行查询
 
 #### 待开发
-- [ ] 慢查询分析（pg_stat_statements/MySQL slow_log）
+- [x] 慢查询分析（pg_stat_statements/MySQL slow_log）(advanced_features.go: GetMySQLSlowQueries + query_analyzer.go: GetSlowQueries PG)
 - [ ] 查询性能历史追踪
 - [ ] 索引使用率分析
-- [ ] 查询计划可视化
+- [x] 查询计划可视化 (connection_groups.go: GetVisualQueryPlan EXPLAIN JSON → 树结构)
 
 ---
 
