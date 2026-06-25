@@ -163,6 +163,19 @@ const WailsAPI = {
 
     // Visual Query Plan
     getVisualQueryPlan: (conn, db, query) => window.go.main.App.GetVisualQueryPlan(conn, db, query),
+
+    // Connection Usage & Templates
+    getConnectionUsage: (id) => window.go.main.App.GetConnectionUsage(id),
+    getAllConnectionUsage: () => window.go.main.App.GetAllConnectionUsage(),
+    getConnectionTemplates: () => window.go.main.App.GetConnectionTemplates(),
+
+    // Partitions & Index Usage
+    getTablePartitions: (conn, db, table) => window.go.main.App.GetTablePartitions(conn, db, table),
+    getIndexUsageStats: (conn, db) => window.go.main.App.GetIndexUsageStats(conn, db),
+
+    // Security Scan & Permissions
+    runSecurityScan: () => window.go.main.App.RunSecurityScan(),
+    setConnectionPermission: (id, readOnly) => window.go.main.App.SetConnectionPermission(id, readOnly),
     
     // Audit Logs
     getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
