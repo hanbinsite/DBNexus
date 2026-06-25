@@ -208,9 +208,9 @@
 
 #### 待开发
 - [x] 结构对比 (schema_ext2.go: CompareTableStructures 列差异/类型不匹配/nullable差异)
-- [ ] 数据库级别全量对比
+- [x] 数据库级别全量对比 (sprint11.go: CompareDatabases 全表行数对比)
 - [x] 流式对比（大数据量）(sprint9.go: CompareTablesStreaming 分批1000行)
-- [ ] 对比结果同步
+- [x] 对比结果同步 (sprint11.go: SyncCompareResult SOURCE_TO_TARGET UPDATE同步)
 
 ---
 
