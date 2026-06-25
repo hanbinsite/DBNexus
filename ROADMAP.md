@@ -54,7 +54,7 @@
 
 #### 待开发
 - [ ] 连接分组管理（文件夹组织）
-- [ ] 连接标签与搜索
+- [x] 连接标签与搜索 (前端搜索框 + filterConnections 实时过滤)
 - [x] 连接导入/导出（支持 JSON 格式）
 - [x] SSH 隧道连接 (ssh_tunnel.go + 连接对话框SSH配置UI)
 - [ ] SSL/TLS 证书配置
@@ -87,16 +87,16 @@
 #### 待开发
 - [x] SQL 自动补全 — 列名补全（`getColumnSuggestions`, 遍历所有表获取列名，已实现于 autocomplete.go:317-346）
 - [x] 查询取消功能 (query_cancel.go: CancelQuery + GetActiveQueries)
-- [ ] 查询结果缓存
+- [x] 查询结果缓存
 - [ ] SQL 语法检查（实时）
 - [ ] 智能提示（上下文相关）
 - [ ] 代码片段（Snippet）库
 - [ ] SQL 调试功能
 - [ ] 参数化查询支持
 - [ ] 大文件 SQL 导入执行
-- [ ] 快捷键自定义
-- [ ] 多光标编辑
-- [ ] 查找替换（正则支持）
+- [x] 快捷键自定义 (Monaco editor actions 暴露到 window.*)
+- [x] 多光标编辑 (addCursorBelow + selectAllOccurrences)
+- [x] 查找替换（正则支持）(findInEditor + replaceInEditor + Monaco内置)
 
 ---
 
@@ -128,9 +128,9 @@
 - [ ] 高级筛选（多条件组合）
 - [ ] BLOB/CLOB 数据预览
 - [ ] JSON/XML 格式化显示
-- [ ] 触发器查询
+- [x] 触发器查询 (schema_ext.go: GetTableTriggers MySQL/PG)
 - [ ] 分区表信息
-- [ ] 表DDL生成
+- [x] 表DDL生成 (schema_ext.go: GenerateTableDDL MySQL/PG/SQLite)
 
 ---
 
@@ -258,8 +258,8 @@
 - [x] 事务使用 `context.Background()` 无超时 — **已修复**: 事务使用 a.ctx + WithTimeout
 
 #### 待开发
-- [ ] 事务保存点（Savepoint）
-- [ ] 事务状态查询
+- [x] 事务保存点（Savepoint）(CreateSavepoint/RollbackToSavepoint/ReleaseSavepoint)
+- [x] 事务状态查询 (GetActiveTransactions: ID/created/duration)
 - [ ] 事务事件通知
 
 ---
