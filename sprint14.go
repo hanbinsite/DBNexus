@@ -669,15 +669,17 @@ func (a *App) MigrateData(config MigrationConfig) (*MigrationResult, error) {
 	return result, nil
 }
 
-// S14-7: 增量同步 (简化版)
+// S14-7: 增量同步
 type SyncConfig struct {
-	SourceConfig Connection `json:"source_config"`
-	TargetConfig Connection `json:"target_config"`
-	SourceDB     string     `json:"source_db"`
-	TargetDB     string     `json:"target_db"`
-	Table        string     `json:"table"`
-	KeyColumn    string     `json:"key_column"`
-	LastSyncValue interface{} `json:"last_sync_value,omitempty"`
+	SourceConfig    Connection   `json:"source_config"`
+	TargetConfig    Connection   `json:"target_config"`
+	SourceDB        string       `json:"source_db"`
+	TargetDB        string       `json:"target_db"`
+	Table           string       `json:"table"`
+	KeyColumn       string       `json:"key_column"`
+	TimestampColumn string       `json:"timestamp_column,omitempty"`
+	LastSyncValue   interface{}  `json:"last_sync_value,omitempty"`
+	LastSyncTime    string       `json:"last_sync_time,omitempty"`
 }
 
 type IncrementalSyncResult struct {
@@ -694,17 +696,33 @@ func (a *App) IncrementalSync(config SyncConfig) (*IncrementalSyncResult, error)
 	startTime := time.Now()
 	result := &IncrementalSyncResult{Success: true}
 
-	// Query source for new/updated records since last sync
 	safeTable := sanitizeIdentifier(config.Table)
 	safeKey := sanitizeIdentifier(config.KeyColumn)
 
-	srcQuery := fmt.Sprintf("SELECT * FROM %s ORDER BY %s", safeTable, safeKey)
-	if config.LastSyncValue != nil {
+	// Build source query — use timestamp column if available, otherwise key column
+	var srcQuery string
+	if config.TimestampColumn != "" && config.LastSyncTime != "" {
+		safeTS := sanitizeIdentifier(config.TimestampColumn)
+		if config.SourceConfig.Type == "mysql" {
+			srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > ? ORDER BY %s", safeTable, safeTS, safeKey)
+		} else {
+			srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > $1 ORDER BY %s", safeTable, safeTS, safeKey)
+		}
+		// Use ExecuteQueryWithTimeout with args — but since it doesn't support args directly,
+		// we format the query with the timestamp value
+		srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > '%s' ORDER BY %s",
+			safeTable, safeTS, config.LastSyncTime, safeKey)
+	} else if config.LastSyncValue != nil {
 		if config.SourceConfig.Type == "mysql" {
 			srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > ? ORDER BY %s", safeTable, safeKey, safeKey)
 		} else {
 			srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > $1 ORDER BY %s", safeTable, safeKey, safeKey)
 		}
+		// Format with the actual value since ExecuteQueryWithTimeout doesn't accept args
+		srcQuery = fmt.Sprintf("SELECT * FROM %s WHERE %s > '%v' ORDER BY %s",
+			safeTable, safeKey, config.LastSyncValue, safeKey)
+	} else {
+		srcQuery = fmt.Sprintf("SELECT * FROM %s ORDER BY %s", safeTable, safeKey)
 	}
 
 	srcResult := a.ExecuteQueryWithTimeout(config.SourceConfig, config.SourceDB, srcQuery, QueryOptions{Timeout: 120})

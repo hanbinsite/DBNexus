@@ -153,9 +153,94 @@ func (a *App) SyncCompareResult(config Connection, database string, compareResul
 		if direction == "SOURCE_TO_TARGET" {
 			if fmt.Sprintf("%v", diff.TargetValue) == "missing" {
 				sync.Action = "insert"
-				// Would need full row data to insert — this is a simplified version
-				sync.Success = false
-				sync.Error = "full row data required for insert sync"
+				// Fetch full source row data and INSERT into target
+				// Build SELECT query to get the full row from source
+				var pkWhere []string
+				var args []interface{}
+				argIdx := 1
+				for pkName, pkVal := range diff.RowKey {
+					safePK := sanitizeIdentifier(pkName)
+					if config.Type == "mysql" {
+						pkWhere = append(pkWhere, fmt.Sprintf("`%s` = ?", safePK))
+					} else {
+						pkWhere = append(pkWhere, fmt.Sprintf("%s = $%d", safePK, argIdx))
+						argIdx++
+					}
+					args = append(args, pkVal)
+				}
+
+				// First, get column names for the target table
+				colResult := a.ExecuteQueryWithTimeout(config, database, fmt.Sprintf("SELECT * FROM %s LIMIT 0", safeTarget), QueryOptions{Timeout: 10})
+				var colNames []string
+				if colResult.Error == "" {
+					colNames = colResult.Columns
+				}
+				if len(colNames) == 0 {
+					sync.Success = false
+					sync.Error = "无法获取目标表列信息"
+					results = append(results, sync)
+					continue
+				}
+
+				// Query the full source row
+				selectQuery := fmt.Sprintf("SELECT * FROM %s WHERE %s", safeTarget, strings.Join(pkWhere, " AND "))
+				sourceRows, err := driver.Query(ctx, selectQuery, args...)
+				if err != nil {
+					sync.Success = false
+					sync.Error = "查询源行失败: " + err.Error()
+					results = append(results, sync)
+					continue
+				}
+
+				var insertValues []interface{}
+				if sourceRows.Next() {
+					values := make([]interface{}, len(colNames))
+					ptrs := make([]interface{}, len(colNames))
+					for i := range values {
+						ptrs[i] = &values[i]
+					}
+					if err := sourceRows.Scan(ptrs...); err != nil {
+						sourceRows.Close()
+						sync.Success = false
+						sync.Error = "扫描源行失败: " + err.Error()
+						results = append(results, sync)
+						continue
+					}
+					insertValues = values
+				}
+				sourceRows.Close()
+
+				if len(insertValues) == 0 {
+					sync.Success = false
+					sync.Error = "源行不存在"
+					results = append(results, sync)
+					continue
+				}
+
+				// Build INSERT statement
+				var colList, placeholders []string
+				for i, col := range colNames {
+					safeCol := sanitizeIdentifier(col)
+					if config.Type == "mysql" {
+						colList = append(colList, fmt.Sprintf("`%s`", safeCol))
+						placeholders = append(placeholders, "?")
+					} else {
+						colList = append(colList, safeCol)
+						placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+					}
+				}
+
+				insertQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+					safeTarget, strings.Join(colList, ", "), strings.Join(placeholders, ", "))
+
+				res, err := driver.Exec(ctx, insertQuery, insertValues...)
+				if err != nil {
+					sync.Success = false
+					sync.Error = err.Error()
+				} else {
+					sync.Success = true
+					sync.RowsAffected, _ = res.RowsAffected()
+				}
 			} else if fmt.Sprintf("%v", diff.SourceValue) != fmt.Sprintf("%v", diff.TargetValue) {
 				sync.Action = "update"
 				// Build UPDATE for the differing column

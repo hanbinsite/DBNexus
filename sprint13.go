@@ -6,8 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -370,16 +374,102 @@ type FunctionComplexity struct {
 }
 
 func (a *App) AnalyzeFunctionComplexity() []FunctionComplexity {
-	// This is a static analysis helper that identifies long functions
-	// In a real implementation, this would parse Go source files
-	return []FunctionComplexity{
-		{Name: "renderDataView", LineCount: 120, Complexity: "high",
-			Suggestion: "已拆分虚拟滚动和普通渲染路径"},
-		{Name: "ExecuteMultiQueryWithTimeout", LineCount: 80, Complexity: "medium",
-			Suggestion: "可进一步拆分结果处理逻辑"},
-		{Name: "CompareTables", LineCount: 90, Complexity: "medium",
-			Suggestion: "可拆分为数据获取和比较两个函数"},
+	// Parse Go source files using go/ast to identify long functions
+	var results []FunctionComplexity
+
+	// Get all .go files in the current directory
+	files, err := filepath.Glob("*.go")
+	if err != nil || len(files) == 0 {
+		return []FunctionComplexity{}
 	}
+
+	for _, filename := range files {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+
+		ast.Inspect(f, func(n ast.Node) bool {
+			fn, ok := n.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				return true
+			}
+
+			// Count lines in function body
+			start := fset.Position(fn.Body.Lbrace).Line
+			end := fset.Position(fn.Body.Rbrace).Line
+			lineCount := end - start - 1 // Exclude braces
+
+			if lineCount < 20 {
+				return true // Skip short functions
+			}
+
+			// Count control flow statements for complexity
+			complexityScore := 0
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				switch n.(type) {
+				case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt:
+					complexityScore++
+				case *ast.CaseClause:
+					complexityScore++
+				}
+				return true
+			})
+
+			var complexity, suggestion string
+			switch {
+			case lineCount > 100 || complexityScore > 15:
+				complexity = "high"
+				suggestion = "建议拆分: 函数过长或控制流复杂，考虑提取子函数"
+			case lineCount > 50 || complexityScore > 8:
+				complexity = "medium"
+				suggestion = "可优化: 考虑拆分部分逻辑"
+			default:
+				complexity = "low"
+			}
+
+			name := fn.Name.Name
+			if fn.Recv != nil && len(fn.Recv.List) > 0 {
+				// Method on a type
+				recvType := ""
+				if star, ok := fn.Recv.List[0].Type.(*ast.StarExpr); ok {
+					if ident, ok := star.X.(*ast.Ident); ok {
+						recvType = ident.Name
+					}
+				} else if ident, ok := fn.Recv.List[0].Type.(*ast.Ident); ok {
+					recvType = ident.Name
+				}
+				if recvType != "" {
+					name = recvType + "." + name
+				}
+			}
+
+			results = append(results, FunctionComplexity{
+				Name:       name,
+				LineCount:  lineCount,
+				Complexity: complexity,
+				Suggestion: suggestion,
+			})
+
+			return true
+		})
+	}
+
+	// Sort by line count descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].LineCount > results[j].LineCount
+	})
+
+	// Limit to top 30
+	if len(results) > 30 {
+		results = results[:30]
+	}
+
+	if results == nil {
+		results = []FunctionComplexity{}
+	}
+	return results
 }
 
 // S13-4: TECH-002 — 错误处理统一化
