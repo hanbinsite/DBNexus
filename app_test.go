@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"db-server/db"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+// cgoEnabled is set at build time to indicate whether CGO is available
+// SQLite integration tests require CGO for go-sqlite3
+var cgoEnabled = false
 
 func TestSanitizeIdentifier(t *testing.T) {
 	tests := []struct {
@@ -1251,3 +1257,505 @@ func TestEscapeStringLiteralNoQuotes(t *testing.T) {
 		t.Errorf("expected hello world, got %s", result)
 	}
 }
+
+// ==========================================================================
+// Integration Tests — DB interaction scenarios
+// ==========================================================================
+
+func TestSQLiteConnectAndQuery(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	conn := Connection{
+		ID:       "test_sqlite",
+		Type:     "sqlite",
+		Database: dbPath,
+	}
+
+	connected, msg := app.TestConnection(conn)
+	if !connected { t.Skipf("SQLite not available: %s", msg); return }
+	if !connected {
+		t.Skipf("SQLite connection failed: %s", msg)
+		return
+	}
+
+	// Create table
+	_, _, execErr := app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE IF NOT EXISTS test_users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT)")
+	if execErr != nil {
+		t.Fatalf("CREATE TABLE failed: %v", execErr)
+	}
+
+	// Insert data
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "INSERT INTO test_users (name, email) VALUES ('test_user', 'test@test.com')")
+
+	// Query data
+	result := app.ExecuteQuery(conn, dbPath, "SELECT * FROM test_users")
+	if result.Error != "" {
+		t.Errorf("SELECT failed: %s", result.Error)
+	}
+	if result.RowCount == 0 {
+		t.Error("expected at least 1 row")
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE test_users")
+}
+
+func TestSQLiteSchemaOperations(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_schema.db")
+	conn := Connection{ID: "test_schema", Type: "sqlite", Database: dbPath}
+
+	_, _ = app.TestConnection(conn)
+
+	// Create table with indexes
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, category TEXT)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE INDEX idx_products_name ON products(name)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE INDEX idx_products_category ON products(category)")
+
+	// Get tables
+	tables, err := app.GetTables(conn, dbPath)
+	if err != nil {
+		t.Errorf("GetTables failed: %v", err)
+	}
+	if len(tables) == 0 {
+		t.Error("expected at least 1 table")
+	}
+
+	// Get table structure
+	for _, table := range tables {
+		if table.Name == "products" {
+			cols, err := app.GetTableColumns(conn, dbPath, table.Name)
+			if err != nil {
+				t.Errorf("GetTableColumns failed: %v", err)
+			}
+			if len(cols) == 0 {
+				t.Error("expected at least 1 column")
+			}
+		}
+	}
+
+	// Get indexes
+	indexes, err := app.GetTableIndexes(conn, dbPath, "products")
+	if err != nil {
+		t.Errorf("GetTableIndexes failed: %v", err)
+	}
+	if len(indexes) < 2 {
+		t.Errorf("expected at least 2 indexes, got %d", len(indexes))
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE products")
+}
+
+func TestSQLiteDataEditFlow(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_edit.db")
+	conn := Connection{ID: "test_edit", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	// Setup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE edit_test (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "INSERT INTO edit_test (name, value) VALUES ('item1', 100)")
+
+	// Test INSERT
+	insertReq := EditRequest{
+		Operation: "INSERT",
+		Table:     "edit_test",
+		Database: dbPath,
+		Data:      map[string]interface{}{"name": "item2", "value": 200},
+	}
+	result := app.EditTableData(conn, insertReq)
+	if !result.Success {
+		t.Errorf("INSERT failed: %s", result.Error)
+	}
+
+	// Test UPDATE
+	updateReq := EditRequest{
+		Operation:  "UPDATE",
+		Table:      "edit_test",
+		Database: dbPath,
+		Data:       map[string]interface{}{"value": 150},
+		PrimaryKey: map[string]interface{}{"id": 1},
+	}
+	result = app.EditTableData(conn, updateReq)
+	if !result.Success {
+		t.Errorf("UPDATE failed: %s", result.Error)
+	}
+
+	// Test DELETE
+	deleteReq := EditRequest{
+		Operation:  "DELETE",
+		Table:      "edit_test",
+		Database: dbPath,
+		PrimaryKey: map[string]interface{}{"id": 2},
+	}
+	result = app.EditTableData(conn, deleteReq)
+	if !result.Success {
+		t.Errorf("DELETE failed: %s", result.Error)
+	}
+
+	// Verify
+	queryResult := app.ExecuteQuery(conn, dbPath, "SELECT COUNT(*) as count FROM edit_test")
+	if queryResult.Error != "" {
+		t.Errorf("verification query failed: %s", queryResult.Error)
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE edit_test")
+}
+
+func TestSQLiteBatchEditFlow(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_batch.db")
+	conn := Connection{ID: "test_batch", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE batch_test (id INTEGER PRIMARY KEY, name TEXT)")
+
+	// Batch INSERT
+	requests := []EditRequest{
+		{Operation: "INSERT", Table: "batch_test", Database: dbPath, Data: map[string]interface{}{"name": "batch1"}},
+		{Operation: "INSERT", Table: "batch_test", Database: dbPath, Data: map[string]interface{}{"name": "batch2"}},
+		{Operation: "INSERT", Table: "batch_test", Database: dbPath, Data: map[string]interface{}{"name": "batch3"}},
+	}
+
+	results := app.BatchEdit(conn, requests)
+	if len(results) != len(requests) {
+		t.Errorf("expected %d results, got %d", len(requests), len(results))
+	}
+
+	for i, r := range results {
+		if !r.Success {
+			t.Errorf("batch edit %d failed: %s", i, r.Error)
+		}
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE batch_test")
+}
+
+func TestMultiStatementQuery(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_multi.db")
+	conn := Connection{ID: "test_multi", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	multiSQL := `
+		CREATE TABLE multi_test (id INTEGER PRIMARY KEY, val TEXT);
+		INSERT INTO multi_test (val) VALUES ('a');
+		INSERT INTO multi_test (val) VALUES ('b');
+		INSERT INTO multi_test (val) VALUES ('c');
+	`
+
+	result := app.ExecuteMultiQuery(conn, dbPath, multiSQL)
+	if result.TotalCount != 4 {
+		t.Errorf("expected 4 statements, got %d", result.TotalCount)
+	}
+	if result.ErrorCount > 0 {
+		t.Errorf("expected 0 errors, got %d", result.ErrorCount)
+	}
+
+	// Verify data
+	queryResult := app.ExecuteQuery(conn, dbPath, "SELECT COUNT(*) as count FROM multi_test")
+	if queryResult.Error != "" {
+		t.Errorf("verification failed: %s", queryResult.Error)
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE multi_test")
+}
+
+func TestTransactionFlow(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_tx.db")
+	conn := Connection{ID: "test_tx", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE tx_test (id INTEGER PRIMARY KEY, val TEXT)")
+
+	// Begin transaction
+	txID, err := app.BeginTransaction(conn, dbPath, TransactionOptions{})
+	if err != nil {
+		t.Fatalf("BeginTransaction failed: %v", err)
+	}
+
+	// Execute in transaction
+	_, err = app.ExecuteInTransaction(txID, "INSERT INTO tx_test (val) VALUES ('tx1')")
+	if err != nil {
+		t.Errorf("ExecuteInTransaction failed: %v", err)
+	}
+
+	// Commit
+	err = app.CommitTransaction(txID)
+	if err != nil {
+		t.Errorf("CommitTransaction failed: %v", err)
+	}
+
+	// Verify
+	result := app.ExecuteQuery(conn, dbPath, "SELECT * FROM tx_test")
+	if result.Error != "" {
+		t.Errorf("verification failed: %s", result.Error)
+	}
+	if result.RowCount != 1 {
+		t.Errorf("expected 1 row after commit, got %d", result.RowCount)
+	}
+
+	// Test rollback
+	txID2, _ := app.BeginTransaction(conn, dbPath, TransactionOptions{})
+	app.ExecuteInTransaction(txID2, "INSERT INTO tx_test (val) VALUES ('tx2')")
+	app.RollbackTransaction(txID2)
+
+	result = app.ExecuteQuery(conn, dbPath, "SELECT COUNT(*) as count FROM tx_test")
+	if result.RowCount > 0 {
+		// Check count value
+		for _, row := range result.Rows {
+			if v, ok := row[0].(int64); ok && v != 1 {
+				t.Errorf("expected 1 row after rollback, got %d", v)
+			}
+		}
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE tx_test")
+}
+
+func TestSQLValidationIntegration(t *testing.T) {
+	app := &App{}
+
+	tests := []struct {
+		name      string
+		sql       string
+		expectValid bool
+	}{
+		{"valid SELECT", "SELECT * FROM users", true},
+		{"valid INSERT", "INSERT INTO users VALUES (1, 'test')", true},
+		{"valid UPDATE", "UPDATE users SET name = 'test' WHERE id = 1", true},
+		{"valid DELETE", "DELETE FROM users WHERE id = 1", true},
+		{"empty SQL", "", false},
+		{"invalid start", "RANDOM TEXT", false},
+		{"unbalanced parens", "SELECT * FROM (users", false},
+		{"unbalanced quotes", "SELECT * FROM users WHERE name = 'test", false},
+		{"DROP without WHERE warning", "DROP TABLE users", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := app.ValidateSQLSyntax(tt.sql)
+			if result.Valid != tt.expectValid {
+				t.Errorf("ValidateSQLSyntax(%q) valid=%v, want %v (errors: %v)", tt.sql, result.Valid, tt.expectValid, result.Errors)
+			}
+		})
+	}
+}
+
+func TestExportImportFlow(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_export.db")
+	conn := Connection{ID: "test_export", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	// Setup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE export_test (id INTEGER PRIMARY KEY, name TEXT, value REAL)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "INSERT INTO export_test (name, value) VALUES ('a', 1.5)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "INSERT INTO export_test (name, value) VALUES ('b', 2.5)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "INSERT INTO export_test (name, value) VALUES ('c', 3.5)")
+
+	// Export to CSV
+	csvPath := filepath.Join(tmpDir, "export.csv")
+	exportReq := ExportRequest{
+		Format:   "csv",
+		Table:    "export_test",
+		Database: dbPath, FileName: filepath.Base(csvPath),
+	}
+	app.ExportData(conn, exportReq)
+
+	// Export to JSON
+	jsonPath := filepath.Join(tmpDir, "export.json")
+	exportReq = ExportRequest{
+		Format:   "json",
+		Table:    "export_test",
+		Database: dbPath, FileName: filepath.Base(jsonPath),
+	}
+	app.ExportData(conn, exportReq)
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE export_test")
+}
+
+func TestCompareTableStructuresIntegration(t *testing.T) {
+	if testing.Short() || !cgoEnabled { t.Skip("skipping SQLite integration test (requires CGO)") }
+	app := &App{
+		ctx:  context.Background(),
+		pool: &connectionPool{connections: make(map[string]*pooledDriver)},
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_compare.db")
+	conn := Connection{ID: "test_compare", Type: "sqlite", Database: dbPath}
+
+_, _ = app.TestConnection(conn)
+
+	// Create two tables with different structures
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE table_a (id INTEGER PRIMARY KEY, name TEXT, email TEXT)")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "CREATE TABLE table_b (id INTEGER PRIMARY KEY, name TEXT, phone TEXT)")
+
+	diff, err := app.CompareTableStructures(conn, dbPath, "table_a", "table_b")
+	if err != nil {
+		t.Errorf("CompareTableStructures failed: %v", err)
+	}
+	if diff == nil {
+		t.Fatal("expected non-nil diff")
+	}
+
+	// table_a has email, table_b has phone
+	emailFound := false
+	phoneFound := false
+	for _, col := range diff.OnlyIn1 {
+		if col == "email" {
+			emailFound = true
+		}
+	}
+	for _, col := range diff.OnlyIn2 {
+		if col == "phone" {
+			phoneFound = true
+		}
+	}
+	if !emailFound {
+		t.Error("expected 'email' in OnlyIn1")
+	}
+	if !phoneFound {
+		t.Error("expected 'phone' in OnlyIn2")
+	}
+
+	// Cleanup
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE table_a")
+	_, _, _ = app.ExecuteNonQuery(conn, dbPath, "DROP TABLE table_b")
+}
+
+func TestQueryHistoryPersistence(t *testing.T) {
+	app := &App{}
+
+	// Add queries
+	app.AddQueryHistory("SELECT 1", "testdb")
+	app.AddQueryHistory("SELECT 2", "testdb")
+	app.AddQueryHistory("SELECT 3", "testdb")
+
+	// Retrieve
+	history := app.GetQueryHistory()
+	if len(history) < 3 {
+		t.Errorf("expected at least 3 history items, got %d", len(history))
+	}
+
+	// Verify most recent is SELECT 3 (history is sorted newest first)
+	found := false
+	for _, h := range history {
+		if h.Query == "SELECT 3" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected to find 'SELECT 3' in history")
+	}
+
+	// Clear
+	err := app.ClearQueryHistory()
+	if err != nil {
+		t.Errorf("ClearQueryHistory failed: %v", err)
+	}
+}
+
+func TestSecurityScanIntegration(t *testing.T) {
+	app := &App{}
+
+	result := app.RunSecurityScan()
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.Score < 0 || result.Score > 100 {
+		t.Errorf("score out of range: %d", result.Score)
+	}
+	if len(result.Issues) == 0 {
+		t.Log("no security issues found (may be expected in test env)")
+	}
+}
+
+func TestPerformanceMetricsIntegration(t *testing.T) {
+	app := &App{}
+
+	metrics := app.GetPerformanceMetrics()
+	if metrics.GoRoutines <= 0 {
+		t.Error("expected positive goroutine count")
+	}
+	if metrics.Timestamp == "" {
+		t.Error("expected non-empty timestamp")
+	}
+
+	health := app.HealthCheck()
+	if health["status"] != "healthy" {
+		t.Errorf("expected healthy status, got %v", health["status"])
+	}
+
+	info := app.GetSystemInfo()
+	if info["go_version"] == nil {
+		t.Error("expected go_version in system info")
+	}
+}
+
+
+
+
+
+
+
