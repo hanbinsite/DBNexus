@@ -87,7 +87,7 @@ func (a *App) ExecuteNonQuery(config Connection, database string, query string) 
 
 	driver, err := a.getDriverForConfig(dbConfig)
 	if err != nil {
-		return 0, "", fmt.Errorf("connection failed: %v", err)
+		return 0, "", fmt.Errorf("connection failed: %w", err)
 	}
 
 	auditLogger := GetAuditLogger()
@@ -107,7 +107,7 @@ func (a *App) ExecuteNonQuery(config Connection, database string, query string) 
 				"query":    truncateQuery(query, 200),
 			},
 		)
-		return 0, "", fmt.Errorf("execution failed: %v", err)
+		return 0, "", fmt.Errorf("execution failed: %w", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()

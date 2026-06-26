@@ -183,7 +183,7 @@ func (a *App) fallbackOptimize(query string, config Connection, database string)
 func (a *App) NaturalLanguageToSQL(config Connection, database string, naturalLanguage string) (string, error) {
 	client, err := a.getAIClient()
 	if err != nil {
-		return "", fmt.Errorf("AI 不可用: %v", err)
+		return "", fmt.Errorf("AI 不可用: %w", err)
 	}
 
 	schemaContext := a.buildSchemaContext(config, database, 20)
