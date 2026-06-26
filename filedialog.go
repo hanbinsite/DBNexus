@@ -57,7 +57,7 @@ func (a *App) WriteFile(path string, content string) error {
 	if strings.Contains(cleanPath, "..") {
 		return fmt.Errorf("path traversal not allowed")
 	}
-	err := os.WriteFile(cleanPath, []byte(content), 0644)
+	err := os.WriteFile(cleanPath, []byte(content), 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}

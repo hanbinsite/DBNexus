@@ -69,7 +69,7 @@ const (
 // 文件权限常量
 const (
 	FilePermSecure   = 0600
-	FilePermNormal   = 0644
+	FilePermNormal   = 0600
 	DirPermSecure    = 0700
 )
 

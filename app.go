@@ -79,7 +79,7 @@ func (a *App) SetLanguage(lang string) error {
 
 	homeDir, _ := os.UserHomeDir()
 	configDir := filepath.Join(homeDir, ".dbnexus")
-	os.MkdirAll(configDir, 0755)
+	os.MkdirAll(configDir, 0700)
 
 	configFile := filepath.Join(configDir, "config.json")
 
