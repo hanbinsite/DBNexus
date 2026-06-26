@@ -265,43 +265,9 @@ export interface TableRef {
 }
 
 // ============================================================
-// Wails API Interface
+// Wails API Interface — see globals.d.ts for global declaration
+// WailsAPI is typed as `any` in globals.d.ts to allow dynamic property access
 // ============================================================
-
-export interface WailsAPI {
-    // Connection
-    saveConnection: (conn: Connection) => Promise<void>;
-    getConnections: () => Promise<Connection[]>;
-    deleteConnection: (id: string) => Promise<void>;
-    connectToDatabase: (conn: Connection) => Promise<boolean>;
-    disconnectFromDatabase: (conn: Connection) => Promise<void>;
-    testConnection: (conn: Connection) => Promise<[boolean, string]>;
-    // Database
-    getDatabases: (conn: Connection) => Promise<DatabaseInfo[]>;
-    getTables: (conn: Connection, db: string) => Promise<TableInfo[]>;
-    getTableStructure: (conn: Connection, db: string, table: string) => Promise<ColumnInfo[]>;
-    getTableData: (conn: Connection, db: string, table: string, page: number, pageSize: number) => Promise<QueryResult>;
-    // Query
-    executeQuery: (conn: Connection, db: string, query: string) => Promise<QueryResult>;
-    executeMultiQuery: (conn: Connection, db: string, query: string) => Promise<MultiQueryResult>;
-    explainQuery: (conn: Connection, db: string, query: string) => Promise<any>;
-    cancelQuery: (conn: Connection, pid: number) => Promise<void>;
-    beautifySQL: (sql: string) => Promise<string>;
-    // Schema
-    getTableIndexes: (conn: Connection, db: string, table: string) => Promise<IndexInfo[]>;
-    getTableForeignKeys: (conn: Connection, db: string, table: string) => Promise<ForeignKeyInfo[]>;
-    // AI
-    aiChat: (req: AIChatRequest) => Promise<AIChatResponse>;
-    recommendIndexes: (conn: Connection, db: string, table: string) => Promise<IndexAnalysisResult>;
-    // Settings
-    getSettings: () => Promise<any>;
-    saveSettings: (s: any) => Promise<void>;
-    // Window
-    windowMinimize: () => Promise<void>;
-    windowMaximize: () => Promise<void>;
-    windowClose: () => Promise<void>;
-    windowIsMaximized: () => Promise<boolean>;
-}
 
 // ============================================================
 // Event Types

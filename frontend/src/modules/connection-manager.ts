@@ -1,29 +1,7 @@
 // DBNexus TypeScript Migration Example
 // This module demonstrates how to migrate JS modules to TS
 
-import { Connection, QueryResult, WailsAPI, NotificationType } from '../types/index';
-
-// Global state typed
-declare global {
-    const state: {
-        currentTheme: 'dark' | 'light';
-        connections: Connection[];
-        activeConnection: Connection | null;
-        selectedDatabase: string | null;
-        currentTable: { name: string; database: string } | null;
-        activeTab: string | null;
-        wailsReady: boolean;
-    };
-
-    const WailsAPI: WailsAPI | null;
-
-    function isWailsAvailable(): boolean;
-    function showNotification(type: NotificationType, message: string): void;
-    function showLoading(message: string): void;
-    function hideLoading(): void;
-    function getEditorValue(): string;
-    function setEditorValue(value: string): void;
-}
+import { Connection, QueryResult, NotificationType } from '../types/index';
 
 // Typed error handler
 export class AppError extends Error {
@@ -61,7 +39,7 @@ export async function executeQuery(
     query: string
 ): Promise<QueryResult | null> {
     return safeAsync(async () => {
-        if (!isWailsAvailable() || !WailsAPI) {
+        if (!isWailsAvailable()) {
             throw new AppError('NET_001', 'Wails API not available');
         }
         return WailsAPI.executeQuery(connection, database, query);
@@ -73,7 +51,7 @@ export class ConnectionManager {
     private connections: Connection[] = [];
 
     async load(): Promise<Connection[]> {
-        if (!isWailsAvailable() || !WailsAPI) {
+        if (!isWailsAvailable()) {
             return this.connections;
         }
         this.connections = await WailsAPI.getConnections();
@@ -81,13 +59,13 @@ export class ConnectionManager {
     }
 
     async save(conn: Connection): Promise<void> {
-        if (!isWailsAvailable() || !WailsAPI) return;
+        if (!isWailsAvailable()) return;
         await WailsAPI.saveConnection(conn);
         await this.load();
     }
 
     async delete(id: string): Promise<void> {
-        if (!isWailsAvailable() || !WailsAPI) return;
+        if (!isWailsAvailable()) return;
         await WailsAPI.deleteConnection(id);
         await this.load();
     }
@@ -106,5 +84,4 @@ export class ConnectionManager {
     }
 }
 
-// Export for use in migration
 export { ConnectionManager as default };

@@ -58,7 +58,4 @@ export class DomUtilsClass {
     }
 }
 
-// Global assignment for backward compatibility
-declare global {
-    const DomUtils: typeof DomUtilsClass;
-}
+// DomUtils is declared as a global in globals.d.ts

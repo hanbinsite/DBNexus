@@ -2,33 +2,18 @@
 // Declares global variables and functions used across all modules
 
 declare global {
-    // Global state
-    const state: {
-        currentTheme: 'dark' | 'light';
-        connections: any[];
-        tabs: any[];
-        activeTab: string | null;
-        activeConnection: any | null;
-        sidebarWidth: number;
-        editorHeight: number;
-        isResizing: boolean;
-        wailsReady: boolean;
-        currentTable: { name: string; database: string; schema?: string } | null;
-        selectedDatabase: string | null;
-        columnWidths: Record<string, number>;
-        queryHistory: any[];
-        editingConnectionId: string | null;
-    };
+    // Global state — typed as any to allow dynamic property access
+    const state: any;
 
-    // Wails API
-    const WailsAPI: any | null;
+    // Wails API — typed as any to allow dynamic property access
+    const WailsAPI: any;
 
     // Monaco editor
-    let monacoEditor: any | null;
+    let monacoEditor: any;
 
     // Core functions
     function isWailsAvailable(): boolean;
-    function showNotification(type: 'success' | 'error' | 'warning' | 'info', message: string): void;
+    function showNotification(type: string, message: string): void;
     function showLoading(message: string): void;
     function hideLoading(): void;
     function getEditorValue(): string;
@@ -69,22 +54,13 @@ declare global {
     function closeLanguageDialog(): void;
     function openAIChatPanel(): void;
     function closeAIChatPanel(): void;
+    function insertSQLToEditor(sql: string): void;
 
     // i18n
-    const i18n: {
-        currentLang: string;
-        init(): void;
-        t(key: string): string;
-        setLang(lang: string): void;
-        messages: Record<string, Record<string, string>>;
-    };
+    const i18n: any;
 
     // DomUtils
-    const DomUtils: {
-        escapeHtml(str: string): string;
-        createElement(tag: string, props?: Record<string, any>, children?: Node[]): HTMLElement;
-        debounce(fn: Function, delay: number): Function;
-    };
+    const DomUtils: any;
 
     // Event bus
     function PublishEvent(eventType: string, data: any): void;
