@@ -5,7 +5,7 @@
 // Connection Types
 // ============================================================
 
-export type DatabaseType = 'postgresql' | 'mysql' | 'sqlite' | 'redis' | 'polardb' | 'gaussdb' | 'mongodb' | 'elasticsearch';
+export type DatabaseType = 'postgresql' | 'mysql' | 'sqlite' | 'redis' | 'polardb' | 'gaussdb' | 'oracle' | 'mongodb' | 'elasticsearch';
 
 export interface Connection {
     id: string;

@@ -171,6 +171,8 @@ func (a *App) getDefaultDatabase(dbType string) string {
 		return "postgres"
 	case "mysql":
 		return "mysql"
+	case "oracle":
+		return "ORCL"
 	case "redis":
 		return "0"
 	case "sqlite":

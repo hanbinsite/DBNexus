@@ -16,6 +16,7 @@ const (
 	MySQL      DBType = "mysql"
 	Redis      DBType = "redis"
 	SQLite     DBType = "sqlite"
+	Oracle     DBType = "oracle"
 )
 
 // ConnectionConfig represents database connection configuration
@@ -72,6 +73,8 @@ func (dm *DriverManager) newDriver(dbType DBType) (DatabaseDriver, error) {
 		return NewSQLiteDriver(), nil
 	case Redis:
 		return NewRedisDriver(), nil
+	case Oracle:
+		return NewOracleDriver(), nil
 	default:
 		return nil, fmt.Errorf("driver not found for database type: %s", dbType)
 	}

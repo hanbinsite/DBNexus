@@ -109,7 +109,7 @@ func (a *App) validateEditRequest(req EditRequest) error {
 func quoteIdentifier(name, dbType string) string {
 	safeName := sanitizeIdentifier(name)
 	switch dbType {
-	case "postgresql", "polardb", "gaussdb":
+	case "postgresql", "polardb", "gaussdb", "oracle":
 		return fmt.Sprintf("\"%s\"", safeName)
 	default:
 		return fmt.Sprintf("`%s`", safeName)

@@ -24,6 +24,8 @@ func (a *App) BackupDatabase(config Connection, database string, outputPath stri
 		return a.backupMySQL(config, database, outputPath)
 	case "postgresql", "polardb", "gaussdb":
 		return a.backupPostgres(config, database, outputPath)
+	case "oracle":
+		return a.backupOracle(config, database, outputPath)
 	case "sqlite":
 		return a.backupSQLite(config, outputPath)
 	default:
@@ -138,6 +140,8 @@ func (a *App) RestoreDatabase(config Connection, database string, inputPath stri
 		return a.restoreMySQL(config, database, inputPath)
 	case "postgresql", "polardb", "gaussdb":
 		return a.restorePostgres(config, database, inputPath)
+	case "oracle":
+		return a.restoreOracle(config, database, inputPath)
 	case "sqlite":
 		return a.restoreSQLite(config, inputPath)
 	default:
@@ -230,6 +234,70 @@ func (a *App) restoreSQLite(config Connection, inputPath string) error {
 	GetAuditLogger().Log(AuditLevelWarning, AuditEventQuery,
 		fmt.Sprintf("SQLite恢复: %s <- %s", dstFile, inputPath),
 		map[string]interface{}{"path": inputPath},
+	)
+
+	return nil
+}
+
+// backupOracle uses exp (traditional export) to back up Oracle database
+func (a *App) backupOracle(config Connection, database string, outputPath string) (string, error) {
+	// Build Oracle connection string: user/pass@host:port/service
+	connStr := fmt.Sprintf("%s/%s@%s:%d/%s",
+		config.Username, config.Password, config.Host, config.Port, database)
+
+	args := []string{
+		connStr,
+		"file=" + outputPath,
+		"owner=" + config.Username,
+		"statistics=none",
+	}
+
+	cmd := exec.Command("exp", args...)
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create backup file: %w", err)
+	}
+	defer f.Close()
+
+	cmd.Stdout = f
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		os.Remove(outputPath)
+		return "", fmt.Errorf("exp failed: %w (is Oracle client installed?)", err)
+	}
+
+	GetAuditLogger().Log(AuditLevelInfo, AuditEventQuery,
+		fmt.Sprintf("Oracle备份: %s -> %s", database, outputPath),
+		map[string]interface{}{"database": database, "path": outputPath},
+	)
+
+	return outputPath, nil
+}
+
+// restoreOracle uses imp (traditional import) to restore Oracle database
+func (a *App) restoreOracle(config Connection, database string, inputPath string) error {
+	connStr := fmt.Sprintf("%s/%s@%s:%d/%s",
+		config.Username, config.Password, config.Host, config.Port, database)
+
+	args := []string{
+		connStr,
+		"file=" + inputPath,
+		"fromuser=" + config.Username,
+		"touser=" + config.Username,
+		"ignore=y",
+	}
+
+	cmd := exec.Command("imp", args...)
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("imp failed: %w (is Oracle client installed?)", err)
+	}
+
+	GetAuditLogger().Log(AuditLevelWarning, AuditEventQuery,
+		fmt.Sprintf("Oracle恢复: %s <- %s", database, inputPath),
+		map[string]interface{}{"database": database, "path": inputPath},
 	)
 
 	return nil

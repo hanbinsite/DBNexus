@@ -419,9 +419,46 @@ func getDBSpecificFunctions(dbType string) []SQLKeyword {
 		return mysqlFunctions
 	case "postgresql", "polardb", "gaussdb":
 		return postgresFunctions
+	case "oracle":
+		return oracleFunctions
 	default:
 		return []SQLKeyword{}
 	}
+}
+
+var oracleFunctions = []SQLKeyword{
+	{"NVL", "NULL值替换"},
+	{"NVL2", "条件NULL值替换"},
+	{"DECODE", "条件解码"},
+	{"ROWNUM", "行号伪列"},
+	{"SYSDATE", "当前日期"},
+	{"SYSTIMESTAMP", "当前时间戳"},
+	{"TO_DATE", "字符串转日期"},
+	{"TO_CHAR", "格式化字符"},
+	{"TO_NUMBER", "字符串转数字"},
+	{"TO_TIMESTAMP", "字符串转时间戳"},
+	{"LISTAGG", "字符串聚合"},
+	{"CONNECT_BY_PRIOR", "层次查询"},
+	{"START WITH", "层次查询起点"},
+	{"DUAL", "虚拟表"},
+	{"ROWID", "行标识伪列"},
+	{"LEVEL", "层次查询层级"},
+	{"COALESCE", "返回第一个非NULL值"},
+	{"EXTRACT", "提取日期部分"},
+	{"LAST_DAY", "月份最后一天"},
+	{"ADD_MONTHS", "增加月份"},
+	{"MONTHS_BETWEEN", "月份差"},
+	{"TRUNC", "截断日期/数字"},
+	{"REGEXP_LIKE", "正则匹配"},
+	{"REGEXP_REPLACE", "正则替换"},
+	{"REGEXP_SUBSTR", "正则提取"},
+	{"DBMS_OUTPUT", "输出包"},
+	{"SEQUENCE", "序列"},
+	{"NEXTVAL", "序列下一个值"},
+	{"CURRVAL", "序列当前值"},
+	{"MERGE", "合并语句"},
+	{"PIVOT", "行转列"},
+	{"UNPIVOT", "列转行"},
 }
 
 func filterAndSortSuggestions(suggestions []AutoCompleteItem, prefix string) []AutoCompleteItem {

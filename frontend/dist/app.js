@@ -252,6 +252,7 @@ function updateConnectionForm(type) {
         gaussdb: 'GaussDB',
         sqlite: 'SQLite',
         redis: 'Redis',
+        oracle: 'Oracle',
         mongodb: 'MongoDB',
         elasticsearch: 'Elasticsearch',
         cloud: '云数据库'
@@ -309,6 +310,15 @@ function updateConnectionForm(type) {
             if (!connName.value) connName.placeholder = 'Redis 连接';
             databaseHint.textContent = 'Redis 数据库编号 (0-15)';
             dbNameLabel.textContent = '数据库编号';
+            break;
+            
+        case 'oracle':
+            portInput.value = '1521';
+            connUser.placeholder = 'system';
+            connHost.placeholder = 'localhost';
+            if (!connName.value) connName.placeholder = 'Oracle 连接';
+            databaseHint.textContent = '服务名或 SID (如 ORCL、XE)';
+            dbNameLabel.textContent = '服务名/SID';
             break;
             
         case 'mongodb':
@@ -653,7 +663,8 @@ function addConnectionToList(connection) {
         polardb: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
         gaussdb: '<circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M2 12h20"/>',
         sqlite: '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>',
-        redis: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 6c-1.5 0-3 1.5-3 4s1.5 4 3 4 3-1.5 3-4-1.5-4-3-4z"/><path d="M12 14c-1 0-2 .5-2 2s1 2 2 2 2-.5 2-2-1-2-2-2z"/>'
+        redis: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 6c-1.5 0-3 1.5-3 4s1.5 4 3 4 3-1.5 3-4-1.5-4-3-4z"/><path d="M12 14c-1 0-2 .5-2 2s1 2 2 2 2-.5 2-2-1-2-2-2z"/>',
+        oracle: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M7 17V7h5a3 3 0 0 1 0 6H9"/><path d="M9 13l4 4"/>'
     };
     
     const iconColors = {
@@ -662,7 +673,8 @@ function addConnectionToList(connection) {
         polardb: 'linear-gradient(135deg, #6366f1, #4f46e5)',
         gaussdb: 'linear-gradient(135deg, #6366f1, #4f46e5)',
         sqlite: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-        redis: 'linear-gradient(135deg, #dc382d, #a4201a)'
+        redis: 'linear-gradient(135deg, #dc382d, #a4201a)',
+        oracle: 'linear-gradient(135deg, #c7372d, #a02020)'
     };
 
   // Build connection item with safe DOM creation (no inline event handlers)
