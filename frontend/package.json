@@ -1,0 +1,14 @@
+{
+  "name": "dbnexus",
+  "version": "0.0.1",
+  "description": "Cross-platform Database Client with AI Assistant",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "check": "tsc --noEmit",
+    "bundle": "tsc && node scripts/bundle.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
