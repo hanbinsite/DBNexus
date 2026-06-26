@@ -1061,6 +1061,13 @@
                         </svg>
                         <span>插件</span>
                     </button>
+                    <button class="settings-nav-btn" data-section="oracle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                            <path d="M7 17V7h5a3 3 0 0 1 0 6H9"/>
+                        </svg>
+                        <span>Oracle</span>
+                    </button>
                 </div>
                 <div class="settings-content">
                     <div class="settings-section active" data-section="general">
@@ -1201,12 +1208,44 @@
                             <div style="margin-top:16px;">
                                 <h4 style="font-size:12px;color:var(--fg-muted);margin-bottom:8px;">可用钩子类型</h4>
                                 <div id="pluginHooksList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                        </div>
+                    </div>
+                    <!-- Oracle Client Settings -->
+                    <div class="settings-section" data-section="oracle">
+                        <h3>Oracle 客户端配置</h3>
+                        <div class="settings-group">
+                            <div style="padding:10px;background:var(--bg-tertiary);border-radius:var(--radius-md);margin-bottom:12px;font-size:12px;color:var(--fg-secondary);">
+                                <strong>Oracle Instant Client</strong> 是连接 Oracle 数据库的必需依赖 (CGO)。<br>
+                                请下载并解压后，在下方设置路径。
                             </div>
+                            <label class="settings-label">
+                                <span>Instant Client 路径</span>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="oracleClientPath" placeholder="C:\oracle\instantclient_19_19 或 /usr/lib/oracle/19.19/client64/lib" style="flex:1;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md);color:var(--fg-primary);font-size:13px;">
+                                    <button class="btn btn-secondary btn-sm" onclick="browseOracleClientPath()">浏览</button>
+                                </div>
+                            </label>
+                            <label class="settings-label">
+                                <span>TNS_ADMIN 路径 (可选)</span>
+                                <input type="text" id="oracleTNSAdmin" placeholder="tnsname.ora 所在目录" style="width:100%;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md);color:var(--fg-primary);font-size:13px;">
+                            </label>
+                            <label class="settings-label">
+                                <span>NLS_LANG (可选)</span>
+                                <input type="text" id="oracleNLSLang" placeholder="AMERICAN_AMERICA.AL32UTF8" style="width:100%;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md);color:var(--fg-primary);font-size:13px;">
+                            </label>
+                            <div style="display:flex;gap:8px;margin-top:12px;">
+                                <button class="btn btn-primary btn-sm" onclick="saveOracleClientConfigUI()">保存配置</button>
+                                <button class="btn btn-secondary btn-sm" onclick="testOracleClientUI()">测试</button>
+                                <button class="btn btn-secondary btn-sm" onclick="showOracleDownloadInfo()">下载地址</button>
+                            </div>
+                            <div id="oracleTestResult" style="margin-top:12px;display:none;padding:10px;border-radius:var(--radius-md);font-size:12px;"></div>
+                            <div id="oracleDownloadInfo" style="margin-top:12px;display:none;padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md);font-size:12px;color:var(--fg-secondary);"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
     </div>
     </div>
 

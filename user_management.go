@@ -33,6 +33,8 @@ func (a *App) GetDatabaseUsers(config Connection) ([]DBUser, error) {
 		query = "SELECT user, host FROM mysql.user ORDER BY user"
 	case "postgresql", "polardb", "gaussdb":
 		query = "SELECT usename, '%' FROM pg_user ORDER BY usename"
+	case "oracle":
+		query = "SELECT username, '%' FROM all_users ORDER BY username"
 	default:
 		return []DBUser{}, nil
 	}
@@ -84,6 +86,8 @@ func (a *App) CreateDatabaseUser(config Connection, username string, password st
 		query = fmt.Sprintf("CREATE USER '%s'@'%s' IDENTIFIED BY '%s'", safeUser, safeHost, escapeStringLiteral(password))
 	case "postgresql", "polardb", "gaussdb":
 		query = fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s'", safeUser, escapeStringLiteral(password))
+	case "oracle":
+		query = fmt.Sprintf("CREATE USER %s IDENTIFIED BY \"%s\"", safeUser, escapeStringLiteral(password))
 	default:
 		return fmt.Errorf("user management not supported for %s", config.Type)
 	}
@@ -131,6 +135,8 @@ func (a *App) DropDatabaseUser(config Connection, username string, host string) 
 		query = fmt.Sprintf("DROP USER '%s'@'%s'", safeUser, safeHost)
 	case "postgresql", "polardb", "gaussdb":
 		query = fmt.Sprintf("DROP USER %s", safeUser)
+	case "oracle":
+		query = fmt.Sprintf("DROP USER %s CASCADE", safeUser)
 	default:
 		return fmt.Errorf("user management not supported for %s", config.Type)
 	}
@@ -180,6 +186,8 @@ func (a *App) GrantPrivileges(config Connection, username string, database strin
 		query = fmt.Sprintf("GRANT %s ON `%s`.* TO '%s'@'%s'", privs, safeDB, safeUser, safeHost)
 	case "postgresql", "polardb", "gaussdb":
 		query = fmt.Sprintf("GRANT %s ON DATABASE %s TO %s", privs, safeDB, safeUser)
+	case "oracle":
+		query = fmt.Sprintf("GRANT %s ON %s TO %s", privs, safeDB, safeUser)
 	default:
 		return fmt.Errorf("grant not supported for %s", config.Type)
 	}

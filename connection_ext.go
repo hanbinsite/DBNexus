@@ -174,6 +174,14 @@ func (a *App) GetTablePartitions(config Connection, database string, tableName s
 			WHERE parent.relname = '%s'
 			ORDER BY pt.relname
 		`, safeTable)
+	case "oracle":
+		query = fmt.Sprintf(`
+			SELECT partition_name, partitioning_type, '',
+				num_rows, tablespace_name, ''
+			FROM user_tab_partitions
+			WHERE table_name = '%s'
+			ORDER BY partition_position
+		`, safeTable)
 	default:
 		return []PartitionInfo{}, nil
 	}
@@ -245,6 +253,12 @@ func (a *App) GetIndexUsageStats(config Connection, database string) ([]IndexUsa
 			WHERE TABLE_SCHEMA = DATABASE()
 			GROUP BY INDEX_NAME, TABLE_NAME
 			ORDER BY INDEX_NAME
+		`
+	case "oracle":
+		query = `
+			SELECT index_name, table_name, 0, 0, 0, ''
+			FROM user_indexes
+			ORDER BY index_name
 		`
 	default:
 		return []IndexUsage{}, nil

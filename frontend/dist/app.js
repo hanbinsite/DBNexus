@@ -113,6 +113,11 @@ function initWails() {
             executeReportTemplate: (conn, db, id, params) => api.ExecuteReportTemplate(conn, db, id, params),
             // SSL
             testSSLConnection: (connID) => api.TestSSLConnection(connID),
+            // Oracle Client
+            getOracleClientConfig: () => api.GetOracleClientConfig(),
+            setOracleClientConfig: (cfg) => api.SetOracleClientConfig(cfg),
+            testOracleClient: () => api.TestOracleClient(),
+            getOracleClientDownloadURLs: () => api.GetOracleClientDownloadURLs(),
             // Multi-Window
             createWindow: (title, connID, db) => api.CreateWindow(title, connID, db),
             closeWindowByID: (id) => api.CloseWindowByID(id),
@@ -2642,6 +2647,7 @@ function openSettings() {
     loadRolesUI();
     loadPluginsUI();
     loadPluginHooksUI();
+    loadOracleClientConfigUI();
 }
 
 function closeSettings() {
@@ -2799,6 +2805,169 @@ async function loadPluginHooksUI() {
         badge.textContent = h;
         el.appendChild(badge);
     });
+}
+
+// ==================== Oracle Client Config UI ====================
+
+async function loadOracleClientConfigUI() {
+    try {
+        if (!isWailsAvailable() || !WailsAPI.getOracleClientConfig) return;
+        const cfg = await WailsAPI.getOracleClientConfig();
+        const pathInput = document.getElementById('oracleClientPath');
+        const tnsInput = document.getElementById('oracleTNSAdmin');
+        const nlsInput = document.getElementById('oracleNLSLang');
+        if (pathInput) pathInput.value = cfg.instant_client_path || '';
+        if (tnsInput) tnsInput.value = cfg.tns_admin || '';
+        if (nlsInput) nlsInput.value = cfg.nls_lang || '';
+    } catch (e) { /* ignore */ }
+}
+
+async function browseOracleClientPath() {
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    try {
+        const path = await WailsAPI.openFileDialog();
+        if (path && document.getElementById('oracleClientPath')) {
+            document.getElementById('oracleClientPath').value = path;
+        }
+    } catch (e) { showNotification('error', '选择路径失败: ' + (e.message || e)); }
+}
+
+async function saveOracleClientConfigUI() {
+    const path = document.getElementById('oracleClientPath')?.value.trim() || '';
+    const tns = document.getElementById('oracleTNSAdmin')?.value.trim() || '';
+    const nls = document.getElementById('oracleNLSLang')?.value.trim() || '';
+
+    if (!path) { showNotification('warning', '请填写 Instant Client 路径'); return; }
+
+    if (!isWailsAvailable() || !WailsAPI.setOracleClientConfig) {
+        showNotification('warning', '需要后端服务支持');
+        return;
+    }
+
+    try {
+        await WailsAPI.setOracleClientConfig({
+            instant_client_path: path,
+            lib_path: path,
+            tns_admin: tns,
+            nls_lang: nls,
+        });
+        showNotification('success', 'Oracle 客户端配置已保存');
+    } catch (e) {
+        showNotification('error', '保存失败: ' + (e.message || e));
+    }
+}
+
+async function testOracleClientUI() {
+    if (!isWailsAvailable() || !WailsAPI.testOracleClient) {
+        showNotification('warning', '需要后端服务支持');
+        return;
+    }
+
+    // Save config first
+    await saveOracleClientConfigUI();
+
+    const resultDiv = document.getElementById('oracleTestResult');
+    if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = 'var(--bg-tertiary)';
+        resultDiv.style.color = 'var(--fg-muted)';
+        resultDiv.textContent = '测试中...';
+    }
+
+    try {
+        const result = await WailsAPI.testOracleClient();
+        let success = false, message = '';
+        if (Array.isArray(result)) {
+            success = result[0];
+            message = result[1] || '';
+        } else if (result && typeof result === 'object') {
+            success = result.success;
+            message = result.message || '';
+        }
+
+        if (resultDiv) {
+            resultDiv.style.background = success ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
+            resultDiv.style.color = success ? 'var(--accent-success)' : 'var(--accent-danger)';
+            resultDiv.textContent = message;
+        }
+        showNotification(success ? 'success' : 'error', message);
+    } catch (e) {
+        if (resultDiv) {
+            resultDiv.style.background = 'rgba(239,68,68,0.15)';
+            resultDiv.style.color = 'var(--accent-danger)';
+            resultDiv.textContent = '测试失败: ' + (e.message || e);
+        }
+        showNotification('error', '测试失败: ' + (e.message || e));
+    }
+}
+
+async function showOracleDownloadInfo() {
+    if (!isWailsAvailable() || !WailsAPI.getOracleClientDownloadURLs) {
+        showNotification('warning', '需要后端服务支持');
+        return;
+    }
+
+    const infoDiv = document.getElementById('oracleDownloadInfo');
+    if (!infoDiv) return;
+
+    try {
+        const info = await WailsAPI.getOracleClientDownloadURLs();
+        infoDiv.style.display = 'block';
+        infoDiv.innerHTML = '';
+
+        // Info text
+        const infoP = document.createElement('p');
+        infoP.style.marginBottom = '8px';
+        infoP.textContent = info.info || 'Oracle Instant Client 下载';
+        infoDiv.appendChild(infoP);
+
+        // Setup guide
+        const guideDiv = document.createElement('div');
+        guideDiv.style.marginBottom = '10px';
+        guideDiv.innerHTML = '<strong>安装步骤:</strong><br>';
+        (info.setup_guide || []).forEach(step => {
+            const s = document.createElement('div');
+            s.style.marginLeft = '8px';
+            s.textContent = step;
+            guideDiv.appendChild(s);
+        });
+        infoDiv.appendChild(guideDiv);
+
+        // Platform links
+        const linksDiv = document.createElement('div');
+        linksDiv.innerHTML = '<strong>下载地址:</strong><br>';
+        (info.platforms || []).forEach(platform => {
+            const link = document.createElement('a');
+            link.href = platform.url;
+            link.target = '_blank';
+            link.style.cssText = 'display:block;color:var(--accent-primary);text-decoration:none;margin:4px 0 4px 8px;font-size:11px;';
+            link.textContent = `${platform.os} ${platform.arch} → ${platform.url}`;
+            link.title = platform.note || '';
+            linksDiv.appendChild(link);
+
+            const note = document.createElement('div');
+            note.style.cssText = 'margin-left:16px;font-size:10px;color:var(--fg-muted);margin-bottom:4px;';
+            note.textContent = platform.note || '';
+            linksDiv.appendChild(note);
+        });
+        infoDiv.appendChild(linksDiv);
+
+        // Env vars
+        const envDiv = document.createElement('div');
+        envDiv.style.marginTop = '10px';
+        envDiv.innerHTML = '<strong>环境变量说明:</strong><br>';
+        const envVars = info.env_vars || {};
+        for (const [key, desc] of Object.entries(envVars)) {
+            const env = document.createElement('div');
+            env.style.cssText = 'margin-left:8px;font-size:11px;margin-bottom:2px;';
+            env.innerHTML = `<code style="color:var(--accent-warning);">${key}</code>: ${desc}`;
+            envDiv.appendChild(env);
+        }
+        infoDiv.appendChild(envDiv);
+
+    } catch (e) {
+        infoDiv.innerHTML = '<span style="color:var(--accent-danger);">加载失败: ' + (e.message || e) + '</span>';
+    }
 }
 
 function saveSettings() {

@@ -26,6 +26,8 @@ func (a *App) GetExplainPlanSafe(config Connection, database string, query strin
 			explainQuery = "EXPLAIN (ANALYZE, FORMAT TEXT) " + query
 		case "mysql":
 			explainQuery = "EXPLAIN ANALYZE " + query
+		case "oracle":
+			explainQuery = "EXPLAIN PLAN FOR " + query
 		default:
 			return nil, fmt.Errorf("EXPLAIN ANALYZE not supported for %s", config.Type)
 		}

@@ -436,6 +436,12 @@ func (a *App) GetTableStatsFast(config Connection, database string, tableName st
 			JOIN pg_namespace n ON n.oid = c.relnamespace
 			WHERE c.relname = '%s' AND c.relkind = 'r'
 		`, safeTable)
+	case "oracle":
+		query = fmt.Sprintf(`
+			SELECT num_rows, 0, 0, '', '', '', comments
+			FROM user_tab_comments
+			WHERE table_name = '%s'
+		`, safeTable)
 	default:
 		return a.GetTableStats(config, database, tableName)
 	}

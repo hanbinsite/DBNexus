@@ -109,6 +109,33 @@ func (a *App) GenerateTableDDL(config Connection, database string, tableName str
 		}
 		ddl.WriteString("\n);")
 
+	case "oracle":
+		ddl.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", safeTable))
+		columns, err := driver.GetTableStructure(ctx, tableName)
+		if err != nil {
+			return "", fmt.Errorf("failed to get columns: %w", err)
+		}
+		var primaryKeys []string
+		for i, col := range columns {
+			if i > 0 {
+				ddl.WriteString(",\n")
+			}
+			ddl.WriteString(fmt.Sprintf("  %s %s", sanitizeIdentifier(col.Name), col.Type))
+			if !col.Nullable {
+				ddl.WriteString(" NOT NULL")
+			}
+			if col.DefaultValue != "" {
+				ddl.WriteString(fmt.Sprintf(" DEFAULT %s", col.DefaultValue))
+			}
+			if col.PrimaryKey {
+				primaryKeys = append(primaryKeys, col.Name)
+			}
+		}
+		if len(primaryKeys) > 0 {
+			ddl.WriteString(fmt.Sprintf(",\n  PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
+		}
+		ddl.WriteString("\n);")
+
 	default:
 		return "", fmt.Errorf("DDL generation not supported for type: %s", config.Type)
 	}
@@ -166,8 +193,19 @@ func (a *App) GetTableTriggers(config Connection, database string, tableName str
 				''
 			FROM pg_trigger t
 			JOIN pg_class c ON c.oid = t.tgrelid
-			WHERE c.relname = '%s' AND NOT t.tgisinternal
-			ORDER BY t.tgname
+		WHERE c.relname = '%s' AND NOT t.tgisinternal
+		ORDER BY t.tgname
+	`, safeTable)
+	case "oracle":
+		query = fmt.Sprintf(`
+			SELECT trigger_name,
+				triggering_event,
+				trigger_type,
+				trigger_body,
+				''
+			FROM user_triggers
+			WHERE table_name = '%s'
+			ORDER BY trigger_name
 		`, safeTable)
 	default:
 		return []TriggerInfo{}, nil

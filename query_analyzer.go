@@ -107,6 +107,8 @@ func (a *App) GetExplainPlan(config Connection, database string, query string) E
 		explainQuery = "EXPLAIN " + query
 	case "postgresql", "polardb", "gaussdb":
 		explainQuery = "EXPLAIN ANALYZE " + query
+	case "oracle":
+		explainQuery = "EXPLAIN PLAN FOR " + query
 	default:
 		explainQuery = "EXPLAIN " + query
 	}
@@ -455,7 +457,20 @@ func (a *App) GetSlowQueries(config Connection, database string, thresholdSecond
 			WHERE query_time > %d
 			ORDER BY query_time DESC
 			LIMIT 50
-		`, thresholdSeconds)
+	`, thresholdSeconds)
+	case "oracle":
+		query = fmt.Sprintf(`
+			SELECT
+				sql_text AS query_sql,
+				elapsed_time AS avg_time_ms,
+				0 AS lock_time,
+				rows_processed AS rows_sent,
+				0 AS rows_examined
+			FROM v$sql
+			WHERE elapsed_time > %d
+			ORDER BY elapsed_time DESC
+			FETCH FIRST 50 ROWS ONLY
+		`, thresholdSeconds*1000)
 	default:
 		return []map[string]interface{}{}, nil
 	}

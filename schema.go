@@ -86,6 +86,8 @@ func (a *App) GetViews(config Connection, database string) ([]TableInfo, error) 
 		FROM sqlite_master
 		WHERE type='view'
 		`
+	case "oracle":
+		query = `SELECT view_name FROM user_views ORDER BY view_name`
 	default:
 		return []TableInfo{}, nil
 	}
@@ -140,6 +142,8 @@ func (a *App) GetFunctions(config Connection, database string) ([]TableInfo, err
 		`
 	case "sqlite":
 		return []TableInfo{}, nil
+	case "oracle":
+		query = `SELECT object_name FROM user_objects WHERE object_type = 'FUNCTION' ORDER BY object_name`
 	default:
 		return []TableInfo{}, nil
 	}
@@ -243,6 +247,19 @@ func (a *App) GetTableIndexes(config Connection, database string, table string) 
 			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
 			WHERE t.relname = '%s'
 			GROUP BY i.relname, ix.indisunique, ix.indisprimary
+		`, safeTable)
+	case "oracle":
+		safeTable := sanitizeIdentifier(table)
+		query = fmt.Sprintf(`
+			SELECT i.index_name,
+			       CASE WHEN i.uniqueness = 'UNIQUE' THEN 1 ELSE 0 END as is_unique,
+			       CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END as is_primary,
+			       LISTAGG(ic.column_name, ',') WITHIN GROUP (ORDER BY ic.column_position) as columns
+			FROM user_indexes i
+			LEFT JOIN user_ind_columns ic ON i.index_name = ic.index_name
+			LEFT JOIN user_constraints c ON i.index_name = c.index_name AND c.constraint_type = 'P'
+			WHERE i.table_name = '%s'
+			GROUP BY i.index_name, i.uniqueness, c.constraint_type
 		`, safeTable)
 	default:
 		return []IndexInfo{}, nil
@@ -376,7 +393,20 @@ func (a *App) GetTableForeignKeys(config Connection, database string, table stri
 			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
 			JOIN pg_class ref ON ref.oid = c.confrelid
 			JOIN pg_attribute af ON af.attrelid = ref.oid AND af.attnum = ANY(c.confkey)
-			WHERE c.contype = 'f' AND t.relname = '%s'
+		WHERE c.contype = 'f' AND t.relname = '%s'
+	`, safeTable)
+	case "oracle":
+		query = fmt.Sprintf(`
+			SELECT
+				a.constraint_name,
+				a.column_name,
+				a.table_name,
+				a.column_name,
+				c.delete_rule,
+				'NO ACTION'
+			FROM user_cons_columns a
+			JOIN user_constraints c ON a.constraint_name = c.constraint_name
+			WHERE c.constraint_type = 'R' AND a.table_name = '%s'
 		`, safeTable)
 	default:
 		return []ForeignKeyInfo{}, nil
@@ -427,7 +457,7 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 	safeTable := sanitizeIdentifier(table)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", safeTable)
-	if config.Type == "postgresql" || config.Type == "polardb" || config.Type == "gaussdb" {
+	if config.Type == "postgresql" || config.Type == "polardb" || config.Type == "gaussdb" || config.Type == "oracle" {
 		countQuery = fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", safeTable)
 	}
 
@@ -447,6 +477,14 @@ func (a *App) GetTableStats(config Connection, database string, table string) (T
 				pg_relation_size('%s') as data_length,
 				pg_indexes_size('%s') as index_length
 		`, safeTable, safeTable)
+	case "oracle":
+		infoQuery = fmt.Sprintf(`
+			SELECT
+				NUM_ROWS as data_length,
+				0 as index_length
+			FROM user_tables
+			WHERE table_name = '%s'
+		`, safeTable)
 	}
 
 	rows2, err := driver.Query(a.ctx, infoQuery)
