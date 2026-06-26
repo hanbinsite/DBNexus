@@ -113,6 +113,23 @@ function initWails() {
             executeReportTemplate: (conn, db, id, params) => api.ExecuteReportTemplate(conn, db, id, params),
             // SSL
             testSSLConnection: (connID) => api.TestSSLConnection(connID),
+            // Multi-Window
+            createWindow: (title, connID, db) => api.CreateWindow(title, connID, db),
+            closeWindowByID: (id) => api.CloseWindowByID(id),
+            getAllWindows: () => api.GetAllWindows(),
+            activateWindowByID: (id) => api.ActivateWindowByID(id),
+            updateWindowGeometry: (id, w, h, x, y) => api.UpdateWindowGeometry(id, w, h, x, y),
+            updateWindowConnection: (id, connID, db) => api.UpdateWindowConnection(id, connID, db),
+            getActiveWindowInfo: () => api.GetActiveWindowInfo(),
+            getWindowCount: () => api.GetWindowCount(),
+            getWindowSessionState: (winID) => api.GetWindowSessionState(winID),
+            saveWindowSessionState: (session) => api.SaveWindowSessionState(session),
+            addWindowTab: (winID, tab) => api.AddWindowTab(winID, tab),
+            removeWindowTab: (winID, tabID) => api.RemoveWindowTab(winID, tabID),
+            // AI Chat
+            aiChat: (req) => api.AIChat(req),
+            recommendIndexes: (conn, db, table) => api.RecommendIndexes(conn, db, table),
+            aiOptimizeQuery: (conn, db, sql) => api.AIOptimizeQuery(conn, db, sql),
         };
         state.wailsReady = true;
     }
@@ -139,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initResultsTabs();
     initKeyboardShortcuts();
     initAccessibility();
+    initMultiWindow();
     updateClock();
     loadSettings();
     setInterval(updateClock, 1000);
