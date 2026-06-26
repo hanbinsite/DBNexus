@@ -1,125 +1,137 @@
-// ==========================================================================
-// Transaction Management Panel Module
-// ==========================================================================
-let activeTxId = null;
-let txStartTime = null;
-let txTimerInterval = null;
-
-function openTransactionPanel() {
-    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
-    document.getElementById('transactionPanel').style.display = 'block';
-}
-
-function closeTransactionPanel() {
-    document.getElementById('transactionPanel').style.display = 'none';
-}
-
-function updateTransactionStatus() {
-    const label = document.getElementById('transactionLabel');
-    if (label) {
-        label.style.color = activeTxId ? 'var(--accent-primary)' : '';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.beginTransaction = beginTransaction;
+exports.executeInTransaction = executeInTransaction;
+exports.commitTransaction = commitTransaction;
+exports.rollbackTransaction = rollbackTransaction;
+exports.createSavepoint = createSavepoint;
+exports.rollbackToSavepoint = rollbackToSavepoint;
+exports.getCurrentTransactionId = getCurrentTransactionId;
+exports.hasActiveTransaction = hasActiveTransaction;
+exports.getActiveTransactions = getActiveTransactions;
+let currentTransactionId = null;
+async function beginTransaction(options) {
+    if (!state.activeConnection) {
+        showNotification('warning', '请先选择连接');
+        return;
     }
-}
-
-async function startTransaction() {
-    if (!state.activeConnection || !isWailsAvailable()) return;
-    showLoading('开始事务...');
     try {
-        const db = state.selectedDatabase || state.currentTable?.database || '';
-        const result = await WailsAPI.beginTransaction(state.activeConnection, db, { isolated: true });
-        activeTxId = result.tx_id || result.txID;
-        txStartTime = Date.now();
-        document.getElementById('txId').textContent = `TX: ${activeTxId}`;
-        document.getElementById('txNoActive').style.display = 'none';
-        document.getElementById('txActive').style.display = 'block';
-        document.getElementById('txResults').innerHTML = '';
-        document.getElementById('txQuery').value = '';
-        startTxTimer();
-        updateTransactionStatus();
-        hideLoading();
-        showNotification('success', '事务已开始');
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `开始事务失败: ${e.message || e}`);
-    }
-}
-
-function startTxTimer() {
-    if (txTimerInterval) clearInterval(txTimerInterval);
-    txTimerInterval = setInterval(() => {
-        if (!txStartTime) return;
-        const elapsed = Math.floor((Date.now() - txStartTime) / 1000);
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        document.getElementById('txTimer').textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }, 1000);
-}
-
-function stopTxTimer() {
-    if (txTimerInterval) { clearInterval(txTimerInterval); txTimerInterval = null; }
-}
-
-async function executeInTx() {
-    if (!activeTxId) { showNotification('warning', '无活动事务'); return; }
-    if (!isWailsAvailable()) return;
-    const query = document.getElementById('txQuery').value.trim();
-    if (!query) { showNotification('warning', '请输入 SQL'); return; }
-    showLoading('执行中...');
-    try {
-        const result = await WailsAPI.executeInTransaction(activeTxId, query);
-        hideLoading();
-        const resultsEl = document.getElementById('txResults');
-        const div = document.createElement('div');
-        div.style.cssText = 'padding:6px 8px;background:var(--bg-primary);border-radius:var(--radius-md);margin-bottom:4px;font-family:var(--font-mono);font-size:12px;';
-        if (result.error) {
-            div.style.borderLeft = '3px solid var(--danger)';
-            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0, 60))}...</span><br><span style="color:var(--danger);">${DomUtils.escapeHtml(result.error)}</span>`;
-        } else {
-            div.style.borderLeft = '3px solid var(--success)';
-            div.innerHTML = `<span style="color:var(--text-secondary);">${DomUtils.escapeHtml(query.substring(0, 60))}...</span><br>影响: ${result.rows_affected || 0} 行`;
+        if (isWailsAvailable()) {
+            const txId = await WailsAPI.beginTransaction(state.activeConnection, state.selectedDatabase || '', options || {});
+            currentTransactionId = txId;
+            showNotification('success', `事务已开始: ${txId}`);
+            updateTransactionStatus();
         }
-        resultsEl.insertBefore(div, resultsEl.firstChild);
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `执行失败: ${e.message || e}`);
+    }
+    catch (e) {
+        showNotification('error', '开始事务失败: ' + (e.message || e));
     }
 }
-
-async function commitTx() {
-    if (!activeTxId || !isWailsAvailable()) return;
-    showLoading('提交事务中...');
+async function executeInTransaction(query) {
+    if (!currentTransactionId) {
+        showNotification('warning', '没有活跃事务');
+        return null;
+    }
     try {
-        await WailsAPI.commitTransaction(activeTxId);
-        hideLoading();
-        showNotification('success', '事务已提交');
-        resetTxState();
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `提交失败: ${e.message || e}`);
+        if (isWailsAvailable()) {
+            const result = await WailsAPI.executeInTransaction(currentTransactionId, query);
+            return result;
+        }
     }
+    catch (e) {
+        showNotification('error', '事务执行失败: ' + (e.message || e));
+    }
+    return null;
 }
-
-async function rollbackTx() {
-    if (!activeTxId || !isWailsAvailable()) return;
-    if (!confirm('确定要回滚事务吗？')) return;
-    showLoading('回滚事务中...');
+async function commitTransaction() {
+    if (!currentTransactionId) {
+        showNotification('warning', '没有活跃事务');
+        return;
+    }
     try {
-        await WailsAPI.rollbackTransaction(activeTxId);
-        hideLoading();
-        showNotification('success', '事务已回滚');
-        resetTxState();
-    } catch (e) {
-        hideLoading();
-        showNotification('error', `回滚失败: ${e.message || e}`);
+        if (isWailsAvailable()) {
+            await WailsAPI.commitTransaction(currentTransactionId);
+            showNotification('success', '事务已提交');
+            currentTransactionId = null;
+            updateTransactionStatus();
+        }
+    }
+    catch (e) {
+        showNotification('error', '提交事务失败: ' + (e.message || e));
     }
 }
-
-function resetTxState() {
-    activeTxId = null;
-    txStartTime = null;
-    stopTxTimer();
-    document.getElementById('txNoActive').style.display = 'block';
-    document.getElementById('txActive').style.display = 'none';
-    document.getElementById('txResults').innerHTML = '';
-    updateTransactionStatus();
+async function rollbackTransaction() {
+    if (!currentTransactionId) {
+        showNotification('warning', '没有活跃事务');
+        return;
+    }
+    try {
+        if (isWailsAvailable()) {
+            await WailsAPI.rollbackTransaction(currentTransactionId);
+            showNotification('info', '事务已回滚');
+            currentTransactionId = null;
+            updateTransactionStatus();
+        }
+    }
+    catch (e) {
+        showNotification('error', '回滚事务失败: ' + (e.message || e));
+    }
+}
+async function createSavepoint(name) {
+    if (!currentTransactionId) {
+        showNotification('warning', '没有活跃事务');
+        return;
+    }
+    try {
+        if (isWailsAvailable() && WailsAPI.createSavepoint) {
+            await WailsAPI.createSavepoint(currentTransactionId, name);
+            showNotification('success', `保存点已创建: ${name}`);
+        }
+    }
+    catch (e) {
+        showNotification('error', '创建保存点失败: ' + (e.message || e));
+    }
+}
+async function rollbackToSavepoint(name) {
+    if (!currentTransactionId) {
+        showNotification('warning', '没有活跃事务');
+        return;
+    }
+    try {
+        if (isWailsAvailable() && WailsAPI.rollbackToSavepoint) {
+            await WailsAPI.rollbackToSavepoint(currentTransactionId, name);
+            showNotification('info', `已回滚到保存点: ${name}`);
+        }
+    }
+    catch (e) {
+        showNotification('error', '回滚到保存点失败: ' + (e.message || e));
+    }
+}
+function getCurrentTransactionId() {
+    return currentTransactionId;
+}
+function hasActiveTransaction() {
+    return currentTransactionId !== null;
+}
+function updateTransactionStatus() {
+    const statusEl = document.getElementById('transactionStatus');
+    if (!statusEl)
+        return;
+    if (currentTransactionId) {
+        statusEl.style.display = 'flex';
+        statusEl.classList.add('active');
+    }
+    else {
+        statusEl.style.display = 'none';
+        statusEl.classList.remove('active');
+    }
+}
+async function getActiveTransactions() {
+    try {
+        if (isWailsAvailable() && WailsAPI.getActiveTransactions) {
+            return await WailsAPI.getActiveTransactions();
+        }
+    }
+    catch { }
+    return [];
 }

@@ -14,7 +14,7 @@
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./frontend/dist/modules",
+    "outDir": "./frontend/dist",
     "rootDir": "./frontend/src",
     "sourceMap": false,
     "declaration": false,

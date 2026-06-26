@@ -1,125 +1,158 @@
-// ==========================================================================
-// Redis Browser Panel Module
-// ==========================================================================
-function openRedisPanel() {
-    if (!state.activeConnection) { showNotification('warning', '请先连接 Redis 数据库'); return; }
-    if (state.activeConnection.type !== 'redis') { showNotification('warning', '请先连接 Redis'); return; }
-    document.getElementById('redisPanel').style.display = 'block';
-    loadRedisDBSize();
-    scanRedisKeys();
-}
-
-function closeRedisPanel() {
-    document.getElementById('redisPanel').style.display = 'none';
-}
-
-async function loadRedisDBSize() {
-    if (!isWailsAvailable()) return;
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.loadRedisDatabases = loadRedisDatabases;
+exports.selectRedisDB = selectRedisDB;
+exports.scanRedisKeys = scanRedisKeys;
+exports.loadRedisKeyValue = loadRedisKeyValue;
+exports.setRedisKeyValue = setRedisKeyValue;
+exports.deleteRedisKey = deleteRedisKey;
+exports.loadRedisInfo = loadRedisInfo;
+exports.openRedisPanel = openRedisPanel;
+exports.closeRedisPanel = closeRedisPanel;
+let redisCurrentDB = 0;
+let redisScanCursor = 0;
+async function loadRedisDatabases() {
+    if (!state.activeConnection)
+        return;
     try {
-        const size = await WailsAPI.getRedisDBSize(state.activeConnection);
-        document.getElementById('redisDBSize').textContent = `${size} keys`;
-    } catch (e) {
-        document.getElementById('redisDBSize').textContent = '--';
-    }
-}
-
-async function scanRedisKeys() {
-    const pattern = document.getElementById('redisKeyPattern').value || '*';
-    const listEl = document.getElementById('redisKeyList');
-    listEl.innerHTML = '<div style="padding:8px;color:var(--text-secondary);">扫描中...</div>';
-    if (!isWailsAvailable()) return;
-    try {
-        const result = await WailsAPI.scanRedisKeys(state.activeConnection, pattern, 0, 100);
-        const keys = result.keys || [];
-        if (keys.length === 0) {
-            listEl.innerHTML = '<div style="padding:8px;color:var(--text-secondary);">无匹配 Key</div>';
-            return;
+        if (isWailsAvailable()) {
+            const dbSize = await WailsAPI.getRedisDBSize(state.activeConnection);
+            const dbList = document.getElementById('redisDBList');
+            if (!dbList)
+                return;
+            dbList.innerHTML = '';
+            for (let i = 0; i < dbSize; i++) {
+                const item = document.createElement('div');
+                item.className = 'redis-db-item';
+                item.dataset.db = String(i);
+                item.textContent = `db${i}`;
+                if (i === redisCurrentDB)
+                    item.classList.add('active');
+                item.addEventListener('click', () => selectRedisDB(i));
+                dbList.appendChild(item);
+            }
         }
-        listEl.innerHTML = '';
-        keys.forEach(key => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border-color);cursor:pointer;';
-            item.innerHTML = `<span style="font-family:var(--font-mono);font-size:13px;">${DomUtils.escapeHtml(key)}</span>
-                <button class="action-btn-sm danger" title="删除" style="visibility:hidden;">x</button>`;
-            item.addEventListener('mouseenter', () => { item.querySelector('button').style.visibility = 'visible'; });
-            item.addEventListener('mouseleave', () => { item.querySelector('button').style.visibility = 'hidden'; });
-            item.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); deleteRedisKey(key); });
-            item.addEventListener('click', () => getRedisKeyDetail(key));
-            listEl.appendChild(item);
-        });
-    } catch (e) {
-        listEl.innerHTML = `<div style="padding:8px;color:var(--danger);">扫描失败: ${DomUtils.escapeHtml(e.message || e)}</div>`;
+    }
+    catch (e) {
+        showNotification('error', '加载Redis数据库失败: ' + (e.message || e));
     }
 }
-
-async function getRedisKeyDetail(key) {
-    if (!isWailsAvailable()) return;
-    const detailEl = document.getElementById('redisKeyDetail');
-    const contentEl = document.getElementById('redisKeyDetailContent');
-    if (!detailEl || !contentEl) return;
-
-    detailEl.style.display = 'block';
-    contentEl.textContent = '加载中...';
-
+async function selectRedisDB(dbIndex) {
+    redisCurrentDB = dbIndex;
+    redisScanCursor = 0;
+    document.querySelectorAll('.redis-db-item').forEach(item => item.classList.remove('active'));
+    const item = document.querySelector(`.redis-db-item[data-db="${dbIndex}"]`);
+    if (item)
+        item.classList.add('active');
+    await scanRedisKeys();
+}
+async function scanRedisKeys(pattern = '*') {
+    if (!state.activeConnection)
+        return;
     try {
-        const info = await WailsAPI.getRedisKeyInfo(state.activeConnection, key);
-        const lines = [];
-        lines.push(`Key:   ${key}`);
-        lines.push(`Type:  ${info.type || 'unknown'}`);
-        lines.push(`TTL:   ${info.ttl !== undefined ? info.ttl + 's' : 'N/A'}`);
-        lines.push('');
-        lines.push('Value:');
-        const valStr = typeof info.value === 'string' ? info.value : JSON.stringify(info.value, null, 2);
-        lines.push(valStr);
-        contentEl.textContent = lines.join('\n');
-
-        document.getElementById('redisNewKey').value = key;
-        document.getElementById('redisNewValue').value = typeof info.value === 'string' ? info.value : JSON.stringify(info.value);
-    } catch (e) {
-        contentEl.textContent = `获取失败: ${e.message || e}`;
+        if (isWailsAvailable()) {
+            const result = await WailsAPI.scanRedisKeys(state.activeConnection, pattern, redisScanCursor, 100);
+            const keyList = document.getElementById('redisKeyList');
+            if (!keyList)
+                return;
+            if (redisScanCursor === 0)
+                keyList.innerHTML = '';
+            if (result && result.keys) {
+                result.keys.forEach((key) => {
+                    const item = document.createElement('div');
+                    item.className = 'redis-key-item';
+                    item.textContent = key;
+                    item.addEventListener('click', () => loadRedisKeyValue(key));
+                    keyList.appendChild(item);
+                });
+            }
+            redisScanCursor = result?.cursor || 0;
+        }
+    }
+    catch (e) {
+        showNotification('error', '扫描Key失败: ' + (e.message || e));
     }
 }
-
-async function setRedisKey() {
-    const key = document.getElementById('redisNewKey').value.trim();
-    const value = document.getElementById('redisNewValue').value.trim();
-    if (!key) { showNotification('warning', '请输入 Key'); return; }
-    if (!isWailsAvailable()) return;
+async function loadRedisKeyValue(key) {
+    if (!state.activeConnection)
+        return;
     try {
-        await WailsAPI.setRedisKeyValue(state.activeConnection, key, value, 0);
-        showNotification('success', `SET ${key} OK`);
-        scanRedisKeys();
-    } catch (e) {
-        showNotification('error', `SET 失败: ${e.message}`);
+        if (isWailsAvailable()) {
+            const keyType = await WailsAPI.getRedisKeyType(state.activeConnection, key);
+            const keyInfo = document.getElementById('redisKeyInfo');
+            if (keyInfo) {
+                keyInfo.innerHTML = `<div class="redis-key-detail"><span class="redis-key-name">${DomUtils.escapeHtml(key)}</span><span class="redis-key-type">${keyType}</span></div>`;
+            }
+            const value = await WailsAPI.getRedisKeyValue(state.activeConnection, key);
+            const valueEl = document.getElementById('redisKeyValue');
+            if (valueEl) {
+                if (typeof value === 'object') {
+                    valueEl.innerHTML = `<pre>${DomUtils.escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+                }
+                else {
+                    valueEl.innerHTML = `<pre>${DomUtils.escapeHtml(String(value))}</pre>`;
+                }
+            }
+        }
+    }
+    catch (e) {
+        showNotification('error', '加载Key值失败: ' + (e.message || e));
     }
 }
-
+async function setRedisKeyValue(key, value) {
+    if (!state.activeConnection)
+        return;
+    try {
+        if (isWailsAvailable()) {
+            await WailsAPI.setRedisKey(state.activeConnection, key, value);
+            showNotification('success', 'Key已设置');
+            await loadRedisKeyValue(key);
+        }
+    }
+    catch (e) {
+        showNotification('error', '设置Key失败: ' + (e.message || e));
+    }
+}
 async function deleteRedisKey(key) {
-    if (!confirm(`确定要删除 Key "${key}" 吗？`)) return;
-    if (!isWailsAvailable()) return;
+    if (!state.activeConnection)
+        return;
+    if (!confirm(`确定要删除Key "${key}" 吗？`))
+        return;
     try {
-        await WailsAPI.deleteRedisKey(state.activeConnection, key);
-        showNotification('success', `DEL ${key} OK`);
-        scanRedisKeys();
-    } catch (e) {
-        showNotification('error', `删除失败: ${e.message}`);
+        if (isWailsAvailable()) {
+            await WailsAPI.deleteRedisKey(state.activeConnection, key);
+            showNotification('success', 'Key已删除');
+            await scanRedisKeys();
+        }
+    }
+    catch (e) {
+        showNotification('error', '删除Key失败: ' + (e.message || e));
     }
 }
-
 async function loadRedisInfo() {
-    const section = document.getElementById('redisInfoSection').value;
-    if (!isWailsAvailable()) return;
+    if (!state.activeConnection)
+        return;
     try {
-        const info = await WailsAPI.getRedisInfo(state.activeConnection, section);
-        const content = document.getElementById('redisInfoContent');
-        content.innerHTML = '';
-        for (const [k, v] of Object.entries(info)) {
-            const line = document.createElement('div');
-            line.style.cssText = 'padding:2px 0;border-bottom:1px solid var(--border-color);';
-            line.innerHTML = `<span style="color:var(--accent-primary);">${DomUtils.escapeHtml(k)}:</span> ${DomUtils.escapeHtml(String(v))}`;
-            content.appendChild(line);
+        if (isWailsAvailable() && WailsAPI.getRedisInfo) {
+            const info = await WailsAPI.getRedisInfo(state.activeConnection);
+            const infoEl = document.getElementById('redisInfoContent');
+            if (infoEl)
+                infoEl.innerHTML = `<pre>${DomUtils.escapeHtml(info)}</pre>`;
         }
-    } catch (e) {
-        document.getElementById('redisInfoContent').textContent = '(无数据)';
     }
+    catch (e) {
+        showNotification('error', '加载Redis信息失败: ' + (e.message || e));
+    }
+}
+function openRedisPanel() {
+    const panel = document.getElementById('redisPanel');
+    if (panel) {
+        panel.style.display = 'flex';
+        loadRedisDatabases();
+    }
+}
+function closeRedisPanel() {
+    const panel = document.getElementById('redisPanel');
+    if (panel)
+        panel.style.display = 'none';
 }

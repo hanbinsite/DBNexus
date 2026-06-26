@@ -1,29 +1,30 @@
-/**
- * Window Controls Module
- * Handles window minimize/maximize/close and resize handles
- */
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initWindowControls = initWindowControls;
+exports.minimizeWindow = minimizeWindow;
+exports.maximizeWindow = maximizeWindow;
+exports.updateMaximizeIcon = updateMaximizeIcon;
+exports.closeWindow = closeWindow;
 function initWindowControls() {
     if (isWailsAvailable()) {
-        WailsAPI.windowIsMaximized().then(isMaximized => {
+        WailsAPI.windowIsMaximized().then((isMaximized) => {
             updateMaximizeIcon(isMaximized);
         });
     }
-
     const resizeHandles = [
         { id: 'resizeTL', dir: 'top-left' },
-        { id: 'resizeT',  dir: 'top' },
+        { id: 'resizeT', dir: 'top' },
         { id: 'resizeTR', dir: 'top-right' },
-        { id: 'resizeL',  dir: 'left' },
-        { id: 'resizeR',  dir: 'right' },
-        { id: 'resizeB',  dir: 'bottom' },
+        { id: 'resizeL', dir: 'left' },
+        { id: 'resizeR', dir: 'right' },
+        { id: 'resizeB', dir: 'bottom' },
         { id: 'resizeBL', dir: 'bottom-left' },
         { id: 'resizeBR', dir: 'bottom-right' },
     ];
-
     resizeHandles.forEach(({ id, dir }) => {
         const el = document.getElementById(id);
-        if (!el) return;
+        if (!el)
+            return;
         el.addEventListener('mousedown', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -33,33 +34,24 @@ function initWindowControls() {
         });
     });
 }
-
 let resizeInterval = null;
 function startWindowResize(dir, e) {
-    const startX = e.screenX;
-    const startY = e.screenY;
-
-    if (resizeInterval) clearInterval(resizeInterval);
-
-    let lastX = startX, lastY = startY;
     document.body.style.userSelect = 'none';
     document.body.style.cursor = getResizeCursor(dir);
-
-    const onMouseMove = (ev) => {
-        lastX = ev.screenX;
-        lastY = ev.screenY;
-    };
+    const onMouseMove = (ev) => { };
     const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        if (resizeInterval) { clearInterval(resizeInterval); resizeInterval = null; }
+        if (resizeInterval) {
+            clearInterval(resizeInterval);
+            resizeInterval = null;
+        }
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
 }
-
 function getResizeCursor(dir) {
     const cursors = {
         'top-left': 'nwse-resize',
@@ -73,47 +65,49 @@ function getResizeCursor(dir) {
     };
     return cursors[dir] || 'default';
 }
-
 async function minimizeWindow() {
-  try {
-    if (isWailsAvailable()) {
-      await WailsAPI.windowMinimize();
+    try {
+        if (isWailsAvailable())
+            await WailsAPI.windowMinimize();
     }
-  } catch (e) {
-    console.warn('Window minimize error:', e);
-  }
+    catch (e) {
+        console.warn('Window minimize error:', e);
+    }
 }
-
 async function maximizeWindow() {
-  try {
-    if (isWailsAvailable()) {
-      await WailsAPI.windowMaximize();
-      const isMaximized = await WailsAPI.windowIsMaximized();
-      updateMaximizeIcon(isMaximized);
+    try {
+        if (isWailsAvailable()) {
+            await WailsAPI.windowMaximize();
+            const isMaximized = await WailsAPI.windowIsMaximized();
+            updateMaximizeIcon(isMaximized);
+        }
     }
-  } catch (e) {
-    console.warn('Window maximize error:', e);
-  }
+    catch (e) {
+        console.warn('Window maximize error:', e);
+    }
 }
-
 function updateMaximizeIcon(isMaximized) {
     const btn = document.getElementById('maximizeBtn');
-    if (!btn) return;
+    if (!btn)
+        return;
     const maximizeIcon = btn.querySelector('.maximize-icon');
     const restoreIcon = btn.querySelector('.restore-icon');
     if (isMaximized) {
-        maximizeIcon.style.display = 'none';
-        restoreIcon.style.display = 'block';
+        if (maximizeIcon)
+            maximizeIcon.style.display = 'none';
+        if (restoreIcon)
+            restoreIcon.style.display = 'block';
         btn.title = '还原';
-    } else {
-        maximizeIcon.style.display = 'block';
-        restoreIcon.style.display = 'none';
+    }
+    else {
+        if (maximizeIcon)
+            maximizeIcon.style.display = 'block';
+        if (restoreIcon)
+            restoreIcon.style.display = 'none';
         btn.title = '最大化';
     }
 }
-
 async function closeWindow() {
-    if (isWailsAvailable()) {
+    if (isWailsAvailable())
         await WailsAPI.windowClose();
-    }
 }

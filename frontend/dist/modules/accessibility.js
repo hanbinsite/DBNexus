@@ -1,99 +1,78 @@
-/**
- * Accessibility (a11y) Module
- * Provides ARIA labels, keyboard navigation, and screen reader support
- */
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initAccessibility = initAccessibility;
+exports.announce = announce;
 function initAccessibility() {
-    // Add ARIA labels to interactive elements without labels
     labelUnlabeledElements();
-
-    // Add keyboard navigation for tables
     enhanceTableKeyboardNav();
-
-    // Add focus management for modals
     enhanceModalFocus();
-
-    // Add skip-to-content link
     addSkipToContent();
 }
-
 function labelUnlabeledElements() {
-    // Add aria-label to icon-only buttons
     document.querySelectorAll('button:not([aria-label]):not([title])').forEach(btn => {
         const svg = btn.querySelector('svg');
-        if (svg && !btn.textContent.trim()) {
+        if (svg && !btn.textContent?.trim()) {
             const path = svg.querySelector('path');
             if (path) {
                 const d = path.getAttribute('d') || '';
-                // Guess label from SVG path
                 let label = '按钮';
-                if (d.includes('M18 6 6 18')) label = '关闭';
-                else if (d.includes('M5 12h14')) label = '展开';
-                else if (d.includes('M12 5v14')) label = '添加';
-                else if (d.includes('M21 21l-6-6m2-5a7')) label = '搜索';
+                if (d.includes('M18 6 6 18'))
+                    label = '关闭';
+                else if (d.includes('M5 12h14'))
+                    label = '展开';
+                else if (d.includes('M12 5v14'))
+                    label = '添加';
+                else if (d.includes('M21 21l-6-6m2-5a7'))
+                    label = '搜索';
                 btn.setAttribute('aria-label', label);
             }
         }
     });
-
-    // Add role to tree items
     document.querySelectorAll('.tree-item').forEach(item => {
         item.setAttribute('role', 'treeitem');
         item.setAttribute('tabindex', '0');
     });
-
-    // Add role to tree containers
     document.querySelectorAll('#databasesTree, #connectionList').forEach(container => {
         container.setAttribute('role', 'tree');
         container.setAttribute('aria-label', container.id === 'connectionList' ? '连接列表' : '数据库树');
     });
-
-    // Add role to tabs
     document.querySelectorAll('.tab').forEach(tab => {
         tab.setAttribute('role', 'tab');
         tab.setAttribute('tabindex', '0');
     });
     const tabBar = document.getElementById('tabBar');
-    if (tabBar) {
+    if (tabBar)
         tabBar.setAttribute('role', 'tablist');
-    }
-
-    // Add role to modals
     document.querySelectorAll('.modal-overlay').forEach(modal => {
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
     });
 }
-
 function enhanceTableKeyboardNav() {
     document.addEventListener('keydown', (e) => {
-        if (e.target.tagName !== 'TD' && e.target.closest('td') === null) return;
-
-        const td = e.target.tagName === 'TD' ? e.target : e.target.closest('td');
+        const target = e.target;
+        if (target.tagName !== 'TD' && !target.closest('td'))
+            return;
+        const td = target.tagName === 'TD' ? target : target.closest('td');
         const tr = td.closest('tr');
         const table = td.closest('table');
-        if (!tr || !table) return;
-
-        const rows = table.querySelectorAll('tbody tr');
-        const currentRowIdx = Array.from(rows).indexOf(tr);
-        const cells = tr.querySelectorAll('td');
-        const currentCellIdx = Array.from(cells).indexOf(td);
-
+        if (!tr || !table)
+            return;
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        const currentRowIdx = rows.indexOf(tr);
+        const cells = Array.from(tr.querySelectorAll('td'));
+        const currentCellIdx = cells.indexOf(td);
         switch (e.key) {
             case 'ArrowDown':
                 if (currentRowIdx < rows.length - 1) {
                     e.preventDefault();
-                    const nextRow = rows[currentRowIdx + 1];
-                    const nextCell = nextRow.querySelectorAll('td')[currentCellIdx];
-                    if (nextCell) nextCell.focus();
+                    rows[currentRowIdx + 1].querySelectorAll('td')[currentCellIdx]?.focus();
                 }
                 break;
             case 'ArrowUp':
                 if (currentRowIdx > 0) {
                     e.preventDefault();
-                    const prevRow = rows[currentRowIdx - 1];
-                    const prevCell = prevRow.querySelectorAll('td')[currentCellIdx];
-                    if (prevCell) prevCell.focus();
+                    rows[currentRowIdx - 1].querySelectorAll('td')[currentCellIdx]?.focus();
                 }
                 break;
             case 'ArrowRight':
@@ -118,77 +97,51 @@ function enhanceTableKeyboardNav() {
                 break;
         }
     });
-
-    // Make table cells focusable
     document.querySelectorAll('.dv-table td, .results-table td').forEach(td => {
-        if (!td.hasAttribute('tabindex')) {
+        if (!td.hasAttribute('tabindex'))
             td.setAttribute('tabindex', '0');
-        }
     });
 }
-
 function enhanceModalFocus() {
-    // Trap focus in modals
     document.querySelectorAll('.modal-overlay').forEach(modal => {
         const focusable = modal.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-
+        const focusableArr = Array.from(focusable);
         modal.addEventListener('keydown', (e) => {
-            if (e.key !== 'Tab') return;
-            if (focusable.length === 0) return;
-
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-
+            if (e.key !== 'Tab' || focusableArr.length === 0)
+                return;
+            const first = focusableArr[0];
+            const last = focusableArr[focusableArr.length - 1];
             if (e.shiftKey) {
                 if (document.activeElement === first) {
                     e.preventDefault();
                     last.focus();
                 }
-            } else {
+            }
+            else {
                 if (document.activeElement === last) {
                     e.preventDefault();
                     first.focus();
                 }
             }
         });
-
-        // Auto-focus first element when modal opens
         const observer = new MutationObserver(() => {
-            if (modal.classList.contains('active') && focusable.length > 0) {
-                setTimeout(() => focusable[0].focus(), 100);
+            if (modal.classList.contains('active') && focusableArr.length > 0) {
+                setTimeout(() => focusableArr[0].focus(), 100);
             }
         });
         observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
     });
 }
-
 function addSkipToContent() {
     const skipLink = document.createElement('a');
     skipLink.href = '#editorPanel';
     skipLink.className = 'skip-to-content';
     skipLink.textContent = '跳转到内容';
-    skipLink.style.cssText = `
-        position: absolute;
-        top: -40px;
-        left: 0;
-        background: var(--accent-primary);
-        color: white;
-        padding: 8px 16px;
-        text-decoration: none;
-        border-radius: 0 0 var(--radius-md) 0;
-        z-index: 10000;
-        transition: top 0.2s;
-    `;
-    skipLink.addEventListener('focus', () => {
-        skipLink.style.top = '0';
-    });
-    skipLink.addEventListener('blur', () => {
-        skipLink.style.top = '-40px';
-    });
+    skipLink.style.cssText = 'position:absolute;top:-40px;left:0;background:var(--accent-primary);color:#fff;padding:8px 16px;text-decoration:none;border-radius:0 0 var(--radius-md) 0;z-index:10000;transition:top 0.2s;';
+    skipLink.addEventListener('focus', () => { skipLink.style.top = '0'; });
+    skipLink.addEventListener('blur', () => { skipLink.style.top = '-40px'; });
     document.body.insertBefore(skipLink, document.body.firstChild);
 }
-
-// Announce to screen readers
 function announce(message) {
     const live = document.createElement('div');
     live.setAttribute('aria-live', 'polite');
