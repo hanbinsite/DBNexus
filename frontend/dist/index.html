@@ -1430,6 +1430,49 @@
         </div>
     </div>
 
+    <!-- Report Designer Panel -->
+    <div class="side-panel" id="reportPanel" style="display:none;width:520px;">
+        <div class="side-panel-header">
+            <h3>报表设计器</h3>
+            <button class="modal-close" onclick="closeReportPanel()">&times;</button>
+        </div>
+        <div class="side-panel-body">
+            <!-- 模板列表 -->
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <select id="reportTemplateSelect" onchange="onReportTemplateChange()" style="flex:1;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:6px 10px;">
+                    <option value="">选择模板...</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="newReportTemplate()">新建</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteReportTemplateUI()">删除</button>
+            </div>
+            <!-- 模板编辑 -->
+            <div id="reportEditor" style="display:none;">
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--fg-secondary);">模板名称</label>
+                    <input type="text" id="reportTplName" placeholder="报表名称" style="width:100%;padding:6px 10px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);">
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--fg-secondary);">描述</label>
+                    <input type="text" id="reportTplDesc" placeholder="报表描述" style="width:100%;padding:6px 10px;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);">
+                </div>
+                <!-- Section 列表 -->
+                <h4 class="perf-section-title">报表区块 (Sections)</h4>
+                <div id="reportSections" class="perf-list"></div>
+                <button class="btn btn-secondary btn-sm" onclick="addReportSection()" style="margin-top:8px;width:100%;">+ 添加区块</button>
+                <!-- 保存和执行 -->
+                <div style="display:flex;gap:8px;margin-top:16px;">
+                    <button class="btn btn-primary btn-sm" onclick="saveReportTemplateUI()" style="flex:1;">保存模板</button>
+                    <button class="btn btn-primary btn-sm" onclick="executeReportUI()" style="flex:1;">执行报表</button>
+                </div>
+                <!-- 执行结果 -->
+                <div id="reportResult" style="margin-top:16px;display:none;">
+                    <h4 class="perf-section-title">报表结果</h4>
+                    <div id="reportResultContent" class="perf-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Redis Browser Panel -->
     <div class="side-panel" id="redisPanel" style="display:none;">
         <div class="side-panel-header">

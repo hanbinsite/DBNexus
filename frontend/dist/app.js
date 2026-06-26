@@ -5760,6 +5760,202 @@ function closeGitPanel() {
     document.getElementById('gitPanel').style.display = 'none';
 }
 
+// ==================== F9: Report Designer Panel ====================
+
+let reportTemplatesData = [];
+let currentReportSections = [];
+
+function openReportPanel() {
+    closeAllSidePanels();
+    document.getElementById('reportPanel').style.display = 'block';
+    loadReportTemplatesUI();
+}
+
+function closeReportPanel() {
+    document.getElementById('reportPanel').style.display = 'none';
+}
+
+async function loadReportTemplatesUI() {
+    const select = document.getElementById('reportTemplateSelect');
+    if (!select) return;
+    try {
+        if (!isWailsAvailable()) { select.innerHTML = '<option value="">需要 Wails 环境</option>'; return; }
+        const templates = await WailsAPI.getReportTemplates();
+        reportTemplatesData = templates || [];
+        select.innerHTML = '<option value="">选择模板...</option>';
+        reportTemplatesData.forEach(t => {
+            select.appendChild(new Option(t.name, t.id));
+        });
+    } catch (e) {
+        select.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+function onReportTemplateChange() {
+    const id = document.getElementById('reportTemplateSelect').value;
+    const editor = document.getElementById('reportEditor');
+    if (!id) { editor.style.display = 'none'; return; }
+    editor.style.display = 'block';
+    const tpl = reportTemplatesData.find(t => t.id === id);
+    if (tpl) {
+        document.getElementById('reportTplName').value = tpl.name || '';
+        document.getElementById('reportTplDesc').value = tpl.description || '';
+        currentReportSections = tpl.sections || [];
+        renderReportSections();
+    }
+    document.getElementById('reportResult').style.display = 'none';
+}
+
+function newReportTemplate() {
+    document.getElementById('reportTemplateSelect').value = '';
+    document.getElementById('reportEditor').style.display = 'block';
+    document.getElementById('reportTplName').value = '';
+    document.getElementById('reportTplDesc').value = '';
+    currentReportSections = [];
+    renderReportSections();
+    document.getElementById('reportResult').style.display = 'none';
+}
+
+function addReportSection() {
+    const section = {
+        id: 'sec_' + Date.now(),
+        title: '新区块',
+        type: 'table',
+        query: '',
+        chartType: 'bar',
+        labelColumn: '',
+        valueColumn: '',
+        width: 12,
+        height: 300
+    };
+    currentReportSections.push(section);
+    renderReportSections();
+}
+
+function removeReportSection(idx) {
+    currentReportSections.splice(idx, 1);
+    renderReportSections();
+}
+
+function renderReportSections() {
+    const el = document.getElementById('reportSections');
+    if (!el) return;
+    el.innerHTML = '';
+    if (currentReportSections.length === 0) {
+        el.innerHTML = '<div class="perf-empty">无区块，点击下方按钮添加</div>';
+        return;
+    }
+    currentReportSections.forEach((s, i) => {
+        const item = document.createElement('div');
+        item.className = 'perf-list-item';
+        item.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <input type="text" value="${escapeHtml(s.title)}" placeholder="区块标题" onchange="updateReportSection(${i},'title',this.value)" style="flex:1;padding:4px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-size:12px;">
+                <select onchange="updateReportSection(${i},'type',this.value)" style="margin-left:8px;padding:4px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-size:12px;">
+                    <option value="table" ${s.type==='table'?'selected':''}>表格</option>
+                    <option value="chart" ${s.type==='chart'?'selected':''}>图表</option>
+                    <option value="summary" ${s.type==='summary'?'selected':''}>摘要</option>
+                    <option value="text" ${s.type==='text'?'selected':''}>文本</option>
+                </select>
+                <button class="btn btn-danger btn-sm" onclick="removeReportSection(${i})" style="margin-left:8px;">删除</button>
+            </div>
+            <textarea placeholder="SQL查询 (文本类型填内容)" onchange="updateReportSection(${i},'query',this.value)" style="width:100%;height:60px;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-family:var(--font-mono);font-size:11px;resize:vertical;">${escapeHtml(s.query || '')}</textarea>
+            ${s.type === 'chart' ? `
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <select onchange="updateReportSection(${i},'chartType',this.value)" style="padding:4px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-size:11px;">
+                    <option value="bar" ${s.chartType==='bar'?'selected':''}>柱状图</option>
+                    <option value="line" ${s.chartType==='line'?'selected':''}>折线图</option>
+                    <option value="pie" ${s.chartType==='pie'?'selected':''}>饼图</option>
+                </select>
+                <input type="text" value="${s.labelColumn||''}" placeholder="标签列" onchange="updateReportSection(${i},'labelColumn',this.value)" style="flex:1;padding:4px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-size:11px;">
+                <input type="text" value="${s.valueColumn||''}" placeholder="数值列" onchange="updateReportSection(${i},'valueColumn',this.value)" style="flex:1;padding:4px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--fg-primary);font-size:11px;">
+            </div>` : ''}
+        `;
+        el.appendChild(item);
+    });
+}
+
+function updateReportSection(idx, field, value) {
+    if (currentReportSections[idx]) {
+        currentReportSections[idx][field] = value;
+    }
+}
+
+async function saveReportTemplateUI() {
+    const name = document.getElementById('reportTplName').value.trim();
+    if (!name) { showNotification('warning', '请输入模板名称'); return; }
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    const id = document.getElementById('reportTemplateSelect').value || '';
+    const tpl = {
+        id: id,
+        name: name,
+        description: document.getElementById('reportTplDesc').value || '',
+        sections: currentReportSections,
+    };
+    try {
+        await WailsAPI.saveReportTemplate(tpl);
+        showNotification('success', '模板已保存');
+        loadReportTemplatesUI();
+    } catch (e) {
+        showNotification('error', '保存失败: ' + (e.message || e));
+    }
+}
+
+async function deleteReportTemplateUI() {
+    const id = document.getElementById('reportTemplateSelect').value;
+    if (!id) { showNotification('warning', '请先选择模板'); return; }
+    if (!confirm('确定删除此模板？')) return;
+    try {
+        await WailsAPI.deleteReportTemplate(id);
+        showNotification('success', '模板已删除');
+        document.getElementById('reportEditor').style.display = 'none';
+        loadReportTemplatesUI();
+    } catch (e) {
+        showNotification('error', '删除失败: ' + (e.message || e));
+    }
+}
+
+async function executeReportUI() {
+    const id = document.getElementById('reportTemplateSelect').value;
+    if (!id) { showNotification('warning', '请先选择模板'); return; }
+    if (!state.activeConnection) { showNotification('warning', '请先连接数据库'); return; }
+    if (!isWailsAvailable()) { showNotification('warning', '需要 Wails 环境'); return; }
+    const db = document.getElementById('queryDatabase')?.value || state.selectedDatabase || '';
+    showLoading('执行报表...');
+    try {
+        const result = await WailsAPI.executeReportTemplate(state.activeConnection, db, id, {});
+        hideLoading();
+        const resultDiv = document.getElementById('reportResult');
+        const contentDiv = document.getElementById('reportResultContent');
+        resultDiv.style.display = 'block';
+        contentDiv.innerHTML = '';
+        if (result && result.sections) {
+            result.sections.forEach(sec => {
+                const item = document.createElement('div');
+                item.className = 'perf-list-item';
+                let html = '<div style="font-weight:600;margin-bottom:4px;">' + escapeHtml(sec.title || sec.id) + '</div>';
+                if (sec.error) {
+                    html += '<div style="color:var(--accent-danger);font-size:11px;">' + escapeHtml(sec.error) + '</div>';
+                } else if (sec.type === 'table' && sec.rows) {
+                    html += '<div style="font-size:11px;color:var(--fg-muted);">' + (sec.row_count || sec.rows.length) + ' 行</div>';
+                } else if (sec.type === 'chart' && sec.chart) {
+                    html += '<div style="font-size:11px;color:var(--fg-muted);">图表数据: ' + (sec.chart.labels ? sec.chart.labels.length : 0) + ' 项</div>';
+                } else if (sec.type === 'summary' && sec.summary) {
+                    html += '<div style="font-size:11px;color:var(--fg-muted);">摘要已生成</div>';
+                } else if (sec.type === 'text' && sec.content) {
+                    html += '<div style="font-size:11px;color:var(--fg-secondary);white-space:pre-wrap;">' + escapeHtml(sec.content.substring(0, 200)) + '</div>';
+                }
+                item.innerHTML = html;
+                contentDiv.appendChild(item);
+            });
+        }
+        showNotification('success', '报表已执行');
+    } catch (e) {
+        hideLoading();
+        showNotification('error', '执行失败: ' + (e.message || e));
+    }
+}
+
 function closeAllSidePanels() {
     document.querySelectorAll('.side-panel').forEach(p => p.style.display = 'none');
 }
