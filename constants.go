@@ -226,10 +226,12 @@ func (a *App) EnableConfigHotReload() {
 	)
 }
 
-// S12-3: ARCH-005 — 事件总线
+// S12-3: ARCH-005 — 事件总线 (带持久化)
 type EventBus struct {
 	mu          sync.RWMutex
 	subscribers map[string][]chan Event
+	eventLog    []Event
+	logMu       sync.Mutex
 }
 
 type Event struct {
@@ -241,6 +243,49 @@ type Event struct {
 
 var eventBus = &EventBus{
 	subscribers: make(map[string][]chan Event),
+	eventLog:    make([]Event, 0, 500),
+}
+
+func getEventLogPath() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, ConfigDirName, "event_log.json")
+}
+
+func (eb *EventBus) persistEvent(event Event) {
+	eb.logMu.Lock()
+	defer eb.logMu.Unlock()
+
+	eb.eventLog = append(eb.eventLog, event)
+	// Keep last 500 events in memory
+	if len(eb.eventLog) > 500 {
+		eb.eventLog = eb.eventLog[len(eb.eventLog)-500:]
+	}
+
+	// Persist to file asynchronously
+	go func(events []Event) {
+		data, err := json.Marshal(events)
+		if err != nil {
+			return
+		}
+		dir := filepath.Dir(getEventLogPath())
+		os.MkdirAll(dir, DirPermSecure)
+		os.WriteFile(getEventLogPath(), data, FilePermSecure)
+	}(append([]Event(nil), eb.eventLog...))
+}
+
+func (eb *EventBus) loadPersistedEvents() {
+	eb.logMu.Lock()
+	defer eb.logMu.Unlock()
+
+	data, err := os.ReadFile(getEventLogPath())
+	if err != nil {
+		return
+	}
+	var events []Event
+	if err := json.Unmarshal(data, &events); err != nil {
+		return
+	}
+	eb.eventLog = events
 }
 
 func (eb *EventBus) Subscribe(eventType string) chan Event {
@@ -273,6 +318,9 @@ func (eb *EventBus) Publish(eventType string, data interface{}, source string) {
 		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
 		Source:    source,
 	}
+
+	// Persist event to file
+	eb.persistEvent(event)
 
 	eb.mu.RLock()
 	subs := eb.subscribers[eventType]
@@ -317,6 +365,32 @@ func (a *App) SubscribeToEvents(eventType string) []Event {
 			return events
 		}
 	}
+}
+
+func (a *App) GetEventHistory(limit int) []Event {
+	eventBus.logMu.Lock()
+	defer eventBus.logMu.Unlock()
+
+	if limit <= 0 || limit > len(eventBus.eventLog) {
+		limit = len(eventBus.eventLog)
+	}
+
+	start := len(eventBus.eventLog) - limit
+	if start < 0 {
+		start = 0
+	}
+
+	result := make([]Event, limit)
+	copy(result, eventBus.eventLog[start:])
+	return result
+}
+
+func (a *App) ClearEventHistory() error {
+	eventBus.logMu.Lock()
+	defer eventBus.logMu.Unlock()
+
+	eventBus.eventLog = make([]Event, 0, 500)
+	return os.Remove(getEventLogPath())
 }
 
 func (a *App) PublishEvent(eventType string, data interface{}) {
