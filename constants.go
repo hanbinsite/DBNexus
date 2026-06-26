@@ -132,11 +132,14 @@ func (w *ConfigWatcher) Start() {
 	w.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		// Use 2-second polling with file size + mod time detection
+		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 
 		homeDir, _ := os.UserHomeDir()
 		configPath := filepath.Join(homeDir, ConfigDirName, ConfigFileName)
+
+		var lastSize int64 = -1
 
 		for {
 			select {
@@ -146,22 +149,30 @@ func (w *ConfigWatcher) Start() {
 					continue
 				}
 				modTime := info.ModTime()
+				currentSize := info.Size()
+
 				w.mu.RLock()
 				lastMod := w.lastModTime
 				w.mu.RUnlock()
 
-				if !modTime.Equal(lastMod) {
+				// Detect changes via both mod time and file size
+				changed := !modTime.Equal(lastMod) || currentSize != lastSize
+
+				if changed {
 					w.mu.Lock()
 					w.lastModTime = modTime
-					callbacks := make([]func(), len(w.callbacks))
-					copy(callbacks, w.callbacks)
 					w.mu.Unlock()
+					lastSize = currentSize
 
+					callbacks := w.getCallbacks()
 					for _, cb := range callbacks {
 						safeCallback(cb)
 					}
 					GetAuditLogger().Log(AuditLevelInfo, AuditEventConfigChange,
-						"配置文件已热重载", map[string]interface{}{"path": configPath},
+						"配置文件已热重载", map[string]interface{}{
+							"path": configPath,
+							"size": currentSize,
+						},
 					)
 				}
 			case <-w.stopChan:
@@ -169,6 +180,14 @@ func (w *ConfigWatcher) Start() {
 			}
 		}
 	}()
+}
+
+func (w *ConfigWatcher) getCallbacks() []func() {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	callbacks := make([]func(), len(w.callbacks))
+	copy(callbacks, w.callbacks)
+	return callbacks
 }
 
 func (w *ConfigWatcher) Stop() {
