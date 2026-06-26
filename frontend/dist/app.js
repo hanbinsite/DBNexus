@@ -18,355 +18,106 @@ const state = {
     wailsReady: false,
     currentTable: null,
     selectedDatabase: null,
-    columnWidths: {}
+    columnWidths: {},
+    queryHistory: [],
+    editingConnectionId: null,
 };
 
 // ==========================================================================
 // Wails Integration
 // ==========================================================================
-const WailsAPI = {
-    // Connection Management
-    getConnections: () => window.go.main.App.GetConnections(),
-    saveConnection: (conn) => window.go.main.App.SaveConnection(conn),
-    deleteConnection: (id) => window.go.main.App.DeleteConnection(id),
-    testConnection: (conn) => window.go.main.App.TestConnection(conn),
-    connectToDatabase: (conn) => window.go.main.App.ConnectToDatabase(conn),
-    disconnectFromDatabase: (conn) => window.go.main.App.DisconnectFromDatabase(conn),
-    getSupportedDatabases: () => window.go.main.App.GetSupportedDatabases(),
-    
-    // Database Operations
-    getDatabases: (conn) => window.go.main.App.GetDatabases(conn),
-    getTables: (conn, db) => window.go.main.App.GetTables(conn, db),
-    getViews: (conn, db) => window.go.main.App.GetViews(conn, db),
-    getFunctions: (conn, db) => window.go.main.App.GetFunctions(conn, db),
-    getTableColumns: (conn, db, table) => window.go.main.App.GetTableColumns(conn, db, table),
-    
-    // Query Execution
-    executeQuery: (conn, db, query) => window.go.main.App.ExecuteQuery(conn, db, query),
-    executeMultiQuery: (conn, db, query) => window.go.main.App.ExecuteMultiQuery(conn, db, query),
-    executeNonQuery: (conn, db, query) => window.go.main.App.ExecuteNonQuery(conn, db, query),
-    executeQueryWithTimeout: (conn, db, query, options) => window.go.main.App.ExecuteQueryWithTimeout(conn, db, query, options),
-    executeMultiQueryWithTimeout: (conn, db, query, options) => window.go.main.App.ExecuteMultiQueryWithTimeout(conn, db, query, options),
-    
-    // Window Controls
-    windowMinimize: () => window.go.main.App.WindowMinimize(),
-    windowMaximize: () => window.go.main.App.WindowMaximize(),
-    windowClose: () => window.go.main.App.WindowClose(),
-    windowIsMaximized: () => window.go.main.App.WindowIsMaximized(),
-    windowSetSize: (w, h) => window.go.main.App.WindowSetSize(w, h),
-    
-    // File Dialogs
-    openFileDialog: (title, filters) => window.go.main.App.OpenFileDialog(title, filters),
-    saveFileDialog: (title, defaultName) => window.go.main.App.SaveFileDialog(title, defaultName),
-    readFile: (path) => window.go.main.App.ReadFile(path),
-    writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
+let WailsAPI = null;
 
-    // Query History & Bookmarks
-    getQueryHistory: () => window.go.main.App.GetQueryHistory(),
-    addQueryHistory: (query, db) => window.go.main.App.AddQueryHistory(query, db),
-    clearQueryHistory: () => window.go.main.App.ClearQueryHistory(),
-    getBookmarks: () => window.go.main.App.GetBookmarks(),
-    addBookmark: (name, query, db) => window.go.main.App.AddBookmark(name, query, db),
-    deleteBookmark: (id) => window.go.main.App.DeleteBookmark(id),
+function initWails() {
+    if (typeof window.go !== 'undefined' && window.go.main && window.go.main.App) {
+        const api = window.go.main.App;
+        WailsAPI = {
+            // Connection
+            saveConnection: (conn) => api.SaveConnection(conn),
+            getConnections: () => api.GetConnections(),
+            deleteConnection: (id) => api.DeleteConnection(id),
+            connectToDatabase: (conn) => api.ConnectToDatabase(conn),
+            disconnectFromDatabase: (conn) => api.DisconnectFromDatabase(conn),
+            testConnection: (conn) => api.TestConnection(conn),
+            // Database
+            getDatabases: (conn) => api.GetDatabases(conn),
+            getTables: (conn, db) => api.GetTables(conn, db),
+            getTableStructure: (conn, db, table) => api.GetTableStructure(conn, db, table),
+            getTableData: (conn, db, table, page, pageSize) => api.GetTableData(conn, db, table, page, pageSize),
+            // Query
+            executeQuery: (conn, db, query) => api.ExecuteQuery(conn, db, query),
+            executeMultiQuery: (conn, db, query) => api.ExecuteMultiQuery(conn, db, query),
+            explainQuery: (conn, db, query) => api.ExplainQuery(conn, db, query),
+            cancelQuery: (conn, pid) => api.CancelQuery(conn, pid),
+            beautifySQL: (sql) => api.BeautifySQL(sql),
+            // Schema
+            getTableIndexes: (conn, db, table) => api.GetTableIndexes(conn, db, table),
+            getTableForeignKeys: (conn, db, table) => api.GetTableForeignKeys(conn, db, table),
+            // Export/Import
+            exportData: (conn, db, table, format, path) => api.ExportData(conn, db, table, format, path),
+            importData: (conn, db, table, format, path) => api.ImportData(conn, db, table, format, path),
+            openFileDialog: () => api.OpenFileDialog(),
+            saveFileDialog: () => api.SaveFileDialog(),
+            // Window
+            windowMinimize: () => api.WindowMinimize(),
+            windowMaximize: () => api.WindowMaximize(),
+            windowClose: () => api.WindowClose(),
+            windowIsMaximized: () => api.WindowIsMaximized(),
+            windowSetSize: (w, h) => api.WindowSetSize(w, h),
+            // AI
+            testAIConnection: () => api.TestAIConnection(),
+            explainSQL: (sql) => api.ExplainSQL(sql),
+            suggestOptimizations: (conn, db, sql) => api.SuggestOptimizations(conn, db, sql),
+            naturalLanguageToSQL: (conn, db, nl) => api.NaturalLanguageToSQL(conn, db, nl),
+            // Settings
+            getSettings: () => api.GetSettings(),
+            saveSettings: (s) => api.SaveSettings(s),
+            // Redis
+            getRedisDBSize: (conn) => api.GetRedisDBSize(conn),
+            scanRedisKeys: (conn, pattern, cursor, count) => api.ScanRedisKeys(conn, pattern, cursor, count),
+            getRedisKeyType: (conn, key) => api.GetRedisKeyType(conn, key),
+            getRedisKeyValue: (conn, key) => api.GetRedisKeyValue(conn, key),
+            setRedisKey: (conn, key, value) => api.SetRedisKey(conn, key, value),
+            deleteRedisKey: (conn, key) => api.DeleteRedisKey(conn, key),
+            // Performance
+            getSystemInfo: () => api.GetSystemInfo(),
+            getPoolStats: () => api.GetPoolStats(),
+            getSlowQueries: (conn, limit) => api.GetSlowQueries(conn, limit),
+            getActiveQueries: (conn) => api.GetActiveQueries(conn),
+            // History
+            getQueryHistory: (limit) => api.GetQueryHistory(limit),
+            // Git
+            getGitRepos: () => api.GetGitRepos(),
+            addGitRepo: (path) => api.AddGitRepo(path),
+            getGitRepoInfo: (repo) => api.GetGitRepoInfo(repo),
+            getGitChanges: (repo) => api.GetGitChanges(repo),
+            getGitLog: (repo, limit) => api.GetGitLog(repo, limit),
+            gitPull: (repo) => api.GitPull(repo),
+            gitPush: (repo) => api.GitPush(repo),
+            gitCommit: (repo, msg) => api.GitCommit(repo, msg),
+            gitCreateBranch: (repo, name) => api.GitCreateBranch(repo, name),
+            // Roles
+            getRoles: () => api.GetRoles(),
+            createRole: (name, perms, desc) => api.CreateRole(name, perms, desc),
+            deleteRole: (id) => api.DeleteRole(id),
+            assignRoleToConnection: (connID, roleID) => api.AssignRoleToConnection(connID, roleID),
+            // Plugins
+            getPlugins: () => api.GetPlugins(),
+            registerPlugin: (name, ver, desc, type) => api.RegisterPlugin(name, ver, desc, type),
+            togglePlugin: (id, enabled) => api.TogglePlugin(id, enabled),
+            removePlugin: (id) => api.RemovePlugin(id),
+            // Report
+            getReportTemplates: () => api.GetReportTemplates(),
+            saveReportTemplate: (tpl) => api.SaveReportTemplate(tpl),
+            deleteReportTemplate: (id) => api.DeleteReportTemplate(id),
+            executeReportTemplate: (conn, db, id, params) => api.ExecuteReportTemplate(conn, db, id, params),
+            // SSL
+            testSSLConnection: (connID) => api.TestSSLConnection(connID),
+        };
+        state.wailsReady = true;
+    }
+}
 
-    // Connection Import/Export
-    exportConnections: () => window.go.main.App.ExportConnections(),
-    importConnections: (json) => window.go.main.App.ImportConnections(json),
-
-    // AI Features
-    explainSQL: (query) => window.go.main.App.ExplainSQL(query),
-    diagnoseQueryError: (conn, db, query, err) => window.go.main.App.DiagnoseQueryError(conn, db, query, err),
-    suggestOptimizations: (conn, db, query) => window.go.main.App.SuggestOptimizations(conn, db, query),
-    naturalLanguageToSQL: (conn, db, text) => window.go.main.App.NaturalLanguageToSQL(conn, db, text),
-    testAIConnection: () => window.go.main.App.TestAIConnection(),
-    setAIConfig: (provider, key, url, model, enable) => window.go.main.App.SetAIConfig(provider, key, url, model, enable),
-
-    // Query Cancellation
-    cancelQuery: (queryID) => window.go.main.App.CancelQuery(queryID),
-    getActiveQueries: () => window.go.main.App.GetActiveQueries(),
-
-    // SSH Tunnel
-    closeSSHTunnel: (connID) => window.go.main.App.CloseSSHTunnel(connID),
-    getSSHTunnelPort: (connID) => window.go.main.App.GetSSHTunnelPort(connID),
-
-    // Backup / Restore
-    backupDatabase: (conn, db, path) => window.go.main.App.BackupDatabase(conn, db, path),
-    restoreDatabase: (conn, db, path) => window.go.main.App.RestoreDatabase(conn, db, path),
-
-    // Full-text Search
-    searchTableData: (conn, db, table, text, limit) => window.go.main.App.SearchTableData(conn, db, table, text, limit),
-    searchAllTables: (conn, db, text, limit) => window.go.main.App.SearchAllTables(conn, db, text, limit),
-
-    // User Management
-    getDatabaseUsers: (conn) => window.go.main.App.GetDatabaseUsers(conn),
-    createDatabaseUser: (conn, user, pass, host) => window.go.main.App.CreateDatabaseUser(conn, user, pass, host),
-    dropDatabaseUser: (conn, user, host) => window.go.main.App.DropDatabaseUser(conn, user, host),
-    grantPrivileges: (conn, user, db, privs, host) => window.go.main.App.GrantPrivileges(conn, user, db, privs, host),
-
-    // Performance Monitoring
-    getPerformanceMetrics: () => window.go.main.App.GetPerformanceMetrics(),
-    getConnectionPoolStats: () => window.go.main.App.GetConnectionPoolStats(),
-    getSystemInfo: () => window.go.main.App.GetSystemInfo(),
-    healthCheck: () => window.go.main.App.HealthCheck(),
-
-    // Data Masking
-    setMaskConfig: (enabled, cols, ch, ks, ke) => window.go.main.App.SetMaskConfig(enabled, cols, ch, ks, ke),
-    getMaskConfig: () => window.go.main.App.GetMaskConfig(),
-
-    // Schema Extensions
-    generateTableDDL: (conn, db, table) => window.go.main.App.GenerateTableDDL(conn, db, table),
-    getTableTriggers: (conn, db, table) => window.go.main.App.GetTableTriggers(conn, db, table),
-
-    // Transaction Savepoint & Status
-    createSavepoint: (txID, name) => window.go.main.App.CreateSavepoint(txID, name),
-    rollbackToSavepoint: (txID, name) => window.go.main.App.RollbackToSavepoint(txID, name),
-    releaseSavepoint: (txID, name) => window.go.main.App.ReleaseSavepoint(txID, name),
-    getActiveTransactions: () => window.go.main.App.GetActiveTransactions(),
-
-    // Blob Preview
-    previewBlobData: (conn, db, table, col, pkCol, pkVal) => window.go.main.App.PreviewBlobData(conn, db, table, col, pkCol, pkVal),
-    formatCellValue: (val, fmt) => window.go.main.App.FormatCellValue(val, fmt),
-
-    // Structure Compare
-    compareTableStructures: (conn, db, t1, t2) => window.go.main.App.CompareTableStructures(conn, db, t1, t2),
-
-    // Streaming Export & Excel Import
-    exportDataStreaming: (conn, db, query, fmt, path) => window.go.main.App.ExportDataStreaming(conn, db, query, fmt, path),
-    importFromExcel: (conn, db, table, path, hasHeader) => window.go.main.App.ImportFromExcel(conn, db, table, path, hasHeader),
-
-    // Query Cache
-    clearQueryCache: () => window.go.main.App.ClearQueryCache(),
-    getQueryCacheSize: () => window.go.main.App.GetQueryCacheSize(),
-
-    // Auth
-    getAuthConfig: () => window.go.main.App.GetAuthConfig(),
-    setAuthPassword: (pass, timeout) => window.go.main.App.SetAuthPassword(pass, timeout),
-    disableAuth: () => window.go.main.App.DisableAuth(),
-    login: (pass) => window.go.main.App.Login(pass),
-    logout: () => window.go.main.App.Logout(),
-    validateSession: (token) => window.go.main.App.ValidateSession(token),
-    refreshSession: () => window.go.main.App.RefreshSession(),
-
-    // Advanced Features
-    queryWithFilter: (conn, db, table, filter) => window.go.main.App.QueryWithFilter(conn, db, table, filter),
-    validateSQLSyntax: (sql) => window.go.main.App.ValidateSQLSyntax(sql),
-    getSnippets: () => window.go.main.App.GetSnippets(),
-    getSnippetsByCategory: (cat) => window.go.main.App.GetSnippetsByCategory(cat),
-    getMySQLSlowQueries: (conn, limit) => window.go.main.App.GetMySQLSlowQueries(conn, limit),
-    executeSQLFile: (conn, db, path) => window.go.main.App.ExecuteSQLFile(conn, db, path),
-
-    // Connection Groups
-    getConnectionGroups: () => window.go.main.App.GetConnectionGroups(),
-    createConnectionGroup: (name, color) => window.go.main.App.CreateConnectionGroup(name, color),
-    deleteConnectionGroup: (id) => window.go.main.App.DeleteConnectionGroup(id),
-    renameConnectionGroup: (id, name) => window.go.main.App.RenameConnectionGroup(id, name),
-
-    // Visual Query Plan
-    getVisualQueryPlan: (conn, db, query) => window.go.main.App.GetVisualQueryPlan(conn, db, query),
-
-    // Connection Usage & Templates
-    getConnectionUsage: (id) => window.go.main.App.GetConnectionUsage(id),
-    getAllConnectionUsage: () => window.go.main.App.GetAllConnectionUsage(),
-    getConnectionTemplates: () => window.go.main.App.GetConnectionTemplates(),
-
-    // Partitions & Index Usage
-    getTablePartitions: (conn, db, table) => window.go.main.App.GetTablePartitions(conn, db, table),
-    getIndexUsageStats: (conn, db) => window.go.main.App.GetIndexUsageStats(conn, db),
-
-    // Security Scan & Permissions
-    runSecurityScan: () => window.go.main.App.RunSecurityScan(),
-    setConnectionPermission: (id, readOnly) => window.go.main.App.SetConnectionPermission(id, readOnly),
-
-    // Batch Transactional Edit & Events
-    batchEditTransactional: (conn, db, reqs) => window.go.main.App.BatchEditTransactional(conn, db, reqs),
-    getTransactionEvents: () => window.go.main.App.GetTransactionEvents(),
-
-    // Qualified Column Suggestions
-    getQualifiedColumnSuggestions: (conn, db, schema, table) => window.go.main.App.GetQualifiedColumnSuggestions(conn, db, schema, table),
-
-    // Shared Scripts
-    saveSharedScript: (name, sql, db, tags) => window.go.main.App.SaveSharedScript(name, sql, db, tags),
-    getSharedScripts: () => window.go.main.App.GetSharedScripts(),
-    deleteSharedScript: (id) => window.go.main.App.DeleteSharedScript(id),
-    exportSharedScripts: (path) => window.go.main.App.ExportSharedScripts(path),
-    importSharedScripts: (path) => window.go.main.App.ImportSharedScripts(path),
-
-    // Scheduled Tasks
-    createScheduledTask: (name, conn, db, query, interval) => window.go.main.App.CreateScheduledTask(name, conn, db, query, interval),
-    getScheduledTasks: () => window.go.main.App.GetScheduledTasks(),
-    deleteScheduledTask: (id) => window.go.main.App.DeleteScheduledTask(id),
-    toggleScheduledTask: (id, enabled) => window.go.main.App.ToggleScheduledTask(id, enabled),
-    runTaskNow: (id) => window.go.main.App.RunTaskNow(id),
-
-    // Fast Table Stats
-    getTableStatsFast: (conn, db, table) => window.go.main.App.GetTableStatsFast(conn, db, table),
-
-    // Sprint 9
-    getExplainPlanSafe: (conn, db, query, analyze) => window.go.main.App.GetExplainPlanSafe(conn, db, query, analyze),
-    getTaskNotifications: () => window.go.main.App.GetTaskNotifications(),
-    validateDataMigration: (conn, srcDB, srcTable, tgtDB, tgtTable) => window.go.main.App.ValidateDataMigration(conn, srcDB, srcTable, tgtDB, tgtTable),
-    getExportProgress: () => window.go.main.App.GetExportProgress(),
-    getSmartSuggestions: (conn, db, query, cursorPos) => window.go.main.App.GetSmartSuggestions(conn, db, query, cursorPos),
-    compareTablesStreaming: (conn, db, t1, t2, keyCol, batchSize) => window.go.main.App.CompareTablesStreaming(conn, db, t1, t2, keyCol, batchSize),
-
-    // Sprint 10
-    getQueryPerformanceHistory: (limit) => window.go.main.App.GetQueryPerformanceHistory(limit),
-    getSlowQueryHistory: (thresholdMs) => window.go.main.App.GetSlowQueryHistory(thresholdMs),
-    clearQueryPerformanceHistory: () => window.go.main.App.ClearQueryPerformanceHistory(),
-    getJoinSuggestions: (conn, db, t1, t2) => window.go.main.App.GetJoinSuggestions(conn, db, t1, t2),
-    executeParameterizedQuery: (conn, db, query, params) => window.go.main.App.ExecuteParameterizedQuery(conn, db, query, params),
-    editWithRowLock: (conn, db, table, pk, data, lockType) => window.go.main.App.EditWithRowLock(conn, db, table, pk, data, lockType),
-    checkEditConflict: (conn, db, table, pk, expectedHash) => window.go.main.App.CheckEditConflict(conn, db, table, pk, expectedHash),
-
-    // Sprint 11
-    compareDatabases: (conn, srcDB, tgtDB) => window.go.main.App.CompareDatabases(conn, srcDB, tgtDB),
-    syncCompareResult: (conn, db, result, targetTable, direction) => window.go.main.App.SyncCompareResult(conn, db, result, targetTable, direction),
-    getTableStructureCached: (conn, db, table) => window.go.main.App.GetTableStructureCached(conn, db, table),
-    invalidateTableStructureCache: (db, table) => window.go.main.App.InvalidateTableStructureCache(db, table),
-    clearTableStructureCache: () => window.go.main.App.ClearTableStructureCache(),
-
-    // Sprint 12 — Config hot reload + Event bus
-    reloadConfig: () => window.go.main.App.ReloadConfig(),
-    enableConfigHotReload: () => window.go.main.App.EnableConfigHotReload(),
-    subscribeToEvents: (eventType) => window.go.main.App.SubscribeToEvents(eventType),
-    publishEvent: (eventType, data) => window.go.main.App.PublishEvent(eventType, data),
-
-    // Sprint 13 — SSL/TLS + Report PDF
-    getSSLConfig: (connID) => window.go.main.App.GetSSLConfig(connID),
-    setSSLConfig: (connID, cfg) => window.go.main.App.SetSSLConfig(connID, cfg),
-    testSSLConnection: (connID) => window.go.main.App.TestSSLConnection(connID),
-    deleteSSLConfig: (connID) => window.go.main.App.DeleteSSLConfig(connID),
-    exportReportPDF: (conn, db, query, reportCfg, path) => window.go.main.App.ExportReportPDF(conn, db, query, reportCfg, path),
-    analyzeFunctionComplexity: () => window.go.main.App.AnalyzeFunctionComplexity(),
-
-    // Sprint 14 — SQL debug, roles, chart data, workspace, migration, sync
-    debugSQL: (conn, db, query) => window.go.main.App.DebugSQL(conn, db, query),
-    getRoles: () => window.go.main.App.GetRoles(),
-    createRole: (name, perms, desc) => window.go.main.App.CreateRole(name, perms, desc),
-    deleteRole: (id) => window.go.main.App.DeleteRole(id),
-    assignRoleToConnection: (connID, roleID) => window.go.main.App.AssignRoleToConnection(connID, roleID),
-    getConnectionRole: (connID) => window.go.main.App.GetConnectionRole(connID),
-    checkPermission: (connID, perm) => window.go.main.App.CheckPermission(connID, perm),
-    prepareChartData: (conn, db, query, type, labelCol, valCol) => window.go.main.App.PrepareChartData(conn, db, query, type, labelCol, valCol),
-    getWorkspaces: () => window.go.main.App.GetWorkspaces(),
-    createWorkspace: (name) => window.go.main.App.CreateWorkspace(name),
-    deleteWorkspace: (id) => window.go.main.App.DeleteWorkspace(id),
-    migrateData: (config) => window.go.main.App.MigrateData(config),
-    incrementalSync: (config) => window.go.main.App.IncrementalSync(config),
-
-    // Sprint 15 — Git integration + Plugin system
-    getGitRepos: () => window.go.main.App.GetGitRepos(),
-    addGitRepo: (path) => window.go.main.App.AddGitRepo(path),
-    removeGitRepo: (path) => window.go.main.App.RemoveGitRepo(path),
-    getGitRepoInfo: (path) => window.go.main.App.GetGitRepoInfo(path),
-    getGitLog: (path, limit) => window.go.main.App.GetGitLog(path, limit),
-    getGitChanges: (path) => window.go.main.App.GetGitChanges(path),
-    gitCommit: (path, msg) => window.go.main.App.GitCommit(path, msg),
-    gitPull: (path) => window.go.main.App.GitPull(path),
-    gitPush: (path) => window.go.main.App.GitPush(path),
-    gitCheckout: (path, branch) => window.go.main.App.GitCheckout(path, branch),
-    gitCreateBranch: (path, name) => window.go.main.App.GitCreateBranch(path, name),
-    gitDiff: (path, file) => window.go.main.App.GitDiff(path, file),
-    gitInitRepo: (path) => window.go.main.App.GitInitRepo(path),
-
-    // Plugin system
-    getPlugins: () => window.go.main.App.GetPlugins(),
-    registerPlugin: (name, ver, desc, type) => window.go.main.App.RegisterPlugin(name, ver, desc, type),
-    togglePlugin: (id, enabled) => window.go.main.App.TogglePlugin(id, enabled),
-    removePlugin: (id) => window.go.main.App.RemovePlugin(id),
-    getPluginHooks: () => window.go.main.App.GetPluginHooks(),
-
-    // Sprint 16 — NoSQL + Cloud DB + Report designer
-    getNoSQLConnections: () => window.go.main.App.GetNoSQLConnections(),
-    saveNoSQLConnection: (conn) => window.go.main.App.SaveNoSQLConnection(conn),
-    deleteNoSQLConnection: (id) => window.go.main.App.DeleteNoSQLConnection(id),
-    testNoSQLConnection: (conn) => window.go.main.App.TestNoSQLConnection(conn),
-    getCloudDBConnections: () => window.go.main.App.GetCloudDBConnections(),
-    saveCloudDBConnection: (conn) => window.go.main.App.SaveCloudDBConnection(conn),
-    deleteCloudDBConnection: (id) => window.go.main.App.DeleteCloudDBConnection(id),
-    testCloudDBConnection: (conn) => window.go.main.App.TestCloudDBConnection(conn),
-    getCloudDBProviders: () => window.go.main.App.GetCloudDBProviders(),
-    getReportTemplates: () => window.go.main.App.GetReportTemplates(),
-    saveReportTemplate: (tpl) => window.go.main.App.SaveReportTemplate(tpl),
-    deleteReportTemplate: (id) => window.go.main.App.DeleteReportTemplate(id),
-    executeReportTemplate: (conn, db, id, params) => window.go.main.App.ExecuteReportTemplate(conn, db, id, params),
-    
-    // Audit Logs
-    getAuditLogs: (limit, level, eventType) => window.go.main.App.GetAuditLogs(limit, level, eventType),
-    exportAuditLogs: (startTime, endTime) => window.go.main.App.ExportAuditLogs(startTime, endTime),
-    clearOldAuditLogs: (daysToKeep) => window.go.main.App.ClearOldAuditLogs(daysToKeep),
-    
-    // Language
-    getLanguage: () => window.go.main.App.GetLanguage(),
-    setLanguage: (lang) => window.go.main.App.SetLanguage(lang),
-    
-    // Test Services
-    runConnectionTest: (conn) => window.go.main.App.RunConnectionTest(conn),
-    runAllTests: () => window.go.main.App.RunAllTests(),
-    getSupportedFeatures: (dbType) => window.go.main.App.GetSupportedFeatures(dbType),
-    getServerInfo: () => window.go.main.App.GetServerInfo(),
-    getDatabaseServerInfo: (conn) => window.go.main.App.GetDatabaseServerInfo(conn),
-    
-    // Table Info
-    getTableIndexes: (conn, db, table) => window.go.main.App.GetTableIndexes(conn, db, table),
-    getTableForeignKeys: (conn, db, table) => window.go.main.App.GetTableForeignKeys(conn, db, table),
-    getTableStats: (conn, db, table) => window.go.main.App.GetTableStats(conn, db, table),
-    
-    // Data Editing
-    editTableData: (conn, req) => window.go.main.App.EditTableData(conn, req),
-    batchEdit: (conn, requests) => window.go.main.App.BatchEdit(conn, requests),
-    getEditableColumns: (conn, db, table) => window.go.main.App.GetEditableColumns(conn, db, table),
-    generateInsertStatement: (table, data) => window.go.main.App.GenerateInsertStatement(table, data),
-    generateUpdateStatement: (table, data, pk) => window.go.main.App.GenerateUpdateStatement(table, data, pk),
-    
-    // Data Export/Import
-    exportData: (conn, req) => window.go.main.App.ExportData(conn, req),
-    importData: (conn, req) => window.go.main.App.ImportData(conn, req),
-    
-    // Data Compare
-    compareTables: (conn, req) => window.go.main.App.CompareTables(conn, req),
-    compareQueries: (conn, req) => window.go.main.App.CompareQueries(conn, req),
-    getCompareReport: (result) => window.go.main.App.GetCompareReport(result),
-    exportCompareResult: (result, format) => window.go.main.App.ExportCompareResult(result, format),
-    
-    // Transaction Management
-    beginTransaction: (conn, db, options) => window.go.main.App.BeginTransaction(conn, db, options),
-    executeInTransaction: (txID, query) => window.go.main.App.ExecuteInTransaction(txID, query),
-    commitTransaction: (txID) => window.go.main.App.CommitTransaction(txID),
-    rollbackTransaction: (txID) => window.go.main.App.RollbackTransaction(txID),
-    executeTransactionBatch: (req) => window.go.main.App.ExecuteTransactionBatch(req),
-    
-    // Redis
-    getRedisKeyInfo: (conn, key) => window.go.main.App.GetRedisKeyInfo(conn, key),
-    setRedisKeyValue: (conn, key, value, ttl) => window.go.main.App.SetRedisKeyValue(conn, key, value, ttl),
-    deleteRedisKey: (conn, ...keys) => window.go.main.App.DeleteRedisKey(conn, ...keys),
-    executeRedisCommand: (conn, cmd, ...args) => window.go.main.App.ExecuteRedisCommand(conn, cmd, ...args),
-    getRedisInfo: (conn, section) => window.go.main.App.GetRedisInfo(conn, section),
-    getRedisDBSize: (conn) => window.go.main.App.GetRedisDBSize(conn),
-    scanRedisKeys: (conn, pattern, cursor, count) => window.go.main.App.ScanRedisKeys(conn, pattern, cursor, count),
-    
-    // Autocomplete
-    getAutoCompleteSuggestions: (conn, db, query, pos) => window.go.main.App.GetAutoCompleteSuggestions(conn, db, query, pos),
-    getQuickSuggestions: (prefix) => window.go.main.App.GetQuickSuggestions(prefix),
-    getTableColumnsForAutoComplete: (conn, db, table) => window.go.main.App.GetTableColumnsForAutoComplete(conn, db, table),
-    
-    // SQL Formatter
-    formatSQL: (sql, options) => window.go.main.App.FormatSQL(sql, options),
-    minifySQL: (sql) => window.go.main.App.MinifySQL(sql),
-    validateSQL: (sql) => window.go.main.App.ValidateSQL(sql),
-    beautifySQL: (sql) => window.go.main.App.BeautifySQL(sql),
-    compactSQL: (sql) => window.go.main.App.CompactSQL(sql),
-    getSQLStructure: (sql) => window.go.main.App.GetSQLStructure(sql),
-    
-    // Query Analyzer
-    getExplainPlan: (conn, db, query) => window.go.main.App.GetExplainPlan(conn, db, query),
-    analyzeQuery: (query) => window.go.main.App.AnalyzeQuery(query),
-    getSlowQueries: (conn, db, threshold) => window.go.main.App.GetSlowQueries(conn, db, threshold),
-    analyzeTableUsage: (conn, db) => window.go.main.App.AnalyzeTableUsage(conn, db),
-    getTableStatistics: (conn, db, table) => window.go.main.App.GetTableStatistics(conn, db, table),
-};
-
-// Check if Wails is available
 function isWailsAvailable() {
     return typeof window.go !== 'undefined' && window.go.main && window.go.main.App;
 }
@@ -376,7 +127,6 @@ function isWailsAvailable() {
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     i18n.init();
-
     initTheme();
     initWindowControls();
     initResizablePanels();
@@ -390,867 +140,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     loadSettings();
     setInterval(updateClock, 1000);
-    
-    // Initialize Wails connection
     initWails();
 });
 
-function initWails() {
-    // In Wails v2, window.go is injected after the page loads.
-    // Use a polling approach to wait for it, with a timeout fallback to mock mode.
-    if (isWailsAvailable()) {
-        state.wailsReady = true;
-        loadSavedConnections();
-        return;
-    }
-
-    let attempts = 0;
-    const maxAttempts = 50; // 5 seconds (50 * 100ms)
-    const poll = setInterval(() => {
-        attempts++;
-        if (isWailsAvailable()) {
-            clearInterval(poll);
-            state.wailsReady = true;
-            loadSavedConnections();
-        } else if (attempts >= maxAttempts) {
-            clearInterval(poll);
-            console.log('Running in browser mode (Wails not available)');
-            loadMockConnections();
-        }
-    }, 100);
+function updateClock() {
+    const now = new Date();
+    const el = document.getElementById('statusTime');
+    if (el) el.textContent = now.toLocaleTimeString();
 }
 
 // ==========================================================================
-// Theme Management
+// Tab Management — extracted to modules/tabs.js
 // ==========================================================================
-function initTheme() {
-    const savedTheme = localStorage.getItem('db-client-theme') || 'dark';
-    setTheme(savedTheme);
-}
-
-function toggleTheme() {
-    const newTheme = state.currentTheme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-}
-
-function setTheme(theme) {
-  state.currentTheme = theme;
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('db-client-theme', theme);
-
-  const themeSelect = document.getElementById('appearanceTheme');
-  if (themeSelect) {
-    themeSelect.value = theme;
-  }
-
-  // Update Monaco editor theme
-  updateEditorTheme(theme);
-}
-
-function setThemeFromSettings(value) {
-    if (value === 'system') {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setTheme(prefersDark ? 'dark' : 'light');
-    } else {
-        setTheme(value);
-    }
-}
-
-function setDensity(value) {
-    document.documentElement.setAttribute('data-density', value);
-    localStorage.setItem('density', value);
-}
-
-function formatSQLViaAPI() {
-    if (!monacoEditor) return;
-    const sql = getEditorValue().trim();
-    if (!sql) return;
-    if (isWailsAvailable()) {
-        WailsAPI.beautifySQL(sql).then(formatted => {
-            if (formatted) setEditorValue(formatted);
-        }).catch(() => {});
-    } else {
-        formatSQL();
-    }
-}
 
 // ==========================================================================
-// Window Controls (Wails Integration)
+// Context Menu — extracted to modules/context-menu.js
 // ==========================================================================
-function initWindowControls() {
-    // Event listeners are already bound in HTML
-    // Check initial maximized state
-    if (isWailsAvailable()) {
-        WailsAPI.windowIsMaximized().then(isMaximized => {
-            updateMaximizeIcon(isMaximized);
-        });
-    }
-
-    // Window border resize handles (8 directions)
-    const resizeHandles = [
-        { id: 'resizeTL', dir: 'top-left' },
-        { id: 'resizeT',  dir: 'top' },
-        { id: 'resizeTR', dir: 'top-right' },
-        { id: 'resizeL',  dir: 'left' },
-        { id: 'resizeR',  dir: 'right' },
-        { id: 'resizeB',  dir: 'bottom' },
-        { id: 'resizeBL', dir: 'bottom-left' },
-        { id: 'resizeBR', dir: 'bottom-right' },
-    ];
-
-    resizeHandles.forEach(({ id, dir }) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (isWailsAvailable() && WailsAPI.windowSetSize) {
-                startWindowResize(dir, e);
-            }
-        });
-    });
-}
-
-let resizeInterval = null;
-function startWindowResize(dir, e) {
-    const startX = e.screenX;
-    const startY = e.screenY;
-    const startSize = WailsAPI.windowIsMaximized ? null : null;
-
-    if (resizeInterval) clearInterval(resizeInterval);
-
-    let lastX = startX, lastY = startY;
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = getResizeCursor(dir);
-
-    const onMouseMove = (ev) => {
-        lastX = ev.screenX;
-        lastY = ev.screenY;
-    };
-    const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-        if (resizeInterval) { clearInterval(resizeInterval); resizeInterval = null; }
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-}
-
-function getResizeCursor(dir) {
-    const cursors = {
-        'top-left': 'nwse-resize',
-        'top': 'ns-resize',
-        'top-right': 'nesw-resize',
-        'left': 'ew-resize',
-        'right': 'ew-resize',
-        'bottom': 'ns-resize',
-        'bottom-left': 'nesw-resize',
-        'bottom-right': 'nwse-resize',
-    };
-    return cursors[dir] || 'default';
-}
-
-async function minimizeWindow() {
-  try {
-    if (isWailsAvailable()) {
-      await WailsAPI.windowMinimize();
-    }
-  } catch (e) {
-    console.warn('Window minimize error:', e);
-  }
-}
-
-async function maximizeWindow() {
-  try {
-    if (isWailsAvailable()) {
-      await WailsAPI.windowMaximize();
-      const isMaximized = await WailsAPI.windowIsMaximized();
-      updateMaximizeIcon(isMaximized);
-    }
-  } catch (e) {
-    console.warn('Window maximize error:', e);
-  }
-}
-
-function updateMaximizeIcon(isMaximized) {
-    const btn = document.getElementById('maximizeBtn');
-    if (!btn) return;
-    const maximizeIcon = btn.querySelector('.maximize-icon');
-    const restoreIcon = btn.querySelector('.restore-icon');
-    if (isMaximized) {
-        maximizeIcon.style.display = 'none';
-        restoreIcon.style.display = 'block';
-        btn.title = '还原';
-    } else {
-        maximizeIcon.style.display = 'block';
-        restoreIcon.style.display = 'none';
-        btn.title = '最大化';
-    }
-}
-
-async function closeWindow() {
-    console.log('Close window');
-    if (isWailsAvailable()) {
-        await WailsAPI.windowClose();
-    }
-}
-
-// ==========================================================================
-// Resizable Panels
-// ==========================================================================
-function initResizablePanels() {
-  const sidebarResize = document.getElementById('sidebarResize');
-  const sidebar = document.querySelector('.sidebar');
-  const splitHandle = document.getElementById('splitHandle');
-  const editorPanel = document.getElementById('editorPanel');
-  const resultsPanel = document.getElementById('resultsPanel');
-
-  if (sidebarResize && sidebar) {
-    sidebarResize.addEventListener('mousedown', (e) => {
-      state.isResizing = true;
-      sidebarResize.classList.add('active');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    });
-  }
-
-  if (splitHandle && editorPanel && resultsPanel) {
-    splitHandle.addEventListener('mousedown', (e) => {
-      state.isResizing = true;
-      splitHandle.classList.add('active');
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-    });
-  }
-
-  document.addEventListener('mousemove', (e) => {
-    if (!state.isResizing) return;
-
-    if (sidebarResize && sidebarResize.classList.contains('active')) {
-      const newWidth = e.clientX;
-      if (newWidth >= 180 && newWidth <= 400) {
-        sidebar.style.width = newWidth + 'px';
-      }
-    }
-
-    if (splitHandle && splitHandle.classList.contains('active')) {
-      const workspace = document.querySelector('.workspace');
-      const workspaceRect = workspace.getBoundingClientRect();
-      const relativeY = e.clientY - workspaceRect.top;
-      const totalHeight = workspaceRect.height;
-      const editorHeight = Math.max(100, Math.min(relativeY - 30, totalHeight - 120));
-      const resultsHeight = totalHeight - editorHeight - 6;
-
-      editorPanel.style.height = editorHeight + 'px';
-      editorPanel.style.flex = 'none';
-      resultsPanel.style.height = resultsHeight + 'px';
-      resultsPanel.style.flex = 'none';
-
-      if (monacoEditor) monacoEditor.layout();
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (state.isResizing) {
-      state.isResizing = false;
-      sidebarResize?.classList.remove('active');
-      splitHandle?.classList.remove('active');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-  });
-}
-
-// ==========================================================================
-// Tab Management
-// ==========================================================================
-function initTabs() {
-    const tabBar = document.getElementById('tabBar');
-    
-    tabBar.addEventListener('click', (e) => {
-        const tab = e.target.closest('.tab');
-        if (tab && !e.target.closest('.tab-close')) {
-            activateTab(tab.dataset.tab);
-        }
-    });
-}
-
-function createNewTab() {
-  const tabNumber = document.querySelectorAll('.tab[data-type="query"]').length + 1;
-  const tabId = `query-${tabNumber}`;
-
-  const tabDiv = document.createElement('div');
-  tabDiv.className = 'tab';
-  tabDiv.dataset.tab = tabId;
-  tabDiv.dataset.type = 'query';
-
-  // Static SVG structure (safe innerHTML — no server data)
-  tabDiv.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-    </svg>
-    <span class="tab-name"></span>
-    <button class="tab-close">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 6 6 18M6 6l12 12"/>
-      </svg>
-    </button>
-  `;
-
-  // Dynamic text via textContent (tabNumber is numeric — safe)
-  tabDiv.querySelector('.tab-name').textContent = `查询 ${tabNumber}`;
-
-  // Close button via addEventListener (no inline onclick XSS risk)
-  tabDiv.querySelector('.tab-close').addEventListener('click', (e) => closeTab(tabId, e));
-
-  document.getElementById('tabsContainer').appendChild(tabDiv);
-  activateTab(tabId);
-
-  // Hide welcome panel, show query editor
-  const welcomePanel = document.getElementById('welcomePanel');
-  if (welcomePanel) welcomePanel.style.display = 'none';
-
-  const editorPanel = document.getElementById('editorPanel');
-  const resultsPanel = document.getElementById('resultsPanel');
-  const splitHandle = document.getElementById('splitHandle');
-  const dataViewPanel = document.getElementById('dataViewPanel');
-
-  // Make editor panel visible with exact dimensions
-  editorPanel.style.display = 'flex';
-  editorPanel.style.flex = '1';
-  editorPanel.style.height = '100%';
-  resultsPanel.style.display = 'none';
-  splitHandle.style.display = 'none';
-  dataViewPanel.style.display = 'none';
-
-  const layoutAndFocus = () => {
-    if (!monacoEditor) return;
-    monacoEditor.layout();
-    // Force content re-render
-    const model = monacoEditor.getModel();
-    if (model) {
-      monacoEditor.setValue('');
-    }
-    monacoEditor.focus();
-  };
-
-  if (monacoLibraryLoaded && !monacoEditor) {
-    // Need to create editor now that container is visible
-    const tryCreate = () => {
-      createMonacoEditorIfNeeded();
-      if (monacoEditor) {
-        setTimeout(layoutAndFocus, 100);
-      } else {
-        // Container still not ready, retry
-        setTimeout(tryCreate, 100);
-      }
-    };
-    setTimeout(tryCreate, 200);
-  } else if (monacoEditor) {
-    layoutAndFocus();
-  }
-}
-
-function activateTab(tabId) {
-  const previousTab = state.tabs.find(t => t.id === state.activeTab);
-  if (previousTab && previousTab.type !== 'table' && typeof monacoEditor !== 'undefined' && monacoEditor) {
-    previousTab.savedContent = monacoEditor.getValue();
-  }
-
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.classList.remove('active');
-  });
-
-  const selectedTab = document.querySelector(`[data-tab="${tabId}"]`);
-  if (!selectedTab) return;
-
-  selectedTab.classList.add('active');
-  state.activeTab = tabId;
-
-  const welcomePanel = document.getElementById('welcomePanel');
-  if (welcomePanel) welcomePanel.style.display = 'none';
-
-  const editorPanel = document.getElementById('editorPanel');
-  const resultsPanel = document.getElementById('resultsPanel');
-  const splitHandle = document.getElementById('splitHandle');
-  const dataViewPanel = document.getElementById('dataViewPanel');
-  const tabType = selectedTab.dataset.type;
-
-  if (tabType === 'table') {
-    editorPanel.style.display = 'none';
-    resultsPanel.style.display = 'none';
-    splitHandle.style.display = 'none';
-    dataViewPanel.style.display = 'flex';
-  } else {
-    editorPanel.style.display = 'flex';
-    editorPanel.style.flex = '1';
-    editorPanel.style.height = 'auto';
-    resultsPanel.style.display = 'none';
-    splitHandle.style.display = 'none';
-    dataViewPanel.style.display = 'none';
-
-    setTimeout(() => {
-      if (monacoEditor) {
-        monacoEditor.layout();
-        const newTab = state.tabs.find(t => t.id === tabId);
-        if (newTab && newTab.savedContent !== undefined) {
-          monacoEditor.setValue(newTab.savedContent);
-        } else {
-          monacoEditor.setValue('');
-        }
-        monacoEditor.focus();
-      }
-    }, 150);
-  }
-}
-
-function closeTab(tabId, event) {
-  if (event) {
-    event.stopPropagation();
-  }
-
-  const tab = document.querySelector(`[data-tab="${tabId}"]`);
-  const allTabs = document.querySelectorAll('.tab');
-  let activeWasClosed = false;
-
-  if (tab && tab.classList.contains('active')) {
-    activeWasClosed = true;
-
-    if (allTabs.length > 1) {
-      const tabArray = Array.from(allTabs);
-      const currentIndex = tabArray.indexOf(tab);
-      const prevTab = tabArray[currentIndex - 1] || tabArray[currentIndex + 1];
-      if (prevTab) {
-        activateTab(prevTab.dataset.tab);
-      }
-    } else {
-      // Last tab closed, show welcome panel
-      state.activeTab = null;
-      state.currentTable = null;
-      const welcomePanel = document.getElementById('welcomePanel');
-      if (welcomePanel) welcomePanel.style.display = 'flex';
-      document.getElementById('editorPanel').style.display = 'none';
-      document.getElementById('resultsPanel').style.display = 'none';
-      document.getElementById('splitHandle').style.display = 'none';
-      document.getElementById('dataViewPanel').style.display = 'none';
-    }
-  }
-
-  if (tab) {
-    tab.remove();
-  }
-
-  // After closing a tab, check what kind of tab is now active and restore correct view
-  if (activeWasClosed && state.activeTab) {
-    setTimeout(() => {
-      const activeTab = document.querySelector(`[data-tab="${state.activeTab}"]`);
-      if (!activeTab) return;
-
-      const tabType = activeTab.dataset.type;
-
-      const welcomePanel = document.getElementById('welcomePanel');
-      const editorPanel = document.getElementById('editorPanel');
-      const resultsPanel = document.getElementById('resultsPanel');
-      const splitHandle = document.getElementById('splitHandle');
-      const dataViewPanel = document.getElementById('dataViewPanel');
-
-      if (tabType === 'query') {
-        if (welcomePanel) welcomePanel.style.display = 'none';
-        editorPanel.style.display = 'flex';
-        editorPanel.style.flex = '1';
-        editorPanel.style.height = 'auto';
-        resultsPanel.style.display = 'none';
-        splitHandle.style.display = 'none';
-        dataViewPanel.style.display = 'none';
-
-        setTimeout(() => {
-          if (monacoEditor) {
-            monacoEditor.layout();
-            monacoEditor.focus();
-          }
-        }, 150);
-      } else if (tabType === 'table') {
-        if (welcomePanel) welcomePanel.style.display = 'none';
-        editorPanel.style.display = 'none';
-        resultsPanel.style.display = 'none';
-        splitHandle.style.display = 'none';
-        dataViewPanel.style.display = 'flex';
-      }
-    }, 50);
-  }
-}
-
-// ==========================================================================
-// Context Menu
-// ==========================================================================
-let contextMenuTarget = null; // 'connection', 'database', 'table', 'view'
-let contextMenuData = null; // Additional data for context menu
-
-function initContextMenu() {
-  const contextMenu = document.getElementById('contextMenu');
-
-  document.addEventListener('click', () => {
-    contextMenu.classList.remove('active');
-  });
-
-  // Initial binding for connection items
-  bindConnectionContextMenu();
-}
-
-function bindConnectionContextMenu() {
-  document.querySelectorAll('.connection-item').forEach(item => {
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = item.dataset.id;
-      const connection = state.connections.find(c => c.id === id);
-      if (connection) {
-        selectConnection(id);
-        contextMenuTarget = 'connection';
-        contextMenuData = { connection };
-        showConnectionContextMenu(e.clientX, e.clientY, connection);
-      }
-    });
-  });
-}
-
-function showConnectionContextMenu(x, y, connection) {
-  const contextMenu = document.getElementById('contextMenu');
-  const isConnected = document.querySelector(`.connection-item[data-id="${connection.id}"]`)?.dataset.connected === 'true';
-  
-  let html = '';
-  
-  if (isConnected) {
-    html += `
-      <div class="context-menu-item" onclick="contextAction('disconnect')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        <span>断开连接</span>
-      </div>
-      <div class="context-menu-item" onclick="contextAction('new_query')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-        </svg>
-        <span>新查询</span>
-      </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-item" onclick="contextAction('refresh')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 4v6h-6M1 20v-6h6"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        <span>刷新</span>
-      </div>
-    `;
-  } else {
-    html += `
-      <div class="context-menu-item" onclick="contextAction('connect')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-          <path d="M15 3h6v6M10 14L21 3"/>
-        </svg>
-        <span>连接</span>
-      </div>
-    `;
-  }
-  
-  html += `
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextAction('edit')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-      </svg>
-      <span>编辑</span>
-    </div>
-    <div class="context-menu-item" onclick="contextAction('duplicate')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-      </svg>
-      <span>复制</span>
-    </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" onclick="contextAction('delete')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-      </svg>
-      <span>删除</span>
-    </div>
-  `;
-  
-  contextMenu.innerHTML = html;
-  contextMenu.style.left = x + 'px';
-  contextMenu.style.top = y + 'px';
-  contextMenu.classList.add('active');
-}
-
-function showDatabaseContextMenu(x, y, dbName) {
-  const contextMenu = document.getElementById('contextMenu');
-  
-  contextMenu.innerHTML = `
-    <div class="context-menu-item" onclick="contextAction('new_query')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-      </svg>
-      <span>新查询</span>
-    </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextAction('refresh_db')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M23 4v6h-6M1 20v-6h6"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-      <span>刷新表列表</span>
-    </div>
-    <div class="context-menu-item" onclick="contextAction('create_table')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <path d="M12 8v8M8 12h8"/>
-      </svg>
-      <span>创建表</span>
-    </div>
-  `;
-  
-  contextMenu.style.left = x + 'px';
-  contextMenu.style.top = y + 'px';
-  contextMenu.classList.add('active');
-}
-
-function showTableContextMenu(x, y, tableName, dbName) {
-  const contextMenu = document.getElementById('contextMenu');
-  
-  contextMenu.innerHTML = `
-    <div class="context-menu-item" onclick="contextAction('open_table')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <path d="M3 9h18M9 21V9"/>
-      </svg>
-      <span>查看数据</span>
-    </div>
-    <div class="context-menu-item" onclick="contextAction('select_table')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 2v6h6M12 18v-6M9 15h6"/>
-      </svg>
-      <span>生成 SELECT 语句</span>
-    </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextAction('describe_table')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M12 16v-4M12 8h.01"/>
-      </svg>
-      <span>查看表结构</span>
-    </div>
-    <div class="context-menu-item" onclick="contextAction('refresh_table')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M23 4v6h-6M1 20v-6h6"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-      <span>刷新数据</span>
-    </div>
-  `;
-  
-  contextMenu.style.left = x + 'px';
-  contextMenu.style.top = y + 'px';
-  contextMenu.classList.add('active');
-}
-
-function showContextMenu(x, y) {
-  const contextMenu = document.getElementById('contextMenu');
-  contextMenu.style.left = x + 'px';
-  contextMenu.style.top = y + 'px';
-  contextMenu.classList.add('active');
-}
-
-async function contextAction(action) {
-  console.log('Context action:', action);
-  document.getElementById('contextMenu').classList.remove('active');
-
-  switch (action) {
-    case 'connect':
-      if (state.activeConnection) {
-        await connectToSelectedConnection();
-      }
-      break;
-    case 'disconnect':
-      if (state.activeConnection) {
-        await disconnectConnection();
-      }
-      break;
-    case 'open':
-      if (state.activeConnection) {
-        await connectToSelectedConnection();
-      }
-      break;
-    case 'new_query':
-      createNewTab();
-      break;
-    case 'refresh':
-      await refreshConnection();
-      break;
-    case 'refresh_db':
-      if (contextMenuData && contextMenuData.dbName) {
-        await refreshDatabaseTables(contextMenuData.dbName);
-      }
-      break;
-    case 'edit':
-      if (state.activeConnection) {
-        editConnection(state.activeConnection);
-      }
-      break;
-    case 'duplicate':
-      if (state.activeConnection) {
-        await duplicateConnection(state.activeConnection);
-      }
-      break;
-    case 'delete':
-      if (state.activeConnection && confirm('确定要删除此连接吗？')) {
-        await deleteConnection(state.activeConnection.id);
-      }
-      break;
-    case 'open_table':
-      if (contextMenuData && contextMenuData.tableName) {
-        await openTable(contextMenuData.tableName, contextMenuData.dbName);
-      }
-      break;
-    case 'select_table':
-      if (contextMenuData && contextMenuData.tableName) {
-        generateSelectStatement(contextMenuData.tableName, contextMenuData.dbName);
-      }
-      break;
-    case 'describe_table':
-      if (contextMenuData && contextMenuData.tableName) {
-        await openTable(contextMenuData.tableName, contextMenuData.dbName);
-        // Switch to structure tab
-        document.querySelector('.data-view-tab[data-view="structure"]')?.click();
-      }
-      break;
-    case 'refresh_table':
-      if (state.currentTable) {
-        await loadTableData(state.currentTable.name, state.currentTable.database);
-      }
-      break;
-    case 'create_table':
-      createNewTab();
-      setEditorValue('CREATE TABLE new_table (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);');
-      showNotification('info', '已生成 CREATE TABLE 模板，请修改后执行');
-      break;
-    case 'drop_table':
-      if (contextMenuData && contextMenuData.tableName) {
-        if (confirm(`确定要删除表 ${contextMenuData.tableName} 吗？此操作不可撤销！`)) {
-          createNewTab();
-          setEditorValue(`DROP TABLE IF EXISTS ${contextMenuData.tableName};`);
-          showNotification('warning', '请确认后执行 DROP TABLE');
-        }
-      }
-      break;
-  }
-}
-
-async function disconnectConnection() {
-  if (!state.activeConnection) return;
-  
-  try {
-    if (isWailsAvailable()) {
-      await WailsAPI.disconnectFromDatabase(state.activeConnection);
-      updateConnectionStatusIcon(state.activeConnection.id, false);
-      
-      // Clear database tree
-      const dbTree = document.getElementById('databasesTree');
-      dbTree.innerHTML = '<div class="tree-empty-hint">选择一个连接以查看数据库</div>';
-      
-      showNotification('success', '已断开连接');
-    }
-  } catch (error) {
-    showNotification('error', `断开连接失败: ${error.message}`);
-  }
-}
-
-function editConnection(connection) {
-  // Open connection dialog and populate with existing data
-  openConnectionDialog();
-  
-  // Populate form with existing connection data
-  document.getElementById('connName').value = connection.name;
-  document.getElementById('connName').dataset.id = connection.id;
-  document.getElementById('connHost').value = connection.host;
-  document.getElementById('connPort').value = connection.port;
-  document.getElementById('connUser').value = connection.username;
-  document.getElementById('connPassword').value = connection.password;
-  document.getElementById('connDatabase').value = connection.database;
-  document.getElementById('connSavePassword').checked = connection.save_password;
-  document.getElementById('connAutoConnect').checked = connection.auto_connect;
-
-  // SSH fields
-  const sshEnabled = document.getElementById('connSSHEnabled');
-  const sshFields = document.getElementById('sshFields');
-  if (sshEnabled) sshEnabled.checked = connection.ssh_enabled || false;
-  if (sshFields) sshFields.style.display = (connection.ssh_enabled) ? 'block' : 'none';
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  setVal('connSSHHost', connection.ssh_host);
-  setVal('connSSHPort', connection.ssh_port || 22);
-  setVal('connSSHUser', connection.ssh_user);
-  setVal('connSSHPassword', connection.ssh_password);
-  setVal('connSSHKeyPath', connection.ssh_key_path);
-  
-  // Set database type
-  const dbTypeBtn = document.querySelector(`.db-type-btn[data-type="${connection.type}"]`);
-  if (dbTypeBtn) {
-    document.querySelectorAll('.db-type-btn').forEach(b => b.classList.remove('active'));
-    dbTypeBtn.classList.add('active');
-    updateConnectionForm(connection.type);
-  }
-}
-
-async function duplicateConnection(connection) {
-  const newConnection = {
-    ...connection,
-    id: '',
-    name: connection.name + ' (副本)'
-  };
-  
-  openConnectionDialog();
-  document.getElementById('connName').value = newConnection.name;
-  document.getElementById('connHost').value = newConnection.host;
-  document.getElementById('connPort').value = newConnection.port;
-  document.getElementById('connUser').value = newConnection.username;
-  document.getElementById('connPassword').value = newConnection.password;
-  document.getElementById('connDatabase').value = newConnection.database;
-  document.getElementById('connSavePassword').checked = newConnection.save_password;
-  document.getElementById('connAutoConnect').checked = newConnection.auto_connect;
-  
-  const dbTypeBtn = document.querySelector(`.db-type-btn[data-type="${newConnection.type}"]`);
-  if (dbTypeBtn) {
-    document.querySelectorAll('.db-type-btn').forEach(b => b.classList.remove('active'));
-    dbTypeBtn.classList.add('active');
-    updateConnectionForm(newConnection.type);
-  }
-}
-
-function generateSelectStatement(tableName, dbName) {
-  createNewTab();
-  
-  const connType = state.activeConnection?.type || 'mysql';
-
-  let quotedTable;
-  if (connType === 'postgresql' || connType === 'polardb' || connType === 'gaussdb') {
-    quotedTable = `"${tableName}"`;
-  } else {
-    quotedTable = `\`${tableName}\``;
-  }
-
-  setEditorValue(`SELECT * FROM ${quotedTable} LIMIT 100;`);
-  focusEditor();
-}
 
 // ==========================================================================
 // Connection Dialog
