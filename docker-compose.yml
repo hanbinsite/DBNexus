@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  db-server:
+    build: .
+    container_name: db-client-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - db-client-data:/data
+      - ./frontend/dist:/app/frontend/dist:ro
+    environment:
+      - DB_CLIENT_DATA_DIR=/data
+      - DB_CLIENT_LANG=zh
+    restart: unless-stopped
+
+  # Optional: PostgreSQL for testing
+  postgres:
+    image: postgres:16-alpine
+    container_name: db-client-postgres
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test123
+      POSTGRES_DB: testdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Optional: MySQL for testing
+  mysql:
+    image: mysql:8.0
+    container_name: db-client-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+
+  # Optional: Redis for testing
+  redis:
+    image: redis:7-alpine
+    container_name: db-client-redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+
+volumes:
+  db-client-data:
+  pg-data:
+  mysql-data:
