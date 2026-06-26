@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDatabaseTree();
     initResultsTabs();
     initKeyboardShortcuts();
+    initAccessibility();
     updateClock();
     loadSettings();
     setInterval(updateClock, 1000);
