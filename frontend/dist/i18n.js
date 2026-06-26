@@ -6,7 +6,7 @@
 const translations = {
     zh: {
         // App
-        appName: 'DB Client',
+        appName: 'DBNexus',
         appSubtitle: '数据库管理工具',
         
 // Toolbar
@@ -254,7 +254,7 @@ const translations = {
     },
     en: {
         // App
-        appName: 'DB Client',
+        appName: 'DBNexus',
         appSubtitle: 'Database Management Tool',
         
 // Toolbar

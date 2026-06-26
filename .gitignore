@@ -4,36 +4,45 @@
 *.dll
 *.so
 *.dylib
+*.bin
 
-# Test binary, built with `go test -c`
+# Build output
+/build/
+/wails.exe
+/db-server
+/db-server.exe
+
+# Test
 *.test
-
-# Output of the go coverage tool
 *.out
-
-# Go workspace file
-go.work
-
-# Wails build output
-build/bin/
+coverage.out
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Frontend
-frontend/dist/assets/
-frontend/dist/lib/
+# Wails
+/frontend/wailsjs/
+/wails.json
+
+# Go
+/vendor/
+
+# Node
 node_modules/
+/frontend/dist/assets/
 
-# Logs
-*.log
+# Config (local dev)
+*.local.json
+.env
 
-# Development
-dev/
+# Docker
+docker-data/

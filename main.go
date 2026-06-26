@@ -18,7 +18,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "DB Client",
+		Title:     AppName + " v" + AppVersion,
 		Width:     1280,
 		Height:    800,
 		MinWidth:  800,
