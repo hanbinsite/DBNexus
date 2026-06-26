@@ -133,3 +133,4 @@ func (a *App) t(key MessageKey, lang string) string {
 	}
 	return string(key)
 }
+

@@ -140,3 +140,4 @@ func (d *MySQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 func (d *MySQLDriver) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return d.sqlDB.BeginTx(ctx, opts)
 }
+

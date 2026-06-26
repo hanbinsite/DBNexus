@@ -62,12 +62,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build -t db-client:latest .
+        run: docker build -t dbnexus:latest .
 
       - name: Run Docker container test
         run: |
-          docker run -d --name db-client-test db-client:latest
+          docker run -d --name dbnexus-test dbnexus:latest
           sleep 5
-          docker logs db-client-test
-          docker stop db-client-test
-          docker rm db-client-test
+          docker logs dbnexus-test
+          docker stop dbnexus-test
+          docker rm dbnexus-test

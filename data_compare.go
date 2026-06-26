@@ -367,3 +367,4 @@ func (a *App) exportCompareToCSV(result CompareResult) ([]byte, error) {
 
 	return buf.Bytes(), nil
 }
+

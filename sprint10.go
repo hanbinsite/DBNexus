@@ -31,7 +31,7 @@ var (
 
 func getPerfHistoryPath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "query_history.json")
+	return filepath.Join(homeDir, ".dbnexus", "query_history.json")
 }
 
 func loadPerfHistory() {
@@ -493,3 +493,4 @@ func simpleHash(s string) uint64 {
 	}
 	return h
 }
+

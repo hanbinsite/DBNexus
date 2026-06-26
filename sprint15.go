@@ -527,3 +527,4 @@ func (a *App) GetPluginHooks() []string {
 		HookDataTransform, HookUIRender,
 	}
 }
+

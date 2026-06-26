@@ -6,3 +6,4 @@ const (
     AppVersion = "0.0.1"
     AppDesc    = "Cross-platform Database Client with AI Assistant"
 )
+

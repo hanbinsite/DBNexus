@@ -12,7 +12,7 @@ import (
 func (a *App) BackupDatabase(config Connection, database string, outputPath string) (string, error) {
 	if outputPath == "" {
 		homeDir, _ := os.UserHomeDir()
-		outputPath = filepath.Join(homeDir, ".db-client", "backups",
+		outputPath = filepath.Join(homeDir, ".dbnexus", "backups",
 			fmt.Sprintf("%s_%s_%s", database, time.Now().Format("20060102_150405"), "backup"))
 	}
 
@@ -238,3 +238,4 @@ func (a *App) restoreSQLite(config Connection, inputPath string) error {
 func copyFile(dst io.Writer, src io.Reader) (int64, error) {
 	return io.Copy(dst, src)
 }
+

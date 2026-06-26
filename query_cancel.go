@@ -67,3 +67,4 @@ func unregisterQuery(queryID string) {
 	defer activeQueriesMu.Unlock()
 	delete(activeQueries, queryID)
 }
+

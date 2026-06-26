@@ -292,3 +292,4 @@ func countErrors(results []SingleQueryResult) int {
 	}
 	return count
 }
+

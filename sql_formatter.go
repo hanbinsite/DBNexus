@@ -471,3 +471,4 @@ func (a *App) GetSQLStructure(sql string) map[string]interface{} {
 
 	return structure
 }
+

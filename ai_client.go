@@ -160,7 +160,7 @@ func (a *App) getAIClient() (LLMClient, error) {
 
 func (a *App) getAIConfig() (*AIConfig, error) {
 	homeDir, _ := os.UserHomeDir()
-	configFile := filepath.Join(homeDir, ".db-client", "config.json")
+	configFile := filepath.Join(homeDir, ".dbnexus", "config.json")
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
@@ -198,7 +198,7 @@ func (a *App) getAIConfig() (*AIConfig, error) {
 
 func (a *App) SetAIConfig(provider, apiKey, baseURL, model string, enableAI bool) error {
 	homeDir, _ := os.UserHomeDir()
-	configDir := filepath.Join(homeDir, ".db-client")
+	configDir := filepath.Join(homeDir, ".dbnexus")
 	os.MkdirAll(configDir, 0700)
 	configFile := filepath.Join(configDir, "config.json")
 
@@ -246,3 +246,4 @@ func (a *App) TestAIConnection() (bool, string) {
 	}
 	return true, resp
 }
+

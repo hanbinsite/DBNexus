@@ -31,7 +31,7 @@ var (
 
 func getScriptsFilePath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "scripts.json")
+	return filepath.Join(homeDir, ".dbnexus", "scripts.json")
 }
 
 func loadScripts() {
@@ -192,7 +192,7 @@ var (
 
 func getTasksFilePath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "tasks.json")
+	return filepath.Join(homeDir, ".dbnexus", "tasks.json")
 }
 
 func loadTasks() {
@@ -513,3 +513,4 @@ func toFloat64(v interface{}) (float64, bool) {
 		return 0, false
 	}
 }
+

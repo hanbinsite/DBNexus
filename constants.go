@@ -53,7 +53,7 @@ const (
 
 // 文件路径常量
 const (
-	ConfigDirName    = ".db-client"
+	ConfigDirName    = ".dbnexus"
 	ConfigFileName   = "config.json"
 	AuthFileName     = "auth.json"
 	GroupsFileName   = "groups.json"
@@ -100,7 +100,7 @@ const (
 const (
 	MinPasswordLength    = 4
 	DefaultSessionTimeoutMins = 30
-	PasswordSalt          = "db-client-salt-2024"
+	PasswordSalt          = "dbnexus-salt-2024"
 )
 
 // S12-2: ARCH-004 — 配置热重载机制
@@ -435,3 +435,4 @@ func publishConnectionEvent(connID string, opened bool) {
 		"connection_id": connID,
 	}, "connection")
 }
+

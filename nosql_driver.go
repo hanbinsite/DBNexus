@@ -246,3 +246,4 @@ func (a *App) SearchNoSQL(config NoSQLConnection, index string, query string, li
 
 // Suppress unused import
 var _ = time.Second
+

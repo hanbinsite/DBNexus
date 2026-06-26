@@ -32,7 +32,7 @@ var (
 
 func getGroupsFilePath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "groups.json")
+	return filepath.Join(homeDir, ".dbnexus", "groups.json")
 }
 
 func loadGroups() {
@@ -373,3 +373,4 @@ func extractMySQLPlan(data interface{}, parent *PlanNode, depth int) {
 		}
 	}
 }
+

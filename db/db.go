@@ -90,3 +90,4 @@ func (dm *DriverManager) Connect(config ConnectionConfig) (DatabaseDriver, error
 
 	return driver, nil
 }
+

@@ -4,7 +4,7 @@
  */
 
 function initTheme() {
-    const savedTheme = localStorage.getItem('db-client-theme') || 'dark';
+    const savedTheme = localStorage.getItem('dbnexus-theme') || 'dark';
     setTheme(savedTheme);
 }
 
@@ -16,7 +16,7 @@ function toggleTheme() {
 function setTheme(theme) {
   state.currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('db-client-theme', theme);
+  localStorage.setItem('dbnexus-theme', theme);
 
   const themeSelect = document.getElementById('appearanceTheme');
   if (themeSelect) {

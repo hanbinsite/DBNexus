@@ -193,3 +193,4 @@ func (a *App) GetTableTriggers(config Connection, database string, tableName str
 	}
 	return triggers, nil
 }
+

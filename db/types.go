@@ -22,3 +22,4 @@ type FunctionInfo struct {
 	ReturnType string `json:"return_type,omitempty"`
 	Arguments  string `json:"arguments,omitempty"`
 }
+

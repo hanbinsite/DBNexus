@@ -404,3 +404,4 @@ func (a *App) CompareTablesStreaming(config Connection, database string, table1 
 
 	return result, nil
 }
+

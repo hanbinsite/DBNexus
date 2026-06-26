@@ -384,3 +384,4 @@ func (a *App) GetActiveTransactions() []TransactionStatus {
 	}
 	return result
 }
+

@@ -170,3 +170,4 @@ func (a *App) getRedisDriver(config Connection) (*db.RedisDriver, error) {
 
 	return redisDriver, nil
 }
+

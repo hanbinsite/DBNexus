@@ -173,7 +173,7 @@ eventBus.Publish("query.executed", map[string]interface{}{
     "duration": duration,
 })
 
-// 事件自动持久化到 ~/.db-client/event_log.json
+// 事件自动持久化到 ~/.dbnexus/event_log.json
 ```
 
 ---
@@ -312,10 +312,10 @@ git push github v0.0.2
 DBNEXUS_DEBUG=1 wails dev
 
 # 查看审计日志
-cat ~/.db-client/audit.log
+cat ~/.dbnexus/audit.log
 
 # 查看事件日志
-cat ~/.db-client/event_log.json
+cat ~/.dbnexus/event_log.json
 ```
 
 ### 前端调试
@@ -324,11 +324,11 @@ cat ~/.db-client/event_log.json
 - `perfMonitor` 性能监控
 
 ### 配置文件位置
-- 连接配置: `~/.db-client/connections.json`
-- 应用配置: `~/.db-client/config.json`
-- 审计日志: `~/.db-client/audit.log`
-- 事件日志: `~/.db-client/event_log.json`
-- 插件目录: `~/.db-client/plugins/`
+- 连接配置: `~/.dbnexus/connections.json`
+- 应用配置: `~/.dbnexus/config.json`
+- 审计日志: `~/.dbnexus/audit.log`
+- 事件日志: `~/.dbnexus/event_log.json`
+- 插件目录: `~/.dbnexus/plugins/`
 
 ---
 

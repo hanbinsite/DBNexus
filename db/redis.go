@@ -292,3 +292,4 @@ func (d *RedisDriver) GetRedisDBSize(ctx context.Context) (int64, error) {
 func (d *RedisDriver) ScanRedisKeys(ctx context.Context, pattern string, cursor uint64, count int64) ([]string, uint64, error) {
 	return d.client.Scan(ctx, cursor, pattern, count).Result()
 }
+

@@ -403,3 +403,4 @@ func extractTableNames(sql string) []string {
 	}
 	return unique
 }
+

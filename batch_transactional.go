@@ -220,3 +220,4 @@ func (a *App) GetQualifiedColumnSuggestions(config Connection, database string, 
 	}
 	return suggestions, nil
 }
+

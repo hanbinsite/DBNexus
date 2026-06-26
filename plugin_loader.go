@@ -223,3 +223,4 @@ func (a *App) GetPluginManifests() []PluginManifest {
 	}
 	return manifests
 }
+

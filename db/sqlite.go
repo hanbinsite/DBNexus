@@ -154,3 +154,4 @@ func (d *SQLiteDriver) GetDatabases(ctx context.Context) ([]string, error) {
 func (d *SQLiteDriver) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return d.sqlDB.BeginTx(ctx, opts)
 }
+

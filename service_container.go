@@ -151,3 +151,4 @@ func (s *QueryServiceImpl) ExecuteQueryWithContext(ctx context.Context, config C
 	_ = ctx
 	return s.app.ExecuteQuery(config, database, query)
 }
+

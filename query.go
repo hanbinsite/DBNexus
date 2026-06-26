@@ -113,3 +113,4 @@ func (a *App) ExecuteNonQuery(config Connection, database string, query string) 
 	rowsAffected, _ := result.RowsAffected()
 	return rowsAffected, fmt.Sprintf("%d rows affected", rowsAffected), nil
 }
+

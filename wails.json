@@ -1,13 +1,13 @@
 {
   "$schema": "https://wails.io/schemas/config.json",
-  "name": "DB Client",
-  "outputfilename": "db-client",
+  "name": "DBNexus",
+  "outputfilename": "DBNexus",
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",
   "frontend:dev:serverUrl": "",
   "author": {
-    "name": "",
+    "name": "hanbinsite",
     "email": ""
   },
   "wailsjs dir": "frontend/dist",

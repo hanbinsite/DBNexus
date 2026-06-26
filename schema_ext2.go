@@ -257,3 +257,4 @@ func (a *App) GetQueryCacheSize() int {
 	defer queryCache.mu.RUnlock()
 	return len(queryCache.cache)
 }
+

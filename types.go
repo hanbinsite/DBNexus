@@ -120,3 +120,4 @@ type TestResult struct {
 type QueryOptions struct {
 	Timeout int `json:"timeout,omitempty"`
 }
+

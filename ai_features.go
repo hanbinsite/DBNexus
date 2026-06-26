@@ -238,3 +238,4 @@ Request: %s`, schemaContext, naturalLanguage)
 
 	return result, nil
 }
+

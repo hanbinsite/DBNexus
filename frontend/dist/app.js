@@ -1,5 +1,5 @@
 /**
- * DB Client - Main Application JavaScript
+ * DBNexus - Main Application JavaScript
  * Handles all UI interactions, theming, and Wails integration
  */
 
@@ -2779,12 +2779,12 @@ function saveSettings() {
         tabSize: document.getElementById('settingsTabSize')?.value || '2',
         lineNumbers: document.getElementById('settingsLineNumbers')?.checked ?? true
     };
-    localStorage.setItem('db-client-settings', JSON.stringify(settings));
+    localStorage.setItem('dbnexus-settings', JSON.stringify(settings));
     applyEditorSettings(settings);
 }
 
 function loadSettings() {
-    const saved = localStorage.getItem('db-client-settings');
+    const saved = localStorage.getItem('dbnexus-settings');
     if (!saved) return;
     try {
         const settings = JSON.parse(saved);

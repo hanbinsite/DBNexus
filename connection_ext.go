@@ -27,7 +27,7 @@ var (
 
 func getUsageFilePath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "usage.json")
+	return filepath.Join(homeDir, ".dbnexus", "usage.json")
 }
 
 func loadUsage() {
@@ -319,7 +319,7 @@ func (a *App) RunSecurityScan() *SecurityScanResult {
 
 	// Check 3: Config file permissions
 	homeDir, _ := os.UserHomeDir()
-	configPath := filepath.Join(homeDir, ".db-client", "config.json")
+	configPath := filepath.Join(homeDir, ".dbnexus", "config.json")
 	if info, err := os.Stat(configPath); err == nil {
 		mode := info.Mode()
 		if mode.Perm() > 0600 {
@@ -327,14 +327,14 @@ func (a *App) RunSecurityScan() *SecurityScanResult {
 				Severity:    "warning",
 				Category:    "文件权限",
 				Description: fmt.Sprintf("配置文件权限过于开放: %o (建议 0600)", mode.Perm()),
-				Recommendation: "运行 chmod 600 ~/.db-client/config.json",
+				Recommendation: "运行 chmod 600 ~/.dbnexus/config.json",
 			})
 			result.Score -= 10
 		}
 	}
 
 	// Check 4: Auth config file
-	authPath := filepath.Join(homeDir, ".db-client", "auth.json")
+	authPath := filepath.Join(homeDir, ".dbnexus", "auth.json")
 	if info, err := os.Stat(authPath); err == nil {
 		mode := info.Mode()
 		if mode.Perm() > 0600 {
@@ -342,7 +342,7 @@ func (a *App) RunSecurityScan() *SecurityScanResult {
 				Severity:    "warning",
 				Category:    "文件权限",
 				Description: fmt.Sprintf("认证文件权限过于开放: %o (建议 0600)", mode.Perm()),
-				Recommendation: "运行 chmod 600 ~/.db-client/auth.json",
+				Recommendation: "运行 chmod 600 ~/.dbnexus/auth.json",
 			})
 			result.Score -= 10
 		}
@@ -430,3 +430,4 @@ func (a *App) SetConnectionPermission(connectionID string, readOnly bool) error 
 	}
 	return fmt.Errorf("connection not found: %s", connectionID)
 }
+

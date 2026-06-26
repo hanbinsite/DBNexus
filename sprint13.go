@@ -503,3 +503,4 @@ const (
 	ErrCodePermission    = "PERM_001"
 	ErrCodeInternal      = "INTERNAL_001"
 )
+

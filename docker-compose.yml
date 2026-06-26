@@ -3,21 +3,21 @@ version: '3.8'
 services:
   db-server:
     build: .
-    container_name: db-client-server
+    container_name: dbnexus-server
     ports:
       - "8080:8080"
     volumes:
-      - db-client-data:/data
+      - dbnexus-data:/data
       - ./frontend/dist:/app/frontend/dist:ro
     environment:
-      - DB_CLIENT_DATA_DIR=/data
-      - DB_CLIENT_LANG=zh
+      - dbnexus_DATA_DIR=/data
+      - dbnexus_LANG=zh
     restart: unless-stopped
 
   # Optional: PostgreSQL for testing
   postgres:
     image: postgres:16-alpine
-    container_name: db-client-postgres
+    container_name: dbnexus-postgres
     environment:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test123
@@ -31,7 +31,7 @@ services:
   # Optional: MySQL for testing
   mysql:
     image: mysql:8.0
-    container_name: db-client-mysql
+    container_name: dbnexus-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: testdb
@@ -46,12 +46,12 @@ services:
   # Optional: Redis for testing
   redis:
     image: redis:7-alpine
-    container_name: db-client-redis
+    container_name: dbnexus-redis
     ports:
       - "6380:6379"
     restart: unless-stopped
 
 volumes:
-  db-client-data:
+  dbnexus-data:
   pg-data:
   mysql-data:

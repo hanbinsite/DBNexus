@@ -565,3 +565,4 @@ func (a *App) ExecuteReportTemplate(config Connection, database string, template
 
 	return result, nil
 }
+

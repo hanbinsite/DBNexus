@@ -31,12 +31,12 @@ var (
 
 func getHistoryPath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "history.json")
+	return filepath.Join(homeDir, ".dbnexus", "history.json")
 }
 
 func getBookmarksPath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".db-client", "bookmarks.json")
+	return filepath.Join(homeDir, ".dbnexus", "bookmarks.json")
 }
 
 func (a *App) GetQueryHistory() []QueryHistoryItem {
@@ -160,7 +160,7 @@ func (a *App) ImportConnections(jsonStr string) error {
 
 func (a *App) saveConnectionsToFile() error {
 	homeDir, _ := os.UserHomeDir()
-	configDir := filepath.Join(homeDir, ".db-client")
+	configDir := filepath.Join(homeDir, ".dbnexus")
 	os.MkdirAll(configDir, 0700)
 
 	data, err := json.MarshalIndent(a.connections, "", "  ")
@@ -170,3 +170,4 @@ func (a *App) saveConnectionsToFile() error {
 
 	return os.WriteFile(filepath.Join(configDir, "connections.json"), data, 0600)
 }
+

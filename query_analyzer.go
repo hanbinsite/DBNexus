@@ -760,3 +760,4 @@ func (a *App) parsePostgresExplainText(text string, result ExplainResult) Explai
 
 	return result
 }
+

@@ -369,3 +369,4 @@ func (a *App) ExecuteSQLFile(config Connection, database string, filePath string
 	result := a.ExecuteMultiQueryWithTimeout(config, database, content, QueryOptions{Timeout: 300})
 	return result, nil
 }
+

@@ -171,3 +171,4 @@ func (a *App) HealthCheck() map[string]interface{} {
 
 	return result
 }
+

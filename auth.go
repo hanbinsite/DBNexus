@@ -33,7 +33,7 @@ var (
 
 func init() {
 	homeDir, _ := os.UserHomeDir()
-	authConfigPath = filepath.Join(homeDir, ".db-client", "auth.json")
+	authConfigPath = filepath.Join(homeDir, ".dbnexus", "auth.json")
 }
 
 func (a *App) GetAuthConfig() AuthConfig {
@@ -180,7 +180,7 @@ func (a *App) RefreshSession() (string, error) {
 func hashPassword(password string) string {
 	h := sha256.New()
 	h.Write([]byte(password))
-	h.Write([]byte("db-client-salt-2024")) // Static salt
+	h.Write([]byte("dbnexus-salt-2024")) // Static salt
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -210,3 +210,4 @@ func loadAuthConfig() {
 	defer authMutex.Unlock()
 	json.Unmarshal(data, &authConfig)
 }
+

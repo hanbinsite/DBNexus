@@ -298,7 +298,7 @@ wails build
 
 ### 原生插件
 - Go plugin (.so 文件) 动态加载
-- 放置在 `~/.db-client/plugins/native/` 目录
+- 放置在 `~/.dbnexus/plugins/native/` 目录
 - 支持 Init/Cleanup 生命周期函数
 
 ---
@@ -379,7 +379,7 @@ A: SQLite 需要 CGO 支持。从源码构建时确保 `CGO_ENABLED=1`。
 A: 检查设置中 AI Provider 配置。Ollama 需要本地运行 Ollama 服务。
 
 ### Q: 连接密码安全吗?
-A: 密码使用 AES-256-GCM 加密存储在 `~/.db-client/connections.json`。
+A: 密码使用 AES-256-GCM 加密存储在 `~/.dbnexus/connections.json`。
 
 ### Q: 如何贡献代码?
 A: 阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，Fork 仓库并提交 PR。

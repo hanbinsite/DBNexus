@@ -166,3 +166,4 @@ func (p *connectionPool) getHealthy(ctx context.Context, key string) (db.Databas
 
 	return driver, true
 }
+

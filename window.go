@@ -31,3 +31,4 @@ func (a *App) WindowIsMaximized() bool {
 func (a *App) WindowSetSize(w, h int) {
 	runtime.WindowSetSize(a.ctx, w, h)
 }
+

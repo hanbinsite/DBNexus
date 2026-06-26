@@ -99,3 +99,4 @@ func (a *App) SetMaskConfig(enabled bool, columns string, maskChar string, keepS
 func (a *App) GetMaskConfig() MaskConfig {
 	return defaultMaskConfig
 }
+

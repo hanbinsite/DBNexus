@@ -196,3 +196,4 @@ func (a *App) GrantPrivileges(config Connection, username string, database strin
 
 	return nil
 }
+

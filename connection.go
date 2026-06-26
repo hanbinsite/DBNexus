@@ -279,3 +279,4 @@ func (a *App) GetSupportedFeatures(dbType string) map[string]bool {
 
 	return features
 }
+

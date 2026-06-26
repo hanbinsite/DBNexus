@@ -441,3 +441,4 @@ func (a *App) InvalidateTableStructureCache(database string, table string) {
 func (a *App) ClearTableStructureCache() {
 	tableStructCache.Clear()
 }
+

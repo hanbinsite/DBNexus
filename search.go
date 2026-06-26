@@ -132,3 +132,4 @@ func (a *App) SearchAllTables(config Connection, database string, searchText str
 
 	return results, nil
 }
+

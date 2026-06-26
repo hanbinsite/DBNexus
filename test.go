@@ -119,3 +119,4 @@ func (a *App) GetDatabaseServerInfo(config Connection) map[string]string {
 
 	return info
 }
+

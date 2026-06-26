@@ -85,3 +85,4 @@ func (a *App) saveConnections() error {
 
 	return nil
 }
+

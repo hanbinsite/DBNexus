@@ -23,7 +23,7 @@ type App struct {
 
 func NewApp() *App {
 	homeDir, _ := os.UserHomeDir()
-	configPath := filepath.Join(homeDir, ".db-client", "connections.json")
+	configPath := filepath.Join(homeDir, ".dbnexus", "connections.json")
 
 	return &App{
 		driverManager: db.NewDriverManager(),
@@ -51,7 +51,7 @@ func (a *App) shutdown(ctx context.Context) {
 
 func (a *App) GetLanguage() string {
 	homeDir, _ := os.UserHomeDir()
-	configFile := filepath.Join(homeDir, ".db-client", "config.json")
+	configFile := filepath.Join(homeDir, ".dbnexus", "config.json")
 
 	data, err := os.ReadFile(configFile)
 	if err == nil {
@@ -63,7 +63,7 @@ func (a *App) GetLanguage() string {
 		}
 	}
 
-	lang := os.Getenv("DB_CLIENT_LANG")
+	lang := os.Getenv("DBNEXUS_LANG")
 	if lang == "" {
 		lang = "zh"
 	}
@@ -78,7 +78,7 @@ func (a *App) SetLanguage(lang string) error {
 	a.runtimeLang = lang
 
 	homeDir, _ := os.UserHomeDir()
-	configDir := filepath.Join(homeDir, ".db-client")
+	configDir := filepath.Join(homeDir, ".dbnexus")
 	os.MkdirAll(configDir, 0755)
 
 	configFile := filepath.Join(configDir, "config.json")
@@ -118,3 +118,4 @@ func (a *App) GetServerInfo() map[string]interface{} {
 		"maxPoolSize":  MaxPoolSize,
 	}
 }
+

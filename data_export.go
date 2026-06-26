@@ -85,7 +85,7 @@ func (a *App) ExportData(config Connection, req ExportRequest) ExportResult {
 	}
 
 	homeDir, _ := os.UserHomeDir()
-	exportDir := filepath.Join(homeDir, ".db-client", "exports")
+	exportDir := filepath.Join(homeDir, ".dbnexus", "exports")
 	os.MkdirAll(exportDir, 0700)
 
 	fileName := fmt.Sprintf("%s.%s", req.FileName, req.Format)
@@ -276,7 +276,7 @@ func (a *App) ImportData(config Connection, req ImportRequest) ImportResult {
 	}
 
 	homeDir, _ := os.UserHomeDir()
-	importDir := filepath.Join(homeDir, ".db-client", "imports")
+	importDir := filepath.Join(homeDir, ".dbnexus", "imports")
 	os.MkdirAll(importDir, 0700)
 
 	baseName := filepath.Base(req.FileName)
@@ -400,3 +400,4 @@ func (a *App) importFromJSON(filePath string) ([]map[string]interface{}, error) 
 
 	return result, nil
 }
+

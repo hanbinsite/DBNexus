@@ -68,3 +68,4 @@ func (a *App) buildSchemaContext(config Connection, database string, maxTables i
 
 	return sb.String()
 }
+

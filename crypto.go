@@ -26,7 +26,7 @@ func initEncryptionKey() error {
 			return
 		}
 
-		keyPath := filepath.Join(homeDir, ".db-client", ".key")
+		keyPath := filepath.Join(homeDir, ".dbnexus", ".key")
 
 		data, err := os.ReadFile(keyPath)
 		if err == nil {
@@ -117,3 +117,4 @@ func decryptPassword(encrypted string) (string, error) {
 
 	return string(plaintext), nil
 }
+

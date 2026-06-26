@@ -180,3 +180,4 @@ func isPrintableText(data []byte) bool {
 	}
 	return printable*100/total > 90
 }
+

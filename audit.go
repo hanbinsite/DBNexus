@@ -69,7 +69,7 @@ var (
 func GetAuditLogger() *AuditLogger {
 	auditLoggerOnce.Do(func() {
 		homeDir, _ := os.UserHomeDir()
-		logDir := filepath.Join(homeDir, ".db-client", "logs")
+		logDir := filepath.Join(homeDir, ".dbnexus", "logs")
 		os.MkdirAll(logDir, 0700)
 
 		logFile := filepath.Join(logDir, fmt.Sprintf("audit_%s.log", time.Now().Format("2006-01-02")))
@@ -252,7 +252,7 @@ func (al *AuditLogger) ClearOldLogs(daysToKeep int) error {
 	cutoffStr := cutoffTime.Format("2006-01-02")
 
 	homeDir, _ := os.UserHomeDir()
-	logDir := filepath.Join(homeDir, ".db-client", "logs")
+	logDir := filepath.Join(homeDir, ".dbnexus", "logs")
 
 	entries, err := os.ReadDir(logDir)
 	if err != nil {
@@ -317,3 +317,4 @@ func (a *App) ClearOldAuditLogs(daysToKeep int) error {
 	auditLogger := GetAuditLogger()
 	return auditLogger.ClearOldLogs(daysToKeep)
 }
+

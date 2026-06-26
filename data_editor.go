@@ -460,3 +460,4 @@ func formatValueForSQL(val interface{}) string {
 		return fmt.Sprintf("%v", v)
 	}
 }
+

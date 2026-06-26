@@ -226,3 +226,4 @@ func (c *QueryResultCache2) Stats() map[string]interface{} {
 func makeQueryCacheKey(config Connection, database string, query string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", config.Type, config.Host, database, query)
 }
+

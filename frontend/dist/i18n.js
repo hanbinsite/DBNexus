@@ -1,5 +1,5 @@
 /**
- * DB Client - Internationalization (i18n)
+ * DBNexus - Internationalization (i18n)
  * Supports: zh (Chinese), en (English)
  */
 
@@ -506,14 +506,14 @@ const i18n = {
     
     init() {
         // Load saved language preference
-        const savedLang = localStorage.getItem('db-client-lang') || 'zh';
+        const savedLang = localStorage.getItem('dbnexus-lang') || 'zh';
         this.setLanguage(savedLang);
     },
     
     setLanguage(lang) {
         if (translations[lang]) {
             this.currentLang = lang;
-            localStorage.setItem('db-client-lang', lang);
+            localStorage.setItem('dbnexus-lang', lang);
             document.documentElement.setAttribute('lang', lang);
             this.updateUI();
         }

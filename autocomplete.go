@@ -486,3 +486,4 @@ func (a *App) GetQuickSuggestions(prefix string) []AutoCompleteItem {
 
 	return items
 }
+

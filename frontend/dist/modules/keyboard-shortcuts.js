@@ -39,7 +39,7 @@ const DefaultShortcuts = {
 let customShortcuts = {};
 
 function loadCustomShortcuts() {
-    const saved = localStorage.getItem('db-client-shortcuts');
+    const saved = localStorage.getItem('dbnexus-shortcuts');
     if (saved) {
         try {
             customShortcuts = JSON.parse(saved);
@@ -50,7 +50,7 @@ function loadCustomShortcuts() {
 }
 
 function saveCustomShortcuts() {
-    localStorage.setItem('db-client-shortcuts', JSON.stringify(customShortcuts));
+    localStorage.setItem('dbnexus-shortcuts', JSON.stringify(customShortcuts));
 }
 
 function getShortcut(action) {
